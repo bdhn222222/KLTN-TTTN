@@ -11,27 +11,31 @@ const Doctors = () => {
   const { doctors } = useContext(AppContext); //kho
 
   const applyFilter = () => {
-    if (speciality) { // chọn bs theo khoa
+    if (speciality) {
+      // chọn bs theo khoa
       setFilterDoctors(doctors.filter((doc) => doc.speciality === speciality)); // lọc theo tên khoa
     } else {
       setFilterDoctors(doctors); // hiển thị tất cả bác sĩ
     }
   };
 
-  useEffect(() => { // dữ liệu được chạy lại nếu 1 trong 2 biến thay đổi - mỗi lần click chuột lọc khoa, dữ liệu sẽ được lọc theo filter đó
+  useEffect(() => {
+    // dữ liệu được chạy lại nếu 1 trong 2 biến thay đổi - mỗi lần click chuột lọc khoa, dữ liệu sẽ được lọc theo filter đó
     applyFilter();
   }, [doctors, speciality]);
 
   return (
     <div>
       {/* Khoa */}
-      <div className="flex flex-col sm:flex-row items-start gap-5 mt-5"> 
+      <div className="flex flex-col sm:flex-row items-start gap-5 mt-5">
         <div className="flex flex-col gap-4 text-sm text-gray-600">
           {specialityData.map((item, index) => (
             <p
-              onClick={() =>
-                speciality === item.speciality ? navigate("/doctors") // lần 2 click chuột vào bộ lọc
-                  : navigate(`/doctors/${item.speciality}`) // lần 1 click chuột vào bộ lọc
+              onClick={
+                () =>
+                  speciality === item.speciality
+                    ? navigate("/doctors") // lần 2 click chuột vào bộ lọc
+                    : navigate(`/doctors/${item.speciality}`) // lần 1 click chuột vào bộ lọc
               }
               className={`w-[94vw] sm:w-auto pl-3 py-1.5 pr-16 border border-gray-300 rounded hover:bg-indigo-50 transition-all duration-300 cursor-pointer ${
                 speciality === item.speciality ? "bg-indigo-50 text-black" : ""

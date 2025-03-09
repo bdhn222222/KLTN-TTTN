@@ -9,7 +9,14 @@
     font-family: Outfit;
 }
 @theme {
-    --color-primary: #5f6fff;
+    --color-primary: #1E3A8A;
+}
+
+.btn-primary {
+    background-color: var(--color-primary);
+    color: #1E3A8A;
+    border: none;
+    padding: 10px 20px;
 }
 
 ::-webkit-scrollbar {

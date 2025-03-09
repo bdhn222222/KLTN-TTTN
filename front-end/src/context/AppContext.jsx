@@ -9,10 +9,10 @@ const AppContextProvider = (props) => {
     currencySymbol,
   };
   return (
-    <AppContext.Provider value={value}>  
-    {/* cung cấp hết tất cả các thuộc tính của value cho tất cả các component con */}
+    <AppContext.Provider value={value}>
+      {/* cung cấp hết tất cả các thuộc tính của value cho tất cả các component con */}
       {props.children}
-    </AppContext.Provider>  
+    </AppContext.Provider>
   );
 };
 
