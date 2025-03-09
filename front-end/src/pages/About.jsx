@@ -4,7 +4,7 @@ const About = () => {
   return (
     <div>
       <div>
-        <p className="text-center text-3xl pt-10 text-gray-500">
+        <p className="text-center text-2xl pt-10 text-gray-500">
           ABOUT <span className="text-gray-700 font-medium">US</span>
         </p>
       </div>
@@ -15,7 +15,7 @@ const About = () => {
           src={assets.about_image}
           alt=""
         />
-        <div className="flex flex-col justify-center gap-4 md:w-2/4 text-sm text-gray-600">
+        <div className="flex flex-col justify-center gap-6 md:w-2/4 text-sm text-gray-600">
           <p>
             Radiance Clinic is a leading U.S.-based healthcare facility
             dedicated to providing exceptional patient care through cutting-edge
@@ -29,7 +29,7 @@ const About = () => {
             a compassionate approach that combines innovation with expertise for
             outstanding healthcare outcomes.
           </p>
-          <b className="text-gray-800 text-lg">Our Vision</b>
+          <b className="text-gray-800">Our Vision</b>
           <p>
             At Radiance Clinic, our vision is to redefine healthcare by setting
             a new standard for patient-centered care and clinical excellence. We

@@ -10,26 +10,32 @@ import MyProfile from "./pages/MyProfile";
 import MyAppointments from "./pages/MyAppointments";
 import Appointment from "./pages/Appointment";
 import Footer from "./components/Footer";
+import AppContextProvider from "./context/AppContext";
+import { ToastContainer } from "react-toastify";
+import "antd/dist/reset.css";
+
 const App = () => {
   return (
-    <div className="mx-4 sm:mx-[8%]">
-      {" "}
-      {/* sm: à breakpoint của Tailwind, nghĩa là CSS này chỉ áp dụng khi màn hình có kích thước từ 640px trở lên.  */}
-      <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/doctors" element={<Doctors />} />
-        <Route path="/doctors/:speciality" element={<Doctors />} />
-        {/* const { speciality } = useParams(); filter ra các bác sĩ trong khoa */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/my-profile" element={<MyProfile />} />
-        <Route path="/my-appointment" element={<MyAppointments />} />
-        <Route path="/appointment/:docId" element={<Appointment />} />
-      </Routes>
-      <Footer />
-    </div>
+    <AppContextProvider>
+      <div className="mx-4 sm:mx-[8%]">
+        {" "}
+        {/* sm: à breakpoint của Tailwind, nghĩa là CSS này chỉ áp dụng khi màn hình có kích thước từ 640px trở lên.  */}
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/doctors" element={<Doctors />} />
+          <Route path="/doctors/:speciality" element={<Doctors />} />
+          {/* const { speciality } = useParams(); filter ra các bác sĩ trong khoa */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/my-profile" element={<MyProfile />} />
+          <Route path="/my-appointments" element={<MyAppointments />} />
+          <Route path="/appointment/:docId" element={<Appointment />} />
+        </Routes>
+        <Footer />
+      </div>
+    </AppContextProvider>
   );
 };
 

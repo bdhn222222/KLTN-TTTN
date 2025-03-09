@@ -1,46 +1,77 @@
-import React from "react";
+import React, { useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import { assets } from "../assets/assets";
-import { NavLink } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
 
 function Navbar() {
-    const navigate = useNavigate();
-    const [showMenu, setShowMenu] = useState(false);
-    const [token, setToken] = useState(true);
-    const logout = () => {
-      setToken(false);
-      localStorage.removeItem("token");
-    };
+  const navigate = useNavigate();
+  const [showMenu, setShowMenu] = useState(false);
+  const [token, setToken] = useState(true);
+
+  const logout = () => {
+    setToken(false);
+    localStorage.removeItem("token");
+  };
+
   return (
-    <div className="flex justify-between items-center text-sm border-b border-b-gray-400 py-4 mb-5">
-      <img className="cursor-pointer w-44" src={assets.logo} alt=""></img>
-      <ul className="flex gap-4 items-start font-medium">
-        {/* <ul className=' hiden md:flex gap-4 items-start font-medium'>   */}
-        <NavLink to="/">
-          <li className="py-1">Home</li>
-          <hr className="border-none outline-none h-0.5 bg-primary w-3/5 m-auto hidden" />
+    <div className="flex items-center justify-between py-4 border-b border-gray-400 px-6 md:px-10">
+      {/* Logo */}
+      <img className="w-28 cursor-pointer" src={assets.logo} alt="Logo" />
+
+      {/* Desktop Navigation */}
+      <ul className="hidden md:flex items-center gap-6 font-medium">
+        <NavLink to="/" className="relative group flex flex-col items-center">
+          <li className="py-1 hover:text-primary transition duration-200">
+            Home
+          </li>
+          <hr className="w-full h-0.5 bg-primary opacity-0 group-hover:opacity-100 transition-all duration-300" />
         </NavLink>
-        <NavLink to="/doctors">
-          <li className="py-1">All Doctors</li>
-          <hr className="border-none outline-none h-0.5 bg-primary w-3/5 m-auto hidden" />
+        <NavLink
+          to="/doctors"
+          className="relative group flex flex-col items-center"
+        >
+          <li className="py-1 hover:text-primary transition duration-200">
+            All Doctors
+          </li>
+          <hr className="w-full h-0.5 bg-primary opacity-0 group-hover:opacity-100 transition-all duration-300" />
         </NavLink>
-        <NavLink to="/about">
-          <li className="py-1">About</li>
-          <hr className="border-none outline-none h-0.5 bg-primary w-3/5 m-auto hidden" />
+        <NavLink
+          to="/about"
+          className="relative group flex flex-col items-center"
+        >
+          <li className="py-1 hover:text-primary transition duration-200">
+            About
+          </li>
+          <hr className="w-full h-0.5 bg-primary opacity-0 group-hover:opacity-100 transition-all duration-300" />
         </NavLink>
-        <NavLink to="/contact">
-          <li className="py-1">Contact</li>
-          <hr className="border-none outline-none h-0.5 bg-primary w-3/5 m-auto hidden" />
+        <NavLink
+          to="/contact"
+          className="relative group flex flex-col items-center"
+        >
+          <li className="py-1 hover:text-primary transition duration-200">
+            Contact
+          </li>
+          <hr className="w-full h-0.5 bg-primary opacity-0 group-hover:opacity-100 transition-all duration-300" />
         </NavLink>
       </ul>
-      <div className="items-center flex gap-4">
-      {token ? (
-          <div className="flex items-center gap-2 cursor-pointer group relative">
-            <img className="w-8 rounded-full" src={assets.profile_pic} alt="" />
-            <img className="w-2.5" src={assets.dropdown_icon} alt="" />
-            <div className="absolute top-0 right-0 pt-14 text-base font-medium text-gray-600 z-20 hidden group-hover:block ">
-              <div className="min-w-48 bg-stone-100 rounded flex flex-col gap-4 p-4 ">
+
+      {/* Profile & Authentication */}
+      <div className="flex items-center gap-4">
+        {token ? (
+          <div className="relative group cursor-pointer">
+            <div className="flex items-center gap-2">
+              <img
+                className="w-8 rounded-full"
+                src={assets.profile_pic}
+                alt="Profile"
+              />
+              <img
+                className="w-2.5"
+                src={assets.dropdown_icon}
+                alt="Dropdown"
+              />
+            </div>
+            <div className="absolute right-0 mt-3 w-48 bg-white shadow-lg rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
+              <div className="p-4 flex flex-col gap-3 text-gray-700">
                 <p
                   onClick={() => navigate("/my-profile")}
                   className="hover:text-black cursor-pointer"
@@ -54,7 +85,7 @@ function Navbar() {
                   My Appointments
                 </p>
                 <p onClick={logout} className="hover:text-black cursor-pointer">
-                  Log outs
+                  Logout
                 </p>
               </div>
             </div>
@@ -62,12 +93,62 @@ function Navbar() {
         ) : (
           <button
             onClick={() => navigate("/login")}
-            className="bg-primary text-white px-8 py-3 rounded-full font-light hidden md:block"
+            className="bg-primary text-white px-6 py-2 rounded-full font-light hidden md:block hover:bg-primary/80 transition duration-300"
           >
             Create Account
           </button>
         )}
+
+        {/* Mobile Menu Button */}
+        <img
+          onClick={() => setShowMenu(true)}
+          className="w-6 cursor-pointer md:hidden"
+          src={assets.menu_icon}
+          alt="Menu"
+        />
+      </div>
+
+      {/* Mobile Sidebar Menu */}
+      {showMenu && (
+        <div className="fixed inset-0 bg-black/50 z-50">
+          <div className="fixed top-0 right-0 h-full w-64 bg-white shadow-lg z-50 transform transition-transform duration-300 md:hidden">
+            {/* Close Button */}
+            <div className="flex justify-between items-center p-4 border-b border-gray-300">
+              <img className="w-24" src={assets.logo} alt="Logo" />
+              <img
+                onClick={() => setShowMenu(false)}
+                className="w-6 cursor-pointer"
+                src={assets.cross_icon}
+                alt="Close"
+              />
+            </div>
+
+            {/* Mobile Menu Items */}
+            <ul className="p-4 text-gray-700">
+              <NavLink to="/" onClick={() => setShowMenu(false)}>
+                <li className="py-3 border-b border-gray-200 hover:text-primary transition duration-200">
+                  Home
+                </li>
+              </NavLink>
+              <NavLink to="/doctors" onClick={() => setShowMenu(false)}>
+                <li className="py-3 border-b border-gray-200 hover:text-primary transition duration-200">
+                  All Doctors
+                </li>
+              </NavLink>
+              <NavLink to="/about" onClick={() => setShowMenu(false)}>
+                <li className="py-3 border-b border-gray-200 hover:text-primary transition duration-200">
+                  About
+                </li>
+              </NavLink>
+              <NavLink to="/contact" onClick={() => setShowMenu(false)}>
+                <li className="py-3 border-b border-gray-200 hover:text-primary transition duration-200">
+                  Contact
+                </li>
+              </NavLink>
+            </ul>
+          </div>
         </div>
+      )}
     </div>
   );
 }

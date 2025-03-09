@@ -1,71 +1,121 @@
 import { useContext, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { AppContext } from "../context/AppContext";
 import { specialityData } from "../assets/assets";
-import { useNavigate } from "react-router-dom";
+import { FilterOutlined, CloseOutlined } from "@ant-design/icons";
 
 const Doctors = () => {
   const navigate = useNavigate();
   const { speciality } = useParams();
-  const [filterDoctors, setFilterDoctors] = useState([]); //lọc
-  const { doctors } = useContext(AppContext); //kho
+  const { doctors } = useContext(AppContext);
 
-  const applyFilter = () => {
-    if (speciality) {
-      // chọn bs theo khoa
-      setFilterDoctors(doctors.filter((doc) => doc.speciality === speciality)); // lọc theo tên khoa
-    } else {
-      setFilterDoctors(doctors); // hiển thị tất cả bác sĩ
-    }
-  };
+  const [filterDoctors, setFilterDoctors] = useState([]);
+  const [showFilter, setShowFilter] = useState(false);
 
   useEffect(() => {
-    // dữ liệu được chạy lại nếu 1 trong 2 biến thay đổi - mỗi lần click chuột lọc khoa, dữ liệu sẽ được lọc theo filter đó
-    applyFilter();
+    if (!doctors) {
+      console.error("Doctors data is missing!");
+      return;
+    }
+    if (speciality) {
+      setFilterDoctors(doctors.filter((doc) => doc.speciality === speciality));
+    } else {
+      setFilterDoctors(doctors);
+    }
   }, [doctors, speciality]);
 
   return (
-    <div>
-      {/* Khoa */}
-      <div className="flex flex-col sm:flex-row items-start gap-5 mt-5">
-        <div className="flex flex-col gap-4 text-sm text-gray-600">
-          {specialityData.map((item, index) => (
-            <p
-              onClick={
-                () =>
+    <div className="max-w-7xl mx-auto px-4">
+      {/* Tiêu đề */}
+      <p className="text-gray-700 font-medium mb-4">
+        Browse through the doctors' specialties
+      </p>
+
+      {/* BỘ LỌC */}
+      <div className="relative flex flex-col sm:flex-row items-start gap-4">
+        {/* Nút mở bộ lọc trên Mobile */}
+        <button
+          className={`py-2 px-4 border rounded-lg text-sm flex items-center gap-2 transition-all sm:hidden ${
+            showFilter
+              ? "bg-primary text-white"
+              : "bg-gray-100 hover:bg-gray-200"
+          }`}
+          onClick={() => setShowFilter((prev) => !prev)}
+        >
+          <FilterOutlined className="text-lg" />
+          <span>Filter</span>
+        </button>
+
+        {/* Danh sách bộ lọc */}
+        <div
+          className={`absolute top-full left-0 w-full sm:w-auto bg-white shadow-lg rounded-lg transition-all duration-300 overflow-hidden ${
+            showFilter
+              ? "max-h-96 opacity-100 scale-100"
+              : "max-h-0 opacity-0 scale-95"
+          } sm:relative sm:max-h-full sm:opacity-100 sm:scale-100 sm:shadow-none`}
+        >
+          <div className="flex flex-col sm:flex-row sm:gap-3 p-4 sm:p-0">
+            {specialityData.map((item, index) => (
+              <p
+                key={index}
+                onClick={() => {
+                  navigate(
+                    speciality === item.speciality
+                      ? "/doctors"
+                      : `/doctors/${item.speciality}`
+                  );
+                  setShowFilter(false);
+                }}
+                className={`w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg hover:bg-indigo-50 transition-all duration-300 cursor-pointer ${
                   speciality === item.speciality
-                    ? navigate("/doctors") // lần 2 click chuột vào bộ lọc
-                    : navigate(`/doctors/${item.speciality}`) // lần 1 click chuột vào bộ lọc
-              }
-              className={`w-[94vw] sm:w-auto pl-3 py-1.5 pr-16 border border-gray-300 rounded hover:bg-indigo-50 transition-all duration-300 cursor-pointer ${
-                speciality === item.speciality ? "bg-indigo-50 text-black" : ""
-              }`}
-              key={index}
-            >
-              {item.speciality}
-            </p>
-          ))}
+                    ? "bg-indigo-100 text-indigo-800 font-medium"
+                    : "bg-white"
+                }`}
+              >
+                {item.speciality}
+              </p>
+            ))}
+          </div>
+
+          {/* Nút Clear Filter (Hiển thị khi có filter) */}
+          {speciality && (
+            <div className="p-3 border-t text-center">
+              <button
+                onClick={() => navigate("/doctors")}
+                className="text-red-500 hover:text-red-600 flex items-center gap-2 mx-auto"
+              >
+                <CloseOutlined />
+                Clear Filter
+              </button>
+            </div>
+          )}
         </div>
-        {/* Bác sĩ */}
-        <div className="w-full grid grid-cols-auto gap-4 gap-y-6">
-          {filterDoctors.map((item) => (
+      </div>
+
+      {/* DANH SÁCH BÁC SĨ */}
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+        {filterDoctors.length > 0 ? (
+          filterDoctors.map((item) => (
             <div
+              key={item._id}
               onClick={() => navigate(`/appointment/${item._id}`)}
-              className="border border-blue-200 rounded-xl overflow-hidden cursor-pointer hover:translate-y-[-10px] transition-all duration-300 "
-              key={item._id} // lấy theo id doctor
+              className="border border-blue-200 rounded-xl overflow-hidden cursor-pointer hover:translate-y-[-5px] transition-all duration-300 hover:shadow-md"
             >
-              <img className="bg-blue-50" src={item.image} alt="" />
+              <img className="bg-blue-50 w-full" src={item.image} alt="" />
+
               <div className="p-4">
-                <div className="flex items-center gap-2 text-sm text-center text-green-500 ">
+                <div className="flex items-center gap-2 text-sm text-green-500">
                   <p className="w-2 h-2 rounded-full bg-green-500"></p>
                   <p>Available</p>
                 </div>
                 <p className="text-gray-900 text-lg font-medium">{item.name}</p>
-                <p className="text-gray-600 text-sm ">{item.speciality}</p>
+                <p className="text-gray-600 text-sm">{item.speciality}</p>
               </div>
             </div>
-          ))}
-        </div>
+          ))
+        ) : (
+          <p className="text-gray-500">No doctors available.</p>
+        )}
       </div>
     </div>
   );
