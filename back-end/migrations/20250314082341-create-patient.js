@@ -9,7 +9,7 @@ export default {
         primaryKey: true,
         type: Sequelize.INTEGER
       },
-      user_id: {
+      id: {
         type: Sequelize.INTEGER,
         references: {
           model: 'Users',

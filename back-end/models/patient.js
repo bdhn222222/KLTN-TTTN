@@ -10,10 +10,10 @@ Patient.init(
       autoIncrement: true,
       primaryKey: true,
     },
-    user_id: {
+    id: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      references: { model: "users", key: "user_id" },
+      references: { model: "users", key: "id" },
     },
     date_of_birth: {
       type: DataTypes.DATE,

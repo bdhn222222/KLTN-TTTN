@@ -14,7 +14,7 @@ module.exports = (sequelize, DataTypes) => {
     }
   }
   Admin.init({
-    user_id: DataTypes.INTEGER
+    id: DataTypes.INTEGER
   }, {
     sequelize,
     modelName: 'Admin',
