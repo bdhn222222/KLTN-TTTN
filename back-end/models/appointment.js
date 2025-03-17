@@ -1,62 +1,77 @@
-"use strict";
-const { Model } = require("sequelize");
+import { Model, DataTypes } from "sequelize";
 
-module.exports = (sequelize, DataTypes) => {
+export default (sequelize) => {
   class Appointment extends Model {
     static associate(models) {
-      Appointment.belongsTo(models.Patient, { foreignKey: "patient_id" });
-      Appointment.belongsTo(models.Doctor, { foreignKey: "doctor_id" });
-      Appointment.belongsTo(models.Appointment, { foreignKey: "rescheduled_to", as: "rescheduled_appointment" });
+      Appointment.belongsTo(models.Doctor, { foreignKey: "doctor_id", as: "doctor" });
+      Appointment.belongsTo(models.Patient, { foreignKey: "patient_id", as: "patient" });
+      Appointment.hasOne(models.Feedback, { foreignKey: "appointment_id", as: "feedback" });
+      Appointment.hasOne(models.Prescription, { foreignKey: "appointment_id", as: "prescription" });
+      Appointment.hasOne(models.MedicalRecord, { foreignKey: "appointment_id", as: "medicalRecord" });
+      Appointment.hasMany(models.Payment, { foreignKey: "appointment_id", as: "payments" });
     }
   }
+
   Appointment.init(
     {
+      appointment_id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+        allowNull: false,
+      },
       patient_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        references: { model: "patients", key: "patient_id" },
+        references: {
+          model: "Patients",
+          key: "patient_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
       },
       doctor_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        references: { model: "doctors", key: "doctor_id" },
+        references: {
+          model: "Doctors",
+          key: "doctor_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
       },
       appointment_datetime: {
         type: DataTypes.DATE,
         allowNull: false,
       },
       status: {
-        type: DataTypes.ENUM(
-          "waiting_for_confirmation",
-          "accepted",
-          "cancelled",
-          "completed",
-          "rescheduled",
-          "no_show"
-        ),
+        type: DataTypes.ENUM("waiting_for_confirmation", "accepted", "cancelled", "completed", "rescheduled"),
         allowNull: false,
         defaultValue: "waiting_for_confirmation",
       },
       rescheduled_to: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        references: { model: "appointments", key: "appointment_id" },
+        references: {
+          model: "Appointments",
+          key: "appointment_id",
+        },
+        onUpdate: "SET NULL",
+        onDelete: "SET NULL",
       },
       reschedule_count: {
         type: DataTypes.INTEGER,
+        allowNull: false,
         defaultValue: 0,
-      },
-      doctor_confirmed: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false,
       },
     },
     {
       sequelize,
       modelName: "Appointment",
-      tableName: "appointments",
+      tableName: "Appointments",
       timestamps: true,
     }
   );
+
   return Appointment;
 };

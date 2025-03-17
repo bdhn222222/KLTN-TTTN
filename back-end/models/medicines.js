@@ -1,11 +1,21 @@
-"use strict";
-const { Model } = require("sequelize");
+import { Model, DataTypes } from "sequelize";
 
-module.exports = (sequelize, DataTypes) => {
-  class Medicine extends Model {}
+export default (sequelize) => {
+  class Medicine extends Model {
+    static associate(models) {
+      Medicine.hasMany(models.PrescriptionMedicine, { foreignKey: "medicine_id", as: "prescriptionMedicines" });
+  
+    }
+  }
 
   Medicine.init(
     {
+      medicine_id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+        allowNull: false,
+      },
       name: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -17,6 +27,7 @@ module.exports = (sequelize, DataTypes) => {
       quantity: {
         type: DataTypes.INTEGER,
         allowNull: false,
+        defaultValue: 0,
       },
       price: {
         type: DataTypes.DECIMAL(10, 2),
@@ -32,15 +43,16 @@ module.exports = (sequelize, DataTypes) => {
       },
       supplier: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
     },
     {
       sequelize,
       modelName: "Medicine",
-      tableName: "medicines",
+      tableName: "Medicines",
       timestamps: true,
     }
   );
+
   return Medicine;
 };

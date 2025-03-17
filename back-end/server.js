@@ -14,17 +14,11 @@ app.get("/", (req, res) => {
   res.json({ message: "Welcome to Booking Doctor API" });
 });
 
-app.use("/auth", userRoutes);
+app.use("/auth", userRoutes);  
 
-// Bắt lỗi cho các route không tồn tại
-app.use((req, res, next) => {
+
+app.use((req, res) => {
   res.status(404).json({ message: "Route không tồn tại" });
-});
-
-// Bắt lỗi toàn bộ server
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: "Có lỗi xảy ra trên server", error: err.message });
 });
 
 const PORT = process.env.PORT || 5001;

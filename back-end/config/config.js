@@ -1,5 +1,4 @@
 import dotenv from "dotenv";
-
 dotenv.config();
 
 export default {
@@ -11,7 +10,7 @@ export default {
     dialect: "mysql",
   },
   jwt: {
-    secret: process.env.JWT_SECRET || "your_jwt_secret_key",
-    expiresIn: "2h", // JWT hết hạn sau 2 giờ
+    secret: process.env.JWT_SECRET || "your_jwt_secret_key",  // ✅ Đảm bảo có dòng này
+    expiresIn: "2h",
   },
 };

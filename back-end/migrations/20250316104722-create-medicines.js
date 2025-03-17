@@ -2,60 +2,56 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('Medicines', {
-      id: {
-        allowNull: false,
+    await queryInterface.createTable("Medicines", {
+      medicine_id: {
+        type: Sequelize.INTEGER,
         autoIncrement: true,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        allowNull: false,
       },
       name: {
         type: Sequelize.STRING,
-        allowNull: false
+        allowNull: false,
       },
       description: {
         type: Sequelize.TEXT,
-        allowNull: true
+        allowNull: true,
       },
       quantity: {
         type: Sequelize.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        validate: {
-          min: 0
-        }
       },
       price: {
         type: Sequelize.DECIMAL(10, 2),
         allowNull: false,
-        defaultValue: 0.00,
-        validate: {
-          min: 0
-        }
       },
       unit: {
         type: Sequelize.STRING,
-        allowNull: false
+        allowNull: false,
       },
       expiry_date: {
         type: Sequelize.DATE,
-        allowNull: false
+        allowNull: false,
       },
       supplier: {
         type: Sequelize.STRING,
-        allowNull: false
+        allowNull: true,
       },
       createdAt: {
         allowNull: false,
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
       },
       updatedAt: {
         allowNull: false,
-        type: Sequelize.DATE
-      }
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+      },
     });
   },
-  async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('Medicines');
-  }
+
+  async down(queryInterface) {
+    await queryInterface.dropTable("Medicines");
+  },
 };
