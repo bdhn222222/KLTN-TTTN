@@ -1,30 +1,29 @@
 import db from "../models/index.js";
+import user from "../models/user.js";
 
 const { User } = db;
 
-export const findUserByEmail = async (email) => {
-  return await User.findOne({ where: { email } });
-};
-
-export const createUser = async (userData) => {
-  return await User.create(userData);
-};
-
 export const getAllUsers = async () => {
-  
-  const allUsers =  await User.findAll({ attributes: ["id", "name", "email", "role", "status"] });
-  const count = await User.count();
-  if(!count) {
-    return { message: "Không có người dùng nào", data: [] }
+  try {
+    const user = await User.findAll({ attributes: { exclude: ["password"] } });
+    if (user.length === 0) {
+      throw new Error("No user found");
+    }
+    return { message: "Get all users successfully", user };
+  } catch (error) {
+    throw new Error(error.message);
   }
-  return allUsers
 };
 
-export const updateUser = async (id, updatedData) => {
-  if (!updatedData || Object.keys(updatedData).length === 0) { 
+export const getUserProfile = async (user_id) => {
+  try {
+    const user = await User.findByPk(user_id, { attributes: { exclude: ["password"] } });
+    if (user.length === 0) {
+      throw new Error("No user found");
+    }
+    return { message: "Get all users successfully", user };
+  } catch (error) {
+    throw new Error(error.message);
   }
-  return await User.update(updatedData, { where: { id: id } }); 
 };
-export const findUserById = async(id)=>{
-  return await User.findOne({ where: { id } });
-}
+
