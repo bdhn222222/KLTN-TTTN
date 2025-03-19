@@ -6,7 +6,7 @@ export default (sequelize) => {
       // Liên kết với bảng Appointments
       Prescription.belongsTo(models.Appointment, { foreignKey: "appointment_id", as: "appointment" });
       Prescription.hasMany(models.PrescriptionMedicine, { foreignKey: "prescription_id", as: "prescriptionMedicines" });
-      Prescription.hasMany(models.PrescriptionPayment, { foreignKey: "prescription_id", as: "prescriptionPayments" });
+      Prescription.hasOne(models.PrescriptionPayment, { foreignKey: "prescription_id", as: "prescriptionPayments" });
   }
   }
 
