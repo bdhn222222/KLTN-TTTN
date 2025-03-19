@@ -5,8 +5,8 @@ const errorHandler = (err, req, res, next) => {
     return res.status(err.statusCode).json({ error: err.message });
   }
 
-  console.error("Unhandled Error:", err);
-  return res.status(500).json({ error: "Internal Server Error" });
+  console.error("Lỗi không xác định:", err);
+  return res.status(500).json({ error: "Lỗi hệ thống" });
 };
 
 export default errorHandler;

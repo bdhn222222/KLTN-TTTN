@@ -1,14 +1,17 @@
 import { getAllUsers, getUserProfile } from "../services/userService.js";
-import validateId from "../middleware/validateId.js";
+import NotFoundError from "../errors/not_found.js";
+import InternalServerError from "../errors/internalServerError.js";
 
 export const getAllUsersController = async (req, res, next) => {
   try {
     const users = await getAllUsers();
     res.status(200).json(users);
   } catch (error) {
-    next(error);
+    next(new InternalServerError(error.message)); 
   }
 };
+
+
 
 export const getUserProfileController = async (req, res, next) => {
   try {

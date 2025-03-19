@@ -16,14 +16,12 @@ app.get("/", (req, res) => {
 });
 
 app.use("/auth", userRoutes);  
+app.use("/doctor", doctorRoutes);
+app.use("/admin", adminRoutes);
+app.use("/pharmacist", pharmacistRoutes);
+app.use("/patient", patientRoutes);
 app.use(requestLogger);
 app.use(errorHandler);
-app.use((req, res) => {
-  res.status(404).json({ message: "Route không tồn tại" });
-});
-
-
-
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {

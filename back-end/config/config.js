@@ -10,7 +10,7 @@ export default {
     dialect: "mysql",
   },
   jwt: {
-    secret: process.env.JWT_SECRET || "your_jwt_secret_key",  // ✅ Đảm bảo có dòng này
-    expiresIn: "2h",
+    secret: process.env.JWT_SECRET || "your_jwt_secret_key", 
+    expiresIn: process.env.JWT_EXPIRES_IN || "2h",
   },
 };

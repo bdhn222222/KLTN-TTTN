@@ -9,23 +9,25 @@ import NotFoundError from "../errors/not_found.js";
 const { User, Doctor } = db;
 export const registerDoctor = async ({ username, email, password, specialization_id, degree, experience_years, description, fees }) => {
     const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) throw new BadRequestError("Email đã được đăng ký từ trước");
+    if (existingUser) throw new BadRequestError("Email đã được đăng ký");
   
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await User.create({
-      username,
-      email,
-      password: hashedPassword,
-      role: "doctor",
-    });
-    const newDoctor = await Doctor.create({
-      user_id: newUser.user_id,
-      specialization_id,
-      degree,
-      experience_years,
-      description,
-      fees,
-    });
+        username,
+        email,
+        password: hashedPassword,
+        role: "doctor",
+      });
+    
+      const newDoctor = await Doctor.create({
+        user_id: newUser.user_id,
+        specialization_id,
+        degree,
+        experience_years,
+        description,
+        fees,
+      });
+    
     return { message: "Đăng ký account Bác sĩ thành công", doctor: newDoctor };
   };
 export const loginDoctor = async ({ email, password }) => {

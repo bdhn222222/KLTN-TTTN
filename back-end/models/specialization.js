@@ -26,14 +26,17 @@ export default (sequelize) => {
         allowNull: false,
         defaultValue: "https://cdn1.youmed.vn/tin-tuc/wp-content/uploads/2023/05/yhocduphong.png",
       },
+      fees: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
     },
     {
       sequelize,
       modelName: "Specialization",
       tableName: "Specializations",
       timestamps: true,
-    }
+    },
   );
-
   return Specialization;
 };

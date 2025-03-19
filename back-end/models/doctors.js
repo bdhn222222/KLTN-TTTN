@@ -50,10 +50,10 @@ export default (sequelize) => {
         type: DataTypes.TEXT,
         allowNull: false,
       },
-      fees: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-      },
+      // fees: {
+      //   type: DataTypes.INTEGER,
+      //   allowNull: true,
+      // },
     },
     {
       sequelize,

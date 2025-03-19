@@ -1,8 +1,12 @@
-import { param } from "express-validator";
-import validate from "./validate.js";
+import BadRequestError from "../errors/bad_request.js";
 
 const validateId = (idField = "id") => {
-  return validate([param(idField).isInt().withMessage("ID không đúng")]);
+  return (req, res, next) => {
+    if (!Number.isInteger(Number(req.params[idField]))) {
+      throw new BadRequestError("ID không hợp lệ");
+    }
+    next();
+  };
 };
 
 export default validateId;

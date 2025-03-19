@@ -1,6 +1,6 @@
-import bcrypt from 'bcryptjs';
-import BadRequestError from "../errors/bad_request.js";
 import db from "../models/index.js";
+import bcrypt from "bcryptjs";
+import BadRequestError from "../errors/bad_request.js";
 import Admin from "../models/admins.js";
 const { User, Admin } = db;
 export const registerAdmin = async ({ username, email, password }) => {
@@ -16,7 +16,9 @@ export const registerAdmin = async ({ username, email, password }) => {
       role: "admin",
     });
   
-    const newAdmin = await Admin.create({ user_id: newUser.user_id });
+    const newAdmin = await Admin.create({
+        user_id: newUser.user_id,
+      });
   
     return { message: "Admin registered successfully", admin: newAdmin };
   };

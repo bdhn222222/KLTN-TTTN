@@ -5,7 +5,7 @@ import UnauthorizedError from "../errors/unauthorized.js";
 export const authenticateUser = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    throw new UnauthorizedError("No token provided");
+    throw new UnauthorizedError("Không tìm thấy token");
   }
 
   const token = authHeader.split(" ")[1];
@@ -15,6 +15,6 @@ export const authenticateUser = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
-    throw new UnauthorizedError("Invalid token");
+    throw new UnauthorizedError("Token không hợp lệ");
   }
 };
