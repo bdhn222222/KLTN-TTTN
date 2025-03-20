@@ -7,10 +7,10 @@ router.post(
     '/register',
     validate([
         body("username").notEmpty().withMessage("Tên đăng nhập không được để trống"),
-    body("email").isEmail().withMessage("Email không hợp lệ"),
-    body("password").isLength({ min: 8 }).withMessage("Mật khẩu phải có ít nhất 8 ký tự"),
-    body("date_of_birth").notEmpty().withMessage("Ngày sinh không được để trống"),
-    body("gender").isIn(["male", "female", "other"]).withMessage("Giới tính không hợp lệ"),
+        body("email").isEmail().withMessage("Email không hợp lệ"),
+        body("password").isLength({ min: 8 }).withMessage("Mật khẩu phải có ít nhất 8 ký tự"),
+        body("date_of_birth").notEmpty().withMessage("Ngày sinh không được để trống"),
+        body("gender").isIn(["male", "female", "other"]).withMessage("Giới tính không hợp lệ"),
     ]),
     registerPatientController
 )

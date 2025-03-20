@@ -14,5 +14,13 @@ router.post(
   ]),
   registerAdminController
 );
-
+router.post(
+  "/login",
+  validate([
+    body("email").isEmail().withMessage("Email không hợp lệ"),
+    body("password").isLength({ min: 8 }).withMessage("Mật khẩu phải có ít nhất 8 ký tự"),
+    body("password").isEmpty().withMessage("Mật khẩu không được để trống"),
+  ]),
+  loginController
+);
 export default router;

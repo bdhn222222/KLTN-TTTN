@@ -35,4 +35,25 @@ export const loginDoctor = async ({ email, password }) => {
     if (!user) {
         throw new NotFoundError("Không tìm thấy tài khoản Bác sĩ");
       }
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if(!isPasswordValid) throw new UnauthorizedError("Mật khẩu không chính xác");
+    const token = jwt.sign(
+      { user_id: user.user_id, role: user.role },
+       process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+    return {
+      message: "Đăng nhập thành công",
+      token,
+      doctor: {
+        user_id: user.user_id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        specialization_id: user.doctor.specialization_id,
+        degree: user.doctor.degree,
+        experience_years: user.doctor.experience_years,
+        fees: user.doctor.fees,
+      },
+    };
 }

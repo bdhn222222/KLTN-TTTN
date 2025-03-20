@@ -14,3 +14,16 @@ export const registerAdminController = async (req, res, next) => {
       }
     }
   };
+  export const loginController = async (req, res, next) => {
+    try {
+      const admin = await loginAdmin(req.body);
+      res.status(200).json(admin);
+    }
+    catch (error) {
+      if (error instanceof BadRequestError) {
+        next(error);
+      } else {
+        next(new InternalServerError(error.message));
+      }
+    }
+  }

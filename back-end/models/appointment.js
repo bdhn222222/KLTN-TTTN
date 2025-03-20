@@ -49,21 +49,25 @@ export default (sequelize) => {
         allowNull: false,
         defaultValue: "waiting_for_confirmation",
       },
-      rescheduled_to: {
+      fees: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        references: {
-          model: "Appointments",
-          key: "appointment_id",
-        },
-        onUpdate: "SET NULL",
-        onDelete: "SET NULL",
       },
-      reschedule_count: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 0,
-      },
+      // rescheduled_to: {
+      //   type: DataTypes.INTEGER,
+      //   allowNull: true,
+      //   references: {
+      //     model: "Appointments",
+      //     key: "appointment_id",
+      //   },
+      //   onUpdate: "SET NULL",
+      //   onDelete: "SET NULL",
+      // },
+      // reschedule_count: {
+      //   type: DataTypes.INTEGER,
+      //   allowNull: false,
+      //   defaultValue: 0,
+      // },
     },
     {
       sequelize,

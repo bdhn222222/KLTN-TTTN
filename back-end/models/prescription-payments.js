@@ -27,7 +27,7 @@ export default (sequelize) => {
         onDelete: "CASCADE",
       },
       amount: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(10,3),
         allowNull: false,
       },
       payment_method: {
