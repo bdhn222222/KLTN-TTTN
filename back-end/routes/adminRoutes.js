@@ -1,5 +1,5 @@
 import express from "express";
-import { registerAdminController } from "../controllers/adminController.js";
+import { registerAdminController, loginAdminController } from "../controllers/adminController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
 
@@ -18,7 +18,6 @@ router.post(
   "/login",
   validate([
     body("email").isEmail().withMessage("Email không hợp lệ"),
-    body("password").isLength({ min: 8 }).withMessage("Mật khẩu phải có ít nhất 8 ký tự"),
     body("password").isEmpty().withMessage("Mật khẩu không được để trống"),
   ]),
   loginController

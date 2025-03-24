@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerPatientController } from "back-end/controllers/patientController.js";
+import { registerPatientController, loginPatientController } from "back-end/controllers/patientController.js";
 import validate from '../middleware/validate.js';
 import { body } from 'express-validator';
 const router = express.Router();
@@ -13,5 +13,15 @@ router.post(
         body("gender").isIn(["male", "female", "other"]).withMessage("Giới tính không hợp lệ"),
     ]),
     registerPatientController
-)
+);
+
+router.post(
+  "/login",
+  validate([
+    body("email").isEmail().withMessage("Email không hợp lệ"),
+    body("password").notEmpty().withMessage("Mật khẩu không được để trống"),
+  ]),
+  loginPatientController
+);
+
 export default router;
