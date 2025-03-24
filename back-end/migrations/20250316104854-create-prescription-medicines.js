@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("Prescription_medicines", {
+    await queryInterface.createTable('prescription_medicines', {
       id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,31 +13,30 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "Prescriptions", // Liên kết đến bảng prescriptions
-          key: "prescription_id",
+          model: 'prescriptions',
+          key: 'prescription_id',
         },
-        onUpdate: "CASCADE",
-        onDelete: "CASCADE",
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE',
       },
       medicine_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "Medicines", // Liên kết đến bảng medicines
-          key: "medicine_id",
+          model: 'medicines',
+          key: 'medicine_id',
         },
-        onUpdate: "CASCADE",
-        onDelete: "CASCADE",
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE',
       },
       quantity: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        defaultValue: 1, // Đơn thuốc phải có ít nhất 1 đơn vị thuốc
       },
     });
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("Prescription_medicines");
+    await queryInterface.dropTable('prescription_medicines');
   },
 };

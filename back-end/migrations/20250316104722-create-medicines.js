@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("Medicines", {
+    await queryInterface.createTable('medicines', {
       medicine_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -20,10 +20,9 @@ export default {
       quantity: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        defaultValue: 0,
       },
       price: {
-        type: Sequelize.DECIMAL(10,3),
+        type: Sequelize.DECIMAL(10, 3),
         allowNull: false,
       },
       unit: {
@@ -36,22 +35,22 @@ export default {
       },
       supplier: {
         type: Sequelize.STRING,
-        allowNull: true,
+        allowNull: false,
       },
-      createdAt: {
+      created_at: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
-      updatedAt: {
+      updated_at: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
       },
     });
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("Medicines");
+    await queryInterface.dropTable('medicines');
   },
 };

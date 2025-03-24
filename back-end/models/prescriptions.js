@@ -7,6 +7,7 @@ export default (sequelize) => {
       Prescription.belongsTo(models.Appointment, { foreignKey: "appointment_id", as: "appointment" });
       Prescription.hasMany(models.PrescriptionMedicine, { foreignKey: "prescription_id", as: "prescriptionMedicines" });
       Prescription.hasOne(models.PrescriptionPayment, { foreignKey: "prescription_id", as: "prescriptionPayments" });
+      Prescription.belongsTo(models.Pharmacist, { foreignKey: "pharmacist_id", as: "pharmacist" });
   }
   }
 
@@ -17,6 +18,16 @@ export default (sequelize) => {
         autoIncrement: true,
         primaryKey: true,
         allowNull: false,
+      },
+      pharmacist_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+          model: "Pharmacists",
+          key: "pharmacist_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
       },
       appointment_id: {
         type: DataTypes.INTEGER,

@@ -2,36 +2,46 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("Prescriptions", {
+    await queryInterface.createTable('prescriptions', {
       prescription_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
         primaryKey: true,
         allowNull: false,
       },
+      pharmacist_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'pharmacists',
+          key: 'pharmacist_id',
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'CASCADE',
+      },
       appointment_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "Appointments", // Liên kết đến bảng appointments
-          key: "appointment_id",
+          model: 'appointments',
+          key: 'appointment_id',
         },
-        onUpdate: "CASCADE",
-        onDelete: "CASCADE",
+        onUpdate: 'CASCADE',
+        onDelete: 'CASCADE',
       },
       medicine_details: {
         type: Sequelize.TEXT,
-        allowNull: false, // Đảm bảo đơn thuốc luôn có thông tin
+        allowNull: true,
       },
-      createdAt: {
+      created_at: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
     });
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("Prescriptions");
+    await queryInterface.dropTable('prescriptions');
   },
 };

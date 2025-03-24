@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("Feedback", {
+    await queryInterface.createTable('feedback', {
       feedback_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,11 +13,11 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "Appointments", // Liên kết đến bảng appointments
-          key: "appointment_id",
+          model: 'appointments',
+          key: 'appointment_id',
         },
-        onUpdate: "CASCADE",
-        onDelete: "CASCADE",
+        onUpdate: 'CASCADE',
+        onDelete: 'CASCADE',
       },
       rating: {
         type: Sequelize.INTEGER,
@@ -27,15 +27,15 @@ export default {
         type: Sequelize.TEXT,
         allowNull: true,
       },
-      createdAt: {
+      created_at: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
     });
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("Feedback");
+    await queryInterface.dropTable('feedback');
   },
 };

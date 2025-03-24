@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("Payments", {
+    await queryInterface.createTable('payments', {
       payment_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,34 +13,32 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "Appointments", // Liên kết đến bảng appointments
-          key: "appointment_id",
+          model: 'appointments',
+          key: 'appointment_id',
         },
-        onUpdate: "CASCADE",
-        onDelete: "CASCADE",
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE',
       },
       amount: {
-        type: Sequelize.DECIMAL(10,3),
+        type: Sequelize.DECIMAL(10, 3),
         allowNull: false,
       },
       payment_method: {
-        type: Sequelize.ENUM("cash", "credit_card", "VNPay", "MoMo", "ZaloPay"),
+        type: Sequelize.ENUM('cash', 'credit_card', 'VNPay', 'MoMo', 'ZaloPay'),
         allowNull: false,
       },
       status: {
-        type: Sequelize.ENUM("paid", "pending", "cancel"),
+        type: Sequelize.ENUM('paid', 'pending', 'cancel'),
         allowNull: false,
-        defaultValue: "pending",
       },
-      createdAt: {
-        allowNull: false,
+      created_at: {
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
     });
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("Payments");
+    await queryInterface.dropTable('payments');
   },
 };

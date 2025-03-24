@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("Appointments", {
+    await queryInterface.createTable('appointments', {
       appointment_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,60 +13,55 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "Patients", // Liên kết đến bảng patients
-          key: "patient_id",
+          model: 'patients',
+          key: 'patient_id',
         },
-        onUpdate: "CASCADE",
-        onDelete: "CASCADE",
+        onUpdate: 'CASCADE',
+        onDelete: 'CASCADE',
       },
       doctor_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "Doctors", // Liên kết đến bảng doctors
-          key: "doctor_id",
+          model: 'doctors',
+          key: 'doctor_id',
         },
-        onUpdate: "CASCADE",
-        onDelete: "CASCADE",
+        onUpdate: 'CASCADE',
+        onDelete: 'CASCADE',
       },
       appointment_datetime: {
         type: Sequelize.DATE,
         allowNull: false,
       },
-      status: {
-        type: Sequelize.ENUM("waiting_for_confirmation", "accepted", "cancelled", "completed", "rescheduled"),
-        allowNull: false,
-        defaultValue: "waiting_for_confirmation",
-      },
-      rescheduled_to: {
-        type: Sequelize.INTEGER,
+      fees: {
+        type: Sequelize.FLOAT,
         allowNull: true,
-        references: {
-          model: "Appointments",
-          key: "appointment_id",
-        },
-        onUpdate: "SET NULL",
-        onDelete: "SET NULL",
       },
-      reschedule_count: {
-        type: Sequelize.INTEGER,
+      status: {
+        type: Sequelize.ENUM(
+          'waiting_for_confirmation',
+          'accepted',
+          'cancelled',
+          'completed',
+          'patient not coming'
+        ),
         allowNull: false,
-        defaultValue: 0,
+        defaultValue: 'waiting_for_confirmation',
       },
-      createdAt: {
-        allowNull: false,
-        type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
-      },
-      updatedAt: {
+      created_at: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+      },
+      updated_at: {
+        allowNull: false,
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
       },
     });
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("Appointments");
+    await queryInterface.dropTable('appointments');
   },
 };

@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("Patients", {
+    await queryInterface.createTable('patients', {
       patient_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,18 +13,18 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "Users", // Liên kết đến bảng Users
-          key: "user_id",
+          model: 'users',
+          key: 'user_id',
         },
-        onUpdate: "CASCADE",
-        onDelete: "CASCADE",
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE',
       },
       date_of_birth: {
-        type: Sequelize.DATE,
+        type: Sequelize.DATEONLY,
         allowNull: true,
       },
       gender: {
-        type: Sequelize.ENUM("male", "female", "other"),
+        type: Sequelize.ENUM('male', 'female', 'other'),
         allowNull: true,
       },
       address: {
@@ -34,17 +34,14 @@ export default {
       phone_number: {
         type: Sequelize.STRING,
         allowNull: true,
-        unique: true,
       },
       insurance_number: {
         type: Sequelize.STRING,
         allowNull: true,
-        unique: true,
       },
       id_number: {
         type: Sequelize.STRING,
         allowNull: true,
-        unique: true,
       },
       is_verified: {
         type: Sequelize.BOOLEAN,
@@ -58,20 +55,20 @@ export default {
         type: Sequelize.DATE,
         allowNull: true,
       },
-      createdAt: {
+      created_at: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
-      updatedAt: {
+      updated_at: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
       },
     });
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("Patients");
+    await queryInterface.dropTable('patients');
   },
 };
