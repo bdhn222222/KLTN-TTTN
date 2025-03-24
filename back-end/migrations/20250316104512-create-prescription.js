@@ -11,7 +11,7 @@ export default {
       },
       pharmacist_id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        allowNull: true,
         references: {
           model: 'pharmacists',
           key: 'pharmacist_id',

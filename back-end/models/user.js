@@ -7,7 +7,7 @@ export default (sequelize) => {
       return await bcrypt.compare(password, this.password);
     }
     createJWT () {
-      return JsonWebTokenError.sign(
+      return jwt.sign(
         {
           user_id: this.user_id,
           username: this.username,

@@ -54,6 +54,11 @@ export default (sequelize) => {
       //   type: DataTypes.INTEGER,
       //   allowNull: true,
       // },
+      rating: {
+        type: DataTypes.FLOAT,
+        allowNull: false,
+        defaultValue: 0,
+      },
     },
     {
       sequelize,

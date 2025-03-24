@@ -8,7 +8,7 @@ export default (sequelize) => {
       Appointment.hasOne(models.Feedback, { foreignKey: "appointment_id", as: "feedback" });
       Appointment.hasOne(models.Prescription, { foreignKey: "appointment_id", as: "prescription" });
       Appointment.hasOne(models.MedicalRecord, { foreignKey: "appointment_id", as: "medicalRecord" });
-      Appointment.hasMany(models.Payment, { foreignKey: "appointment_id", as: "payments" });
+      Appointment.hasOne(models.Payment, { foreignKey: "appointment_id", as: "payments" });
     }
   }
 

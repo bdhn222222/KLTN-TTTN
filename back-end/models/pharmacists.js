@@ -5,7 +5,7 @@ export default (sequelize) => {
     static associate(models) {
       // Liên kết với bảng Users
       Pharmacist.belongsTo(models.User, { foreignKey: "user_id", as: "user" });
-      Pharmacist.hasMany(models.Prescription, { foreignKey: "prescription_id", as: "prescriptions" });
+      Pharmacist.hasMany(models.Prescription, { foreignKey: "pharmacist_id", as: "prescriptions" });
     }
   }
 

@@ -21,7 +21,7 @@ export default (sequelize) => {
       },
       pharmacist_id: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true,
         references: {
           model: "Pharmacists",
           key: "pharmacist_id",
