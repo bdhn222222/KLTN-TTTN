@@ -20,7 +20,7 @@ export default {
         onUpdate: 'CASCADE',
       },
       amount: {
-        type: Sequelize.DECIMAL(10, 3),
+        type: Sequelize.INT,
         allowNull: false,
       },
       payment_method: {

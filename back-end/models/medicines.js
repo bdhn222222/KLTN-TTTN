@@ -30,7 +30,7 @@ export default (sequelize) => {
         defaultValue: 0,
       },
       price: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: DataTypes.INT,
         allowNull: false,
       },
       unit: {

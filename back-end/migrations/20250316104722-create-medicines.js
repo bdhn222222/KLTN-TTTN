@@ -22,7 +22,7 @@ export default {
         allowNull: false,
       },
       price: {
-        type: Sequelize.DECIMAL(10, 3),
+        type: Sequelize.INT,
         allowNull: false,
       },
       unit: {

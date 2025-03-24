@@ -18,7 +18,7 @@ export default {
         allowNull: true,
       },
       fees: {
-        type: Sequelize.DECIMAL(10, 3),
+        type: Sequelize.INT,
         allowNull: true,
       },
       created_at: {
