@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('pharmacists', {
+    await queryInterface.createTable('Pharmacists', {
       pharmacist_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,7 +13,7 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'users',
+          model: 'Users',
           key: 'user_id',
         },
         onDelete: 'CASCADE',
@@ -21,14 +21,15 @@ export default {
       },
       license_number: {
         type: Sequelize.STRING,
-        allowNull: true,
+        allowNull: false,
+        unique: true,
       },
-      created_at: {
+      createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
-      updated_at: {
+      updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
@@ -37,6 +38,6 @@ export default {
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('pharmacists');
+    await queryInterface.dropTable('Pharmacists');
   },
 };

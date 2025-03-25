@@ -1,6 +1,7 @@
 import { Model, DataTypes } from "sequelize";
 import bcrypt from "bcrypt";
-
+import jwt from "jsonwebtoken";
+import { BadRequestError } from "../errors/bad_request.js";
 export default (sequelize) => {
   class User extends Model {
     async checkPassword(password) {
@@ -67,6 +68,8 @@ export default (sequelize) => {
       modelName: "User",
       tableName: "Users",
       timestamps: true,
+      createdAt: "createdAt",
+      updatedAt: "updatedAt",
     }
   );
 

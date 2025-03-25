@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('specializations', {
+    await queryInterface.createTable('Specializations', {
       specialization_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -16,17 +16,18 @@ export default {
       image: {
         type: Sequelize.STRING,
         allowNull: true,
+        defaultValue: "https://cdn1.youmed.vn/tin-tuc/wp-content/uploads/2023/05/yhocduphong.png", 
       },
       fees: {
         type: Sequelize.INT,
         allowNull: true,
       },
-      created_at: {
+      createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
-      updated_at: {
+      updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
@@ -35,6 +36,6 @@ export default {
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('specializations');
+    await queryInterface.dropTable('Specializations');
   },
 };

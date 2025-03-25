@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('appointments', {
+    await queryInterface.createTable('Appointments', {
       appointment_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,7 +13,7 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'patients',
+          model: 'Patients',
           key: 'patient_id',
         },
         onUpdate: 'CASCADE',
@@ -23,7 +23,7 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'doctors',
+          model: 'Doctors',
           key: 'doctor_id',
         },
         onUpdate: 'CASCADE',
@@ -33,27 +33,28 @@ export default {
         type: Sequelize.DATE,
         allowNull: false,
       },
-      fees: {
-        type: Sequelize.FLOAT,
-        allowNull: true,
-      },
       status: {
         type: Sequelize.ENUM(
           'waiting_for_confirmation',
           'accepted',
           'cancelled',
           'completed',
-          'patient not coming'
+         'rescheduled'
         ),
         allowNull: false,
         defaultValue: 'waiting_for_confirmation',
       },
-      created_at: {
+      fees: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+      },
+      
+      createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
-      updated_at: {
+      updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
@@ -62,6 +63,6 @@ export default {
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('appointments');
+    await queryInterface.dropTable('Appointments');
   },
 };

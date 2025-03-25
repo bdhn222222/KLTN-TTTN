@@ -20,7 +20,7 @@ export default (sequelize) => {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-          model: "appointments",
+          model: "Appointments",
           key: "appointment_id",
         },
         onUpdate: "CASCADE",
@@ -44,6 +44,8 @@ export default (sequelize) => {
       modelName: "Medical_record",
       tableName: "Medical_records",
       timestamps: true,
+      createdAt: "createdAt",
+      updatedAt: "updatedAt",
     }
   );
 

@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('payments', {
+    await queryInterface.createTable('Payments', {
       payment_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,14 +13,14 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'appointments',
+          model: 'Appointments',
           key: 'appointment_id',
         },
         onDelete: 'CASCADE',
         onUpdate: 'CASCADE',
       },
       amount: {
-        type: Sequelize.INT,
+        type: Sequelize.INTEGER,
         allowNull: false,
       },
       payment_method: {
@@ -30,8 +30,9 @@ export default {
       status: {
         type: Sequelize.ENUM('paid', 'pending', 'cancel'),
         allowNull: false,
+        defaultValue: "pending",
       },
-      created_at: {
+      createdAt: {
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
@@ -39,6 +40,6 @@ export default {
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('payments');
+    await queryInterface.dropTable('Payments');
   },
 };

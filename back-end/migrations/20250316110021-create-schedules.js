@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('schedules', {
+    await queryInterface.createTable('Schedules', {
       schedule_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,7 +13,7 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'doctors',
+          model: 'Doctors',
           key: 'doctor_id',
         },
         onDelete: 'CASCADE',
@@ -21,38 +21,38 @@ export default {
       },
       monday: {
         type: Sequelize.BOOLEAN,
-        defaultValue: false,
+        defaultValue: true,
       },
       tuesday: {
         type: Sequelize.BOOLEAN,
-        defaultValue: false,
+        defaultValue: true,
       },
       wednesday: {
         type: Sequelize.BOOLEAN,
-        defaultValue: false,
+        defaultValue: true,
       },
       thursday: {
         type: Sequelize.BOOLEAN,
-        defaultValue: false,
+        defaultValue: true,
       },
       friday: {
         type: Sequelize.BOOLEAN,
-        defaultValue: false,
+        defaultValue: true,
       },
       saturday: {
         type: Sequelize.BOOLEAN,
-        defaultValue: false,
+        defaultValue: true,
       },
       sunday: {
         type: Sequelize.BOOLEAN,
-        defaultValue: false,
+        defaultValue: true,
       },
-      created_at: {
+      createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
-      updated_at: {
+      updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
@@ -61,6 +61,6 @@ export default {
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('schedules');
+    await queryInterface.dropTable('Schedules');
   },
 };

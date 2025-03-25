@@ -30,13 +30,14 @@ export default {
       role: {
         type: Sequelize.ENUM('patient', 'doctor', 'pharmacist', 'admin'),
         allowNull: false,
+        defaultValue: 'patient',
       },
-      created_at: {
+      createdAt: {
         type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
-      updated_at: {
+      updatedAt: {
         type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
@@ -45,6 +46,6 @@ export default {
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('users');
+    await queryInterface.dropTable('Users');
   },
 };

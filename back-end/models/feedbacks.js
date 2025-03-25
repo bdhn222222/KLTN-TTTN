@@ -41,6 +41,8 @@ export default (sequelize) => {
       modelName: "Feedback",
       tableName: "Feedbacks",
       timestamps: true,
+      createdAt: "createdAt",
+      updatedAt: false,
     }
   );
 

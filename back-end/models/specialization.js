@@ -36,7 +36,9 @@ export default (sequelize) => {
       modelName: "Specialization",
       tableName: "Specializations",
       timestamps: true,
-    },
+      createdAt: "createdAt",
+      updatedAt: "updatedAt",
+    }
   );
   return Specialization;
 };

@@ -30,7 +30,7 @@ export default (sequelize) => {
         defaultValue: 0,
       },
       price: {
-        type: DataTypes.INT,
+        type: DataTypes.INTEGER,
         allowNull: false,
       },
       unit: {
@@ -51,6 +51,8 @@ export default (sequelize) => {
       modelName: "Medicine",
       tableName: "Medicines",
       timestamps: true,
+      createdAt: "createdAt",
+      updatedAt: "updatedAt",
     }
   );
 

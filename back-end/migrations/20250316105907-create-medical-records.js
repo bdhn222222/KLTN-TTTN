@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('medical_records', {
+    await queryInterface.createTable('Medical_records', {
       record_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,7 +13,7 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'appointments',
+          model: 'Appointments',
           key: 'appointment_id',
         },
         onDelete: 'CASCADE',
@@ -21,22 +21,22 @@ export default {
       },
       diagnosis: {
         type: Sequelize.TEXT,
-        allowNull: true,
+        allowNull: false,
       },
       treatment: {
         type: Sequelize.TEXT,
-        allowNull: true,
+        allowNull: false,
       },
       notes: {
         type: Sequelize.TEXT,
         allowNull: true,
       },
-      created_at: {
+      createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
-      updated_at: {
+      updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
@@ -45,6 +45,6 @@ export default {
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('medical_records');
+    await queryInterface.dropTable('Medical_records');
   },
 };

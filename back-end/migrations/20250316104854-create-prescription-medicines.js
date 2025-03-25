@@ -2,9 +2,8 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('prescription_medicines', {
-      id: {
-        type: Sequelize.INTEGER,
+    await queryInterface.createTable('Prescription_medicines', {
+      prescription_medicine_id: {
         autoIncrement: true,
         primaryKey: true,
         allowNull: false,
@@ -13,7 +12,7 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'prescriptions',
+          model: 'Prescriptions',
           key: 'prescription_id',
         },
         onDelete: 'CASCADE',
@@ -23,7 +22,7 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'medicines',
+          model: 'Medicines',
           key: 'medicine_id',
         },
         onDelete: 'CASCADE',
@@ -32,11 +31,12 @@ export default {
       quantity: {
         type: Sequelize.INTEGER,
         allowNull: false,
+        defaultValue: 1,
       },
     });
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('prescription_medicines');
+    await queryInterface.dropTable('Prescription_medicines');
   },
 };

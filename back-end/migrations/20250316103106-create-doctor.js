@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('doctors', {
+    await queryInterface.createTable('Doctors', {
       doctor_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,7 +13,7 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'users',
+          model: 'Users',
           key: 'user_id',
         },
         onDelete: 'CASCADE',
@@ -23,7 +23,7 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'specializations',
+          model: 'Specializations',
           key: 'specialization_id',
         },
         onDelete: 'CASCADE',
@@ -31,26 +31,26 @@ export default {
       },
       degree: {
         type: Sequelize.STRING,
-        allowNull: true,
+        allowNull: false,
       },
       experience_years: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
       },
       description: {
         type: Sequelize.TEXT,
-        allowNull: true,
+        allowNull: false,
       },
       rating: {
         type: Sequelize.FLOAT,
         defaultValue: 0,
       },
-      created_at: {
+      createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
-      updated_at: {
+      updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),

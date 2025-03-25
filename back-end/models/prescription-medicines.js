@@ -11,7 +11,7 @@ export default (sequelize) => {
 
   PrescriptionMedicine.init(
     {
-      prescriptio_nmedicine_id: {
+      prescription_medicine_id: { 
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true,
@@ -46,7 +46,7 @@ export default (sequelize) => {
     {
       sequelize,
       modelName: "Prescription_medicine",
-      tableName: "prescription_medicines",
+      tableName: "Prescription_medicines",
       timestamps: false,
     }
   );

@@ -53,27 +53,14 @@ export default (sequelize) => {
         type: DataTypes.INTEGER,
         allowNull: true,
       },
-      // rescheduled_to: {
-      //   type: DataTypes.INTEGER,
-      //   allowNull: true,
-      //   references: {
-      //     model: "Appointments",
-      //     key: "appointment_id",
-      //   },
-      //   onUpdate: "SET NULL",
-      //   onDelete: "SET NULL",
-      // },
-      // reschedule_count: {
-      //   type: DataTypes.INTEGER,
-      //   allowNull: false,
-      //   defaultValue: 0,
-      // },
     },
     {
       sequelize,
       modelName: "Appointment",
       tableName: "Appointments",
       timestamps: true,
+      createdAt: "createdAt",
+      updatedAt: "updatedAt",
     }
   );
 

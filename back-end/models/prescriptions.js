@@ -41,7 +41,7 @@ export default (sequelize) => {
       },
       medicine_details: {
         type: DataTypes.TEXT,
-        allowNull: false,
+        allowNull: true,
       },
     },
     {
@@ -49,6 +49,8 @@ export default (sequelize) => {
       modelName: "Prescription",
       tableName: "Prescriptions",
       timestamps: true,
+      createdAt: "createdAt",
+      updatedAt: false,
     }
   );
 

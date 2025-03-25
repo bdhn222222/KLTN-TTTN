@@ -65,6 +65,8 @@ export default (sequelize) => {
       modelName: "Doctor",
       tableName: "Doctors",
       timestamps: true,
+      createdAt: "createdAt",
+      updatedAt: "updatedAt",
     }
   );
 

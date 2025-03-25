@@ -27,7 +27,7 @@ export default (sequelize) => {
         onDelete: "CASCADE",
       },
       amount: {
-        type: DataTypes.INT,
+        type: DataTypes.INTEGER,
         allowNull: false,
       },
       payment_method: {
@@ -43,8 +43,10 @@ export default (sequelize) => {
     {
       sequelize,
       modelName: "Prescription_payment",
-      tableName: "prescription_payments",
+      tableName: "Prescription_payments",
       timestamps: true,
+      createdAt: "createdAt",
+      updatedAt: false
     }
   );
 

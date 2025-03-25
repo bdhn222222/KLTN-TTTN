@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('feedback', {
+    await queryInterface.createTable('Feedbacks', {
       feedback_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,7 +13,7 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'appointments',
+          model: 'Appointments',
           key: 'appointment_id',
         },
         onUpdate: 'CASCADE',
@@ -27,7 +27,7 @@ export default {
         type: Sequelize.TEXT,
         allowNull: true,
       },
-      created_at: {
+      createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
@@ -36,6 +36,6 @@ export default {
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('feedback');
+    await queryInterface.dropTable('Feedbacks');
   },
 };
