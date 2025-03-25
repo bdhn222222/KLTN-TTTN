@@ -19,7 +19,7 @@ export default {
         defaultValue: "https://cdn1.youmed.vn/tin-tuc/wp-content/uploads/2023/05/yhocduphong.png", 
       },
       fees: {
-        type: Sequelize.INT,
+        type: Sequelize.INTEGER,
         allowNull: true,
       },
       createdAt: {

@@ -4,6 +4,7 @@ export default {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('Prescription_medicines', {
       prescription_medicine_id: {
+        type: Sequelize.INTEGER,
         autoIncrement: true,
         primaryKey: true,
         allowNull: false,
