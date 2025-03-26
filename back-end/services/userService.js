@@ -1,5 +1,6 @@
 import db from "../models/index.js";
 import NotFoundError from "../errors/not_found.js";
+import e from "express";
 
 const { User } = db;
 
@@ -23,6 +24,6 @@ export const getUserProfile = async (user_id) => {
     }
     return { message: "User profile retrieved successfully", user };
   } catch (error) {
-    throw new Error (error.message);
+    throw error;
   }
 };

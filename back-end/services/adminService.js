@@ -1,7 +1,6 @@
 import db from "../models/index.js";
 import bcrypt from "bcryptjs";
 import BadRequestError from "../errors/bad_request.js";
-import Admin from "../models/admins.js";
 const { User, Admin } = db;
 export const registerAdmin = async ({ username, email, password }) => {
     const existingUser = await User.findOne({ where: { email } });
@@ -35,15 +34,13 @@ export const loginAdmin = async ({ email, password }) => {
   return {
     message: "Đăng nhập thành công",
     token,
-    doctor: {
-      user_id: user.user_id,
-      email: user.email,
-      username: user.username,
-      role: user.role,
-      specialization_id: user.doctor.specialization_id,
-      degree: user.doctor.degree,
-      experience_years: user.doctor.experience_years,
-      fees: user.doctor.fees,
+    admin: {
+      admin: {
+        user_id: user.user_id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+      },
     },
   };
 }

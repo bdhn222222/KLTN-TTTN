@@ -20,6 +20,6 @@ router.post(
     body("email").isEmail().withMessage("Email không hợp lệ"),
     body("password").isEmpty().withMessage("Mật khẩu không được để trống"),
   ]),
-  loginController
+  loginAdminController
 );
 export default router;

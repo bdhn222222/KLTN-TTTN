@@ -1,8 +1,6 @@
 import bcrypt from 'bcryptjs';
 import BadRequestError from "../errors/bad_request.js";
 import db from "../models/index.js";
-import {Pharmacist} from "../models/admins.js";
-import User from '../models/user.js';
 const { User, Pharmacist } = db;
 export const registerPharmacist = async ( {username, email, password, license_number}) =>{
   const existingPharmacist = await User.findOne({ where: { email } });

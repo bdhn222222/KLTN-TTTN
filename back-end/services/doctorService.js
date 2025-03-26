@@ -1,8 +1,6 @@
 import bcrypt from 'bcryptjs';
 import BadRequestError from "../errors/bad_request.js";
 import db from "../models/index.js";
-import Doctor from "../models/doctors.js";
-import db from "../models/index.js";
 import jwt from "jsonwebtoken";
 import UnauthorizedError from "../errors/unauthorized.js";
 import NotFoundError from "../errors/not_found.js";
@@ -16,7 +14,7 @@ export const registerDoctor = async ({ username, email, password, specialization
     const newUser = await User.create({
         username,
         email,
-        password: hashedPassword,
+        password, // giữ nguyên
         role: "doctor",
       });
     

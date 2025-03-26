@@ -1,5 +1,6 @@
 import { getAllUsers, getUserProfile } from "../services/userService.js";
 import NotFoundError from "../errors/not_found.js";
+import validateId from "../middleware/validateId.js";
 import InternalServerError from "../errors/internalServerError.js";
 
 export const getAllUsersController = async (req, res, next) => {

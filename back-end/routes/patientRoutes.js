@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerPatientController, loginPatientController } from "back-end/controllers/patientController.js";
+import { registerPatientController, loginPatientController } from "../controllers/patientController.js";
 import validate from '../middleware/validate.js';
 import { body } from 'express-validator';
 const router = express.Router();
