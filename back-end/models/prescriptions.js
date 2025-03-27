@@ -4,11 +4,23 @@ export default (sequelize) => {
   class Prescription extends Model {
     static associate(models) {
       // Liên kết với bảng Appointments
-      Prescription.belongsTo(models.Appointment, { foreignKey: "appointment_id", as: "appointment" });
-      Prescription.hasMany(models.PrescriptionMedicine, { foreignKey: "prescription_id", as: "prescriptionMedicines" });
-      Prescription.hasOne(models.PrescriptionPayment, { foreignKey: "prescription_id", as: "prescriptionPayments" });
-      Prescription.belongsTo(models.Pharmacist, { foreignKey: "pharmacist_id", as: "pharmacist" });
-  }
+      Prescription.belongsTo(models.Appointment, {
+        foreignKey: "appointment_id",
+        as: "appointment",
+      });
+      Prescription.hasMany(models.PrescriptionMedicine, {
+        foreignKey: "prescription_id",
+        as: "prescriptionMedicines",
+      });
+      Prescription.hasOne(models.PrescriptionPayment, {
+        foreignKey: "prescription_id",
+        as: "prescriptionPayments",
+      });
+      Prescription.belongsTo(models.Pharmacist, {
+        foreignKey: "pharmacist_id",
+        as: "pharmacist",
+      });
+    }
   }
 
   Prescription.init(
@@ -38,6 +50,10 @@ export default (sequelize) => {
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
+      },
+      dispensed: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
       },
       medicine_details: {
         type: DataTypes.TEXT,

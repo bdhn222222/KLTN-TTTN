@@ -1,8 +1,8 @@
-'use strict';
+"use strict";
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('Prescriptions', {
+    await queryInterface.createTable("Prescriptions", {
       prescription_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,35 +13,40 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: true,
         references: {
-          model: 'Pharmacists',
-          key: 'pharmacist_id',
+          model: "Pharmacists",
+          key: "pharmacist_id",
         },
-        onUpdate: 'CASCADE',
-        onDelete: 'CASCADE',
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
       },
       appointment_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'Appointments',
-          key: 'appointment_id',
+          model: "Appointments",
+          key: "appointment_id",
         },
-        onUpdate: 'CASCADE',
-        onDelete: 'CASCADE',
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
       },
       medicine_details: {
         type: Sequelize.TEXT,
         allowNull: true,
       },
+      dispensed: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+      },
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
       },
     });
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('Prescriptions');
+    await queryInterface.dropTable("Prescriptions");
   },
 };

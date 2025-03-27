@@ -1,8 +1,8 @@
-'use strict';
+"use strict";
 /** @type {import('sequelize-cli').Migration} */
 export default {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('Prescription_medicines', {
+    await queryInterface.createTable("Prescription_medicines", {
       prescription_medicine_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
@@ -13,31 +13,39 @@ export default {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'Prescriptions',
-          key: 'prescription_id',
+          model: "Prescriptions",
+          key: "prescription_id",
         },
-        onDelete: 'CASCADE',
-        onUpdate: 'CASCADE',
+        onDelete: "CASCADE",
+        onUpdate: "CASCADE",
       },
       medicine_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'Medicines',
-          key: 'medicine_id',
+          model: "Medicines",
+          key: "medicine_id",
         },
-        onDelete: 'CASCADE',
-        onUpdate: 'CASCADE',
+        onDelete: "CASCADE",
+        onUpdate: "CASCADE",
       },
       quantity: {
         type: Sequelize.INTEGER,
         allowNull: false,
         defaultValue: 1,
       },
+      actual_quantity: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      note: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
     });
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('Prescription_medicines');
+    await queryInterface.dropTable("Prescription_medicines");
   },
 };

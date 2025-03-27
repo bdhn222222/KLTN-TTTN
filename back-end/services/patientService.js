@@ -1,28 +1,49 @@
-import bcrypt from 'bcryptjs';
+import bcrypt from "bcryptjs";
 import BadRequestError from "../errors/bad_request.js";
 import db from "../models/index.js";
 import jwt from "jsonwebtoken";
 import UnauthorizedError from "../errors/unauthorized.js";
 import NotFoundError from "../errors/not_found.js";
 const { User, Patient } = db;
-export const registerPatient = async ({username, email, password, date_of_birth, gender, phone_number, insurance_number, id_number}) => {
+export const registerPatient = async ({
+  username,
+  email,
+  password,
+  date_of_birth,
+  gender,
+  phone_number,
+  insurance_number,
+  id_number,
+}) => {
   const existingPatient = await User.findOne({ where: { email } });
-  if(existingPatient) throw new BadRequestError("Email đã được đăng ký");
-  const hashedPassword = bcrypt.hashSync(password, 10);
-  const newUser = await User.create({ username, email, password: hashedPassword });
-  const newPatient = await Patient.create({ 
-    user_id: newUser.id,
+  if (existingPatient) throw new BadRequestError("Email đã được đăng ký");
+  // const hashedPassword = bcrypt.hashSync(password, 10);
+  const newUser = await User.create({
+    username,
+    email,
+    // password: hashedPassword,
+    password,
+    role: "patient",
+  });
+  const newPatient = await Patient.create({
+    user_id: newUser.user_id,
     date_of_birth,
     gender,
-    phone_number, 
+    phone_number,
     insurance_number,
     id_number,
     is_verified: false,
-  })
-  return { message: "Đăng ký account bệnh nhân thành công", patient: newPatient };
-}
+  });
+  return {
+    message: "Đăng ký account bệnh nhân thành công",
+    patient: newPatient,
+  };
+};
 export const loginPatient = async ({ email, password }) => {
-  const user = await User.findOne({ where: { email, role: "patient" }, include: {model: Patient, as: "patient"}});
+  const user = await User.findOne({
+    where: { email, role: "patient" },
+    include: { model: Patient, as: "patient" },
+  });
   if (!user) {
     throw new NotFoundError("Bệnh nhân không tồn tại hoặc email không đúng");
   }
@@ -31,9 +52,9 @@ export const loginPatient = async ({ email, password }) => {
     throw new UnauthorizedError("Mật khẩu không chính xác");
   }
   const token = jwt.sign(
-    { user_id: user.user_id, email: user.email, role: user.role },
-    config.jwt.secret,
-    { expiresIn: config.jwt.expiresIn }
+    { user_id: user.user_id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN }
   );
 
   return {

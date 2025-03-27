@@ -8,6 +8,7 @@ import pharmacistRoutes from "./routes/pharmacistRoutes.js";
 import patientRoutes from "./routes/patientRoutes.js";
 import requestLogger from "./middleware/logger.js";
 import errorHandler from "./middleware/errorHandler.js";
+import specializationRoutes from "./routes/specializationRoutes.js";
 dotenv.config();
 
 const app = express();
@@ -19,11 +20,12 @@ app.get("/", (req, res) => {
   res.json({ message: "Welcome to Booking Doctor API" });
 });
 
-app.use("/user", userRoutes);  
+app.use("/user", userRoutes);
 app.use("/doctor", doctorRoutes);
 app.use("/admin", adminRoutes);
 app.use("/pharmacist", pharmacistRoutes);
 app.use("/patient", patientRoutes);
+app.use("/specializations", specializationRoutes);
 app.use(requestLogger);
 app.use(errorHandler);
 

@@ -1,13 +1,13 @@
 import { Model, DataTypes } from "sequelize";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import BadRequestError  from "../errors/bad_request.js";
+import BadRequestError from "../errors/bad_request.js";
 export default (sequelize) => {
   class User extends Model {
     async checkPassword(password) {
       return await bcrypt.compare(password, this.password);
     }
-    createJWT () {
+    createJWT() {
       return jwt.sign(
         {
           user_id: this.user_id,
@@ -18,13 +18,16 @@ export default (sequelize) => {
         {
           expiresIn: "7d",
         }
-      )
+      );
     }
     static associate(models) {
-    User.hasOne(models.Patient, { foreignKey: "user_id", as: "patient" });
-    User.hasOne(models.Doctor, { foreignKey: "user_id", as: "doctor" });
-    User.hasOne(models.Pharmacist, { foreignKey: "user_id", as: "pharmacist" });
-    User.hasOne(models.Admin, { foreignKey: "user_id", as: "admin" });
+      User.hasOne(models.Patient, { foreignKey: "user_id", as: "patient" });
+      User.hasOne(models.Doctor, { foreignKey: "user_id", as: "doctor" });
+      User.hasOne(models.Pharmacist, {
+        foreignKey: "user_id",
+        as: "pharmacist",
+      });
+      User.hasOne(models.Admin, { foreignKey: "user_id", as: "admin" });
     }
   }
 
@@ -55,7 +58,8 @@ export default (sequelize) => {
       avatar: {
         type: DataTypes.STRING,
         allowNull: false,
-        defaultValue: "https://img.freepik.com/premium-vector/default-avatar-profile-icon-social-media-user-image-gray-avatar-icon-blank-profile-silhouette-vector-illustration_561158-3467.jpg",
+        defaultValue:
+          "https://img.freepik.com/premium-vector/default-avatar-profile-icon-social-media-user-image-gray-avatar-icon-blank-profile-silhouette-vector-illustration_561158-3467.jpg",
       },
       role: {
         type: DataTypes.ENUM("patient", "doctor", "pharmacist", "admin"),
@@ -75,7 +79,7 @@ export default (sequelize) => {
 
   User.beforeSave(async (user) => {
     if (user.changed("password")) {
-      const value = user.password;
+      const value = String(user.password);
 
       if (value.length < 8 || value.length > 32) {
         throw new BadRequestError(
@@ -95,7 +99,7 @@ export default (sequelize) => {
       }
 
       const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(user.password, salt);
+      user.password = await bcrypt.hash(value, salt);
     }
   });
 

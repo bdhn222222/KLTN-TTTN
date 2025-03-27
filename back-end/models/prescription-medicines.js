@@ -4,14 +4,20 @@ export default (sequelize) => {
   class PrescriptionMedicine extends Model {
     static associate(models) {
       // Liên kết với bảng Prescriptions
-      PrescriptionMedicine.belongsTo(models.Prescription, { foreignKey: "prescription_id", as: "prescription" });
-      PrescriptionMedicine.belongsTo(models.Medicine, { foreignKey: "medicine_id", as: "medicine" });
-  }
+      PrescriptionMedicine.belongsTo(models.Prescription, {
+        foreignKey: "prescription_id",
+        as: "prescription",
+      });
+      PrescriptionMedicine.belongsTo(models.Medicine, {
+        foreignKey: "medicine_id",
+        as: "medicine",
+      });
+    }
   }
 
   PrescriptionMedicine.init(
     {
-      prescription_medicine_id: { 
+      prescription_medicine_id: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true,
@@ -41,6 +47,14 @@ export default (sequelize) => {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 1,
+      },
+      actual_quantity: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      note: {
+        type: DataTypes.STRING,
+        allowNull: true,
       },
     },
     {
