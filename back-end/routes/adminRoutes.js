@@ -5,6 +5,7 @@ import {
 } from "../controllers/adminController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
+import rateLimiter from "../middleware/rateLimiter.js";
 
 const router = express.Router();
 
@@ -28,6 +29,7 @@ router.post(
     body("email").isEmail().withMessage("Email không hợp lệ"),
     body("password").notEmpty().withMessage("Mật khẩu không được để trống"),
   ]),
+  rateLimiter,
   loginAdminController
 );
 export default router;
