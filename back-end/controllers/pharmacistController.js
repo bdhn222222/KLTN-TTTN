@@ -5,6 +5,10 @@ import {
   getPrescriptionDetails,
   updatePrescriptionItem,
   confirmPrescription,
+  getAllMedicines,
+  addMedicine,
+  updateMedicine,
+  getMedicineById,
 } from "../services/pharmacistService.js";
 import BadRequestError from "../errors/bad_request.js";
 import InternalServerError from "../errors/internalServerError.js";
@@ -101,5 +105,45 @@ export const confirmPrescriptionController = async (req, res, next) => {
       return next(error);
     }
     next(new InternalServerError(error.message));
+  }
+};
+export const getAllMedicinesController = async (req, res, next) => {
+  try {
+    const { search, expiry_before, page } = req.query;
+    const result = await getAllMedicines({ search, expiry_before, page });
+    res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof NotFoundError) return next(error);
+    next(new InternalServerError(error.message));
+  }
+};
+export const addMedicineController = async (req, res, next) => {
+  try {
+    const result = await addMedicine(req.body);
+    res.status(201).json(result);
+  } catch (error) {
+    if (error instanceof BadRequestError) return next(error);
+    return next(new InternalServerError(error.message));
+  }
+};
+
+export const updateMedicineController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const result = await updateMedicine(id, updateData);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+export const getMedicineByIdController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await getMedicineById(id);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
   }
 };

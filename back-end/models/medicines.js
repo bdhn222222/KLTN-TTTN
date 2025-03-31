@@ -3,8 +3,10 @@ import { Model, DataTypes } from "sequelize";
 export default (sequelize) => {
   class Medicine extends Model {
     static associate(models) {
-      Medicine.hasMany(models.PrescriptionMedicine, { foreignKey: "medicine_id", as: "prescriptionMedicines" });
-  
+      Medicine.hasMany(models.PrescriptionMedicine, {
+        foreignKey: "medicine_id",
+        as: "prescriptionMedicines",
+      });
     }
   }
 
@@ -28,6 +30,11 @@ export default (sequelize) => {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
+      },
+      is_out_of_stock: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
       },
       price: {
         type: DataTypes.INTEGER,

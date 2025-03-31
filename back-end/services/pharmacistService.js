@@ -3,6 +3,8 @@ import BadRequestError from "../errors/bad_request.js";
 import db from "../models/index.js";
 import jwt from "jsonwebtoken";
 import NotFoundError from "../errors/not_found.js";
+import { Op } from "sequelize";
+import dayjs from "dayjs";
 const {
   User,
   Pharmacist,
@@ -192,4 +194,156 @@ export const confirmPrescription = async (prescription_id, pharmacist_id) => {
     pharmacist_id,
   });
   return { message: "Đã xác nhận đơn thuốc thành công" };
+};
+
+export const getAllMedicines = async ({ search, expiry_before, page = 1 }) => {
+  const limit = 10;
+  const offset = (page - 1) * limit;
+  const whereClause = {};
+
+  if (search) {
+    whereClause[Op.or] = [
+      { name: { [Op.like]: `%${search}%` } },
+      { supplier: { [Op.like]: `%${search}%` } },
+    ];
+  }
+
+  if (expiry_before) {
+    whereClause.expiry_date = { [Op.lte]: new Date(expiry_before) };
+  }
+
+  const { count, rows } = await Medicine.findAndCountAll({
+    where: whereClause,
+    limit,
+    offset,
+    order: [["name", "ASC"]],
+  });
+
+  const formattedMedicines = rows.map((med) => ({
+    ...med.toJSON(),
+    status_message: med.is_out_of_stock ? "Tạm hết hàng" : "",
+  }));
+
+  return {
+    message:
+      count > 0 ? "Lấy danh sách thuốc thành công" : "Không tìm thấy thuốc nào",
+    medicines: formattedMedicines,
+    currentPage: +page,
+    totalPages: Math.ceil(count / limit) || 1,
+    totalRecords: count,
+  };
+};
+export const addMedicine = async (medicineData) => {
+  const { name, description, quantity, price, unit, expiry_date, supplier } =
+    medicineData;
+  medicineData.is_out_of_stock = Number(quantity) === 0;
+  if (!name || !quantity || !price || !unit || !expiry_date) {
+    throw new BadRequestError("Vui lòng nhập đầy đủ thông tin bắt buộc");
+  }
+  const existingMedicine = await Medicine.findOne({
+    where: { name },
+  });
+  if (existingMedicine) {
+    throw new BadRequestError("Tên thuốc đã tồn tại");
+  }
+  const newMedicine = await db.Medicine.create(medicineData);
+  return {
+    message: "Thêm thuốc vào kho thành công",
+    medicine: newMedicine,
+  };
+};
+
+export const updateMedicine = async (medicine_id, updateData) => {
+  const medicine = await Medicine.findByPk(medicine_id);
+  if (!medicine) {
+    throw new NotFoundError("Không tìm thấy thuốc với ID này");
+  }
+
+  const allowedFields = [
+    "name",
+    "description",
+    "quantity",
+    "price",
+    "unit",
+    "expiry_date",
+    "supplier",
+  ];
+
+  const validUpdateData = {};
+  for (const field of allowedFields) {
+    if (updateData[field] !== undefined) {
+      validUpdateData[field] = updateData[field];
+    }
+  }
+
+  if (Object.keys(validUpdateData).length === 0) {
+    throw new BadRequestError("Không có thông tin hợp lệ để cập nhật");
+  }
+
+  // Validate
+  if (
+    validUpdateData.name !== undefined &&
+    validUpdateData.name.trim() === ""
+  ) {
+    throw new BadRequestError("Tên thuốc không được để trống");
+  }
+
+  if (
+    validUpdateData.price !== undefined &&
+    (isNaN(validUpdateData.price) ||
+      validUpdateData.price < 0 ||
+      !Number.isInteger(Number(validUpdateData.price)))
+  ) {
+    throw new BadRequestError("Giá thuốc phải là số nguyên >= 0");
+  }
+
+  if (validUpdateData.quantity !== undefined) {
+    const quantity = Number(validUpdateData.quantity);
+
+    if (isNaN(quantity) || quantity < 0 || !Number.isInteger(quantity)) {
+      throw new BadRequestError("Số lượng thuốc phải là số nguyên >= 0");
+    }
+
+    validUpdateData.quantity = quantity;
+    validUpdateData.is_out_of_stock = quantity === 0;
+  }
+
+  if (
+    validUpdateData.expiry_date !== undefined &&
+    (!dayjs(validUpdateData.expiry_date).isValid() ||
+      dayjs(validUpdateData.expiry_date).isBefore(dayjs()))
+  ) {
+    throw new BadRequestError("Ngày hết hạn phải hợp lệ và trong tương lai");
+  }
+
+  if (
+    validUpdateData.unit !== undefined &&
+    validUpdateData.unit.trim() === ""
+  ) {
+    throw new BadRequestError("Đơn vị thuốc không được để trống");
+  }
+
+  await medicine.update(validUpdateData);
+
+  return {
+    success: true,
+    message: "Cập nhật thuốc thành công",
+    data: medicine,
+  };
+};
+
+export const getMedicineById = async (medicine_id) => {
+  const medicine = await Medicine.findByPk(medicine_id);
+  if (!medicine) {
+    throw new NotFoundError("Không tìm thấy thuốc với ID này");
+  }
+
+  const data = medicine.toJSON();
+  data.status_message = medicine.is_out_of_stock ? "Tạm hết hàng" : "";
+
+  return {
+    success: true,
+    message: "Lấy thông tin thuốc thành công",
+    data,
+  };
 };
