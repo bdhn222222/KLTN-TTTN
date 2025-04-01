@@ -2,7 +2,7 @@ import express from "express";
 import {
   registerPharmacistController,
   loginPharmacistController,
-  getPendingPrescriptionsController,
+  //  getPendingPrescriptionsController,
   getPrescriptionDetailsController,
   updatePrescriptionItemController,
   confirmPrescriptionController,
@@ -10,6 +10,10 @@ import {
   addMedicineController,
   updateMedicineController,
   getMedicineByIdController,
+  deleteMedicineController,
+  getPharmacistProfileController,
+  updatePharmacistProfileController,
+  changePharmacistPasswordController,
 } from "../controllers/pharmacistController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
@@ -41,12 +45,12 @@ router.post(
     loginLimiter,
     loginPharmacistController
   );
-router.get(
-  "/prescriptions/pending",
-  authenticateUser,
-  authorize(["pharmacist"]),
-  getPendingPrescriptionsController
-);
+// router.get(
+//   "/prescriptions/pending",
+//   authenticateUser,
+//   authorize(["pharmacist"]),
+//   getPendingPrescriptionsController
+// );
 router.get(
   "/prescriptions/:prescription_id",
   authenticateUser,
@@ -130,4 +134,29 @@ router.get(
   authorize(["pharmacist"]),
   getMedicineByIdController
 );
+router.delete(
+  "/medicines/:id",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  deleteMedicineController
+);
+router.get(
+  "/profile",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  getPharmacistProfileController
+);
+router.put(
+  "/profile",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  updatePharmacistProfileController
+);
+router.put(
+  "/change-password",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  changePharmacistPasswordController
+);
+
 export default router;

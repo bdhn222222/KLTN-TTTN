@@ -73,26 +73,50 @@ export const loginPharmacist = async ({ email, password }) => {
     },
   };
 };
-export const getPendingPrescriptions = async () => {
-  const prescriptions = await Prescription.findAll({
-    where: { dispensed: "false" },
+export const getPrescriptionDetails = async (prescription_id) => {
+  const prescription = await db.Prescription.findByPk(prescription_id, {
     include: [
       {
-        model: Appointment,
-        as: "appointment",
-        where: { status: "completed" },
+        model: db.PrescriptionMedicine,
+        as: "prescriptionMedicines",
+        attributes: ["prescription_medicine_id", "actual_quantity", "note"],
         include: [
           {
-            model: Payment,
-            as: "payments",
-            where: { status: "paid" },
+            model: db.Medicine,
+            as: "medicine",
+            attributes: [
+              "medicine_id",
+              "name",
+              "price",
+              "unit",
+              "expiry_date",
+              "is_out_of_stock",
+            ],
           },
+        ],
+      },
+      {
+        model: db.Appointment,
+        as: "appointment",
+        attributes: ["appointment_id", "appointment_datetime", "status"],
+        include: [
           {
-            model: Patient,
+            model: db.Patient,
             as: "patient",
             include: [
               {
-                model: User,
+                model: db.User,
+                as: "user",
+                attributes: ["username", "email"],
+              },
+            ],
+          },
+          {
+            model: db.Doctor,
+            as: "doctor",
+            include: [
+              {
+                model: db.User,
                 as: "user",
                 attributes: ["username", "email"],
               },
@@ -103,46 +127,19 @@ export const getPendingPrescriptions = async () => {
     ],
   });
 
-  if (!prescriptions || prescriptions.length === 0) {
-    throw new NotFoundError("Không có đơn thuốc nào cần xác nhận");
-  }
-  return prescriptions;
-};
-
-export const getPrescriptionDetails = async (prescription_id) => {
-  const prescription = await Prescription.findByPk(prescription_id, {
-    include: [
-      {
-        model: PrescriptionMedicine,
-        as: "prescriptionMedicines",
-        include: [
-          {
-            model: Medicine,
-            as: "medicine",
-            attributes: ["medicine_id", "name", "price", "unit", "expiry_date"],
-          },
-        ],
-      },
-      {
-        model: Appointment,
-        as: "appointment",
-        include: {
-          model: Patient,
-          as: "patient",
-          include: {
-            model: User,
-            as: "user",
-            attributes: ["username", "email"],
-          },
-        },
-      },
-    ],
-  });
   if (!prescription) {
     throw new NotFoundError("Không tìm thấy đơn thuốc");
   }
+
+  prescription.prescriptionMedicines.forEach((item) => {
+    if (item.medicine && item.medicine.is_out_of_stock) {
+      item.medicine.dataValues.status_message = "Tạm hết hàng";
+    }
+  });
+
   return prescription;
 };
+
 export const updatePrescriptionItem = async (
   prescription_id,
   original_medicine_id,
@@ -152,48 +149,90 @@ export const updatePrescriptionItem = async (
 ) => {
   const prescription = await Prescription.findByPk(prescription_id);
   if (!prescription) throw new NotFoundError("Không tìm thấy đơn thuốc");
+
   if (prescription.dispensed) {
     throw new BadRequestError(
       "Đơn thuốc đã được xác nhận. Không thể chỉnh sửa"
     );
   }
+
   const item = await PrescriptionMedicine.findOne({
     where: {
       prescription_id,
       medicine_id: original_medicine_id,
     },
   });
+
   if (!item)
     throw new NotFoundError("Không tìm thấy thuốc gốc trong đơn thuốc");
+
+  if (
+    isNaN(actual_quantity) ||
+    !Number.isInteger(actual_quantity) ||
+    actual_quantity < 0
+  ) {
+    throw new BadRequestError("Số lượng thuốc thực tế phải là số nguyên >= 0");
+  }
+
   if (original_medicine_id === new_medicine_id) {
-    // Pharmacist không đổi thuốc
-    await item.update({
-      actual_quantity,
-      note,
-    });
+    await item.update({ actual_quantity, note });
     return { message: "Đã cập nhật thuốc trong đơn thành công" };
   }
-  await item.destroy(); // nếu có đổi thuốc, xóa thuốc cũ
+
+  // Nếu thay thuốc → kiểm tra xem thuốc mới tồn tại không
+  const newMedicine = await Medicine.findByPk(new_medicine_id);
+  if (!newMedicine) {
+    throw new NotFoundError("Không tìm thấy thuốc thay thế");
+  }
+
+  await item.destroy();
+
   await PrescriptionMedicine.create({
     prescription_id,
     medicine_id: new_medicine_id,
-    quantity: 0, // nếu muốn thể hiện đây là thuốc thay thế
+    quantity: 0,
     actual_quantity,
     note,
   });
+
   return { message: "Đã thay thuốc thành công trong đơn thuốc" };
 };
+
 export const confirmPrescription = async (prescription_id, pharmacist_id) => {
-  const prescription = await Prescription.findByPk(prescription_id);
-  if (!prescription) throw new NotFoundError("Không tìm thấy đơn thuốc");
-  if (prescription.dispensed) {
-    throw new BadRequestError("Đơn thuốc đã được xác nhận");
+  const prescription = await db.Prescription.findByPk(prescription_id, {
+    include: [
+      {
+        model: db.PrescriptionMedicine,
+        as: "prescriptionMedicines",
+      },
+    ],
+  });
+
+  if (!prescription) {
+    throw new NotFoundError("Không tìm thấy đơn thuốc");
   }
+
+  if (prescription.dispensed) {
+    throw new BadRequestError("Đơn thuốc đã được xác nhận trước đó");
+  }
+
+  if (
+    !prescription.prescriptionMedicines ||
+    prescription.prescriptionMedicines.length === 0
+  ) {
+    throw new BadRequestError("Đơn thuốc không có thuốc để xác nhận");
+  }
+
+  // Cập nhật đơn thuốc đã được cấp phát
   await prescription.update({
     dispensed: true,
     pharmacist_id,
   });
-  return { message: "Đã xác nhận đơn thuốc thành công" };
+
+  return {
+    success: true,
+    message: "Đã xác nhận cấp phát thuốc thành công",
+  };
 };
 
 export const getAllMedicines = async ({ search, expiry_before, page = 1 }) => {
@@ -345,5 +384,134 @@ export const getMedicineById = async (medicine_id) => {
     success: true,
     message: "Lấy thông tin thuốc thành công",
     data,
+  };
+};
+export const deleteMedicine = async (medicine_id) => {
+  const medicine = await db.Medicine.findByPk(medicine_id);
+  if (!medicine) {
+    throw new NotFoundError("Không tìm thấy thuốc với ID này");
+  }
+
+  await medicine.destroy();
+
+  return {
+    success: true,
+    message: "Xóa thuốc thành công",
+  };
+};
+export const getPharmacistProfile = async (user_id) => {
+  const pharmacist = await db.Pharmacist.findOne({
+    where: { user_id },
+    include: [
+      {
+        model: db.User,
+        as: "user",
+        attributes: ["username", "email", "avatar"],
+      },
+    ],
+  });
+
+  if (!pharmacist) {
+    throw new NotFoundError("Không tìm thấy hồ sơ dược sĩ");
+  }
+
+  return {
+    user_id,
+    username: pharmacist.user.username,
+    email: pharmacist.user.email,
+    avatar: pharmacist.user.avatar,
+    phone_number: pharmacist.phone_number,
+    address: pharmacist.address,
+    gender: pharmacist.gender,
+    date_of_birth: pharmacist.date_of_birth,
+    id_number: pharmacist.id_number,
+  };
+};
+export const updatePharmacistProfile = async (user_id, updateData) => {
+  const user = await db.User.findByPk(user_id);
+  if (!user) throw new NotFoundError("Không tìm thấy người dùng");
+
+  const pharmacist = await db.Pharmacist.findOne({ where: { user_id } });
+  if (!pharmacist) throw new NotFoundError("Không tìm thấy hồ sơ dược sĩ");
+
+  const userFields = ["username", "avatar"];
+  const pharmacistFields = ["license_number"];
+
+  const userUpdate = {};
+  const pharmacistUpdate = {};
+  // Xử lý các field của User
+  for (const field of userFields) {
+    if (updateData[field] !== undefined) {
+      if (
+        typeof updateData[field] !== "string" ||
+        updateData[field].trim() === ""
+      ) {
+        throw new BadRequestError(`${field} không được để trống`);
+      }
+      userUpdate[field] = updateData[field].trim();
+    }
+  }
+  // Xử lý field của Pharmacist
+  for (const field of pharmacistFields) {
+    if (updateData[field] !== undefined) {
+      if (
+        typeof updateData[field] !== "string" ||
+        updateData[field].trim() === ""
+      ) {
+        throw new BadRequestError(`${field} không được để trống`);
+      }
+      pharmacistUpdate[field] = updateData[field].trim();
+    }
+  }
+
+  if (
+    Object.keys(userUpdate).length === 0 &&
+    Object.keys(pharmacistUpdate).length === 0
+  ) {
+    throw new BadRequestError("Không có thông tin hợp lệ để cập nhật");
+  }
+
+  // Cập nhật nếu có
+  if (Object.keys(userUpdate).length > 0) await user.update(userUpdate);
+  if (Object.keys(pharmacistUpdate).length > 0)
+    await pharmacist.update(pharmacistUpdate);
+
+  return {
+    success: true,
+    message: "Cập nhật hồ sơ cá nhân thành công",
+    data: {
+      user_id: user.user_id,
+      username: user.username,
+      email: user.email,
+      avatar: user.avatar,
+      license_number: pharmacist.license_number,
+    },
+  };
+};
+export const changePharmacistPassword = async (user_id, data) => {
+  const { oldPassword, newPassword, confirmPassword } = data;
+
+  if (!oldPassword || !newPassword || !confirmPassword) {
+    throw new BadRequestError("Vui lòng nhập đầy đủ thông tin");
+  }
+
+  const user = await db.User.findByPk(user_id);
+  if (!user) throw new NotFoundError("Không tìm thấy người dùng");
+
+  const isMatch = await user.checkPassword(oldPassword);
+  if (!isMatch) {
+    throw new BadRequestError("Mật khẩu cũ không đúng");
+  }
+
+  if (newPassword !== confirmPassword) {
+    throw new BadRequestError("Mật khẩu xác nhận không khớp");
+  }
+
+  user.password = newPassword; // ✅ Được bcrypt hash trong `beforeSave`
+  await user.save();
+
+  return {
+    success: true,
+    message: "Đổi mật khẩu thành công",
   };
 };

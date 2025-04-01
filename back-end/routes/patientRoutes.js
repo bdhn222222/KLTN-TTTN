@@ -2,9 +2,15 @@ import express from "express";
 import {
   registerPatientController,
   loginPatientController,
+  getAllSpecializationsController,
+  getAllDoctorsController,
+  getDoctorProfileController,
+  bookAppointmentController,
 } from "../controllers/patientController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
+import { authenticateUser } from "../middleware/authentication.js";
+import authorize from "../middleware/authorization.js";
 const router = express.Router();
 import { loginLimiter, registerLimiter } from "../middleware/rateLimiter.js";
 router.post(
@@ -37,7 +43,16 @@ router.post(
   loginLimiter,
   loginPatientController
 );
+router.get("/specializations", getAllSpecializationsController);
 
+router.get("/doctors", getAllDoctorsController);
+router.get("/doctors/:id", getDoctorProfileController);
+router.post(
+  "/appointments",
+  authenticateUser,
+  authorize(["patient"]),
+  bookAppointmentController
+);
 export default router;
 
 // import upload from "../middleware/uploadHandler.js";
