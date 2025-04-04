@@ -3,10 +3,23 @@ import { Model, DataTypes } from "sequelize";
 export default (sequelize) => {
   class Doctor extends Model {
     static associate(models) {
-    Doctor.belongsTo(models.User, { foreignKey: "user_id", as: "user" });
-    Doctor.belongsTo(models.Specialization, { foreignKey: "specialization_id", as: "specialization" });
-    Doctor.hasMany(models.Appointment, { foreignKey: "doctor_id", as: "appointments" });
-    Doctor.hasOne(models.Schedule, { foreignKey: "doctor_id", as: "schedule" });
+      Doctor.belongsTo(models.User, { foreignKey: "user_id", as: "user" });
+      Doctor.belongsTo(models.Specialization, {
+        foreignKey: "specialization_id",
+        as: "specialization",
+      });
+      Doctor.hasMany(models.Appointment, {
+        foreignKey: "doctor_id",
+        as: "appointments",
+      });
+      Doctor.hasOne(models.Schedule, {
+        foreignKey: "doctor_id",
+        as: "schedule",
+      });
+      Doctor.hasMany(models.DoctorDayOff, {
+        foreignKey: "doctor_id",
+        as: "dayOffs",
+      });
     }
   }
 
