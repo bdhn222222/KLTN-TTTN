@@ -778,16 +778,16 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
     const getTimeCondition = (timeOffType) => {
       if (timeOffType === 'morning') {
         return Sequelize.where(
-          Sequelize.fn('HOUR', Sequelize.fn('CONVERT_TZ', Sequelize.col('appointment_datetime'), '+00:00', '+07:00')),
+          Sequelize.fn('TIME', Sequelize.fn('CONVERT_TZ', Sequelize.col('appointment_datetime'), '+00:00', '+07:00')),
           {
-            [Op.between]: [8, 11]
+            [Op.between]: ['08:00:00', '11:30:00']
           }
         );
       } else if (timeOffType === 'afternoon') {
         return Sequelize.where(
-          Sequelize.fn('HOUR', Sequelize.fn('CONVERT_TZ', Sequelize.col('appointment_datetime'), '+00:00', '+07:00')),
+          Sequelize.fn('TIME', Sequelize.fn('CONVERT_TZ', Sequelize.col('appointment_datetime'), '+00:00', '+07:00')),
           {
-            [Op.between]: [13, 16]
+            [Op.between]: ['13:30:00', '17:00:00']
           }
         );
       } else {
