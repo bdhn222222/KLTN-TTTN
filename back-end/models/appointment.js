@@ -45,7 +45,14 @@ export default (sequelize) => {
         allowNull: false,
       },
       status: {
-        type: DataTypes.ENUM("waiting_for_confirmation", "accepted", "cancelled", "completed", "rescheduled"),
+        type: DataTypes.ENUM(
+          "waiting_for_confirmation", 
+          "accepted", 
+          "cancelled", 
+          "completed", 
+          "patient_not_coming",
+          "doctor_day_off"
+        ),
         allowNull: false,
         defaultValue: "waiting_for_confirmation",
       },

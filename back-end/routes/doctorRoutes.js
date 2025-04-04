@@ -12,7 +12,7 @@ import {
   markPatientNotComingController,
   completeAppointmentController,
   getDoctorDayOffsController,
-  cancelDoctorDayOffController,
+  // cancelDoctorDayOffController,
 } from "../controllers/doctorController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
@@ -116,11 +116,11 @@ router.get(
   authorize(["doctor"]),
   getDoctorDayOffsController
 );
-router.delete(
-  "/day-offs/:id",
-  authenticateUser,
-  authorize(["doctor"]),
-  cancelDoctorDayOffController
-);
+// router.delete(
+//   "/day-offs/:id",
+//   authenticateUser,
+//   authorize(["doctor"]),
+//   cancelDoctorDayOffController
+// );
 
 export default router;

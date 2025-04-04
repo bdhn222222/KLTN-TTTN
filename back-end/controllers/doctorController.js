@@ -3,7 +3,7 @@ import {
   loginDoctor,
   updateDoctorProfile,
   createDoctorDayOff,
-  cancelDoctorDayOff,
+  // cancelDoctorDayOff,
   getDoctorAppointments,
   getDoctorSummary,
   getDoctorAppointmentStats,
@@ -137,27 +137,35 @@ export const getDoctorDayOffsController = asyncHandler(async (req, res, next) =>
     }
   }
 });
-export const createDoctorDayOffController = async (req, res, next) => {
-  try {
-    console.log('Request body:', req.body);
-    const doctor_id = req.user.user_id; // Lấy từ token
-    const { off_date, time_off, reason } = req.body;
-    const result = await createDoctorDayOff(doctor_id, off_date, time_off, reason);
-    res.status(201).json(result);
-  } catch (error) {
-    if (error instanceof BadRequestError) {
-      next(error);
-    } else {
-      next(new InternalServerError(error.message));
-    }
-  }
-};
-export const cancelDoctorDayOffController = asyncHandler(async (req, res) => {
+export const createDoctorDayOffController = asyncHandler(async (req, res) => {
   const doctor_id = req.user.user_id;
-  const day_off_id = req.params.id;
-  const { time_off } = req.body;
 
-  const result = await cancelDoctorDayOff(doctor_id, day_off_id, time_off);
+  if (!doctor_id) {
+    res.status(401); // Unauthorized
+    throw new Error('Không tìm thấy thông tin bác sĩ từ token');
+  }
 
-  res.status(200).json(result);
+  const { off_date, time_off, reason } = req.body;
+
+  const result = await createDoctorDayOff(doctor_id, off_date, time_off, reason);
+
+  if (result.success) {
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result.data,
+    });
+  } else {
+    res.status(400);
+    throw new Error(result.message || 'Đã có lỗi xảy ra khi đăng ký ngày nghỉ');
+  }
 });
+// export const cancelDoctorDayOffController = asyncHandler(async (req, res) => {
+//   const doctor_id = req.user.user_id;
+//   const day_off_id = req.params.id;
+//   const { time_off } = req.body;
+
+//   const result = await cancelDoctorDayOff(doctor_id, day_off_id, time_off);
+
+//   res.status(200).json(result);
+// });

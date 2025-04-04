@@ -129,215 +129,8 @@ export const updateDoctorProfile = async (user_id, data, authenticatedUser) => {
   };
 };
 
-export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) => {
-  // Bắt đầu transaction
-  const t = await db.sequelize.transaction();
 
-  try {
-    console.log('createDoctorDayOff parameters:', {
-      doctor_id,
-      off_date,
-      time_off,
-      reason
-    });
 
-    // 1. Validate thời gian nghỉ
-    if (!off_date || !time_off) {
-      console.log('Validation failed in service - missing required fields');
-      throw new BadRequestError("Thiếu thông tin ngày nghỉ hoặc buổi nghỉ");
-    }
-
-    if (!['morning', 'afternoon', 'all'].includes(time_off)) {
-      console.log('Invalid time_off value:', time_off);
-      throw new BadRequestError("Buổi nghỉ không hợp lệ");
-    }
-
-    const dayOffDate = dayjs(off_date);
-    console.log('Parsed date:', {
-      input: off_date,
-      parsed: dayOffDate.format('YYYY-MM-DD'),
-      isValid: dayOffDate.isValid()
-    });
-
-    if (!dayOffDate.isValid()) {
-      throw new BadRequestError("Ngày nghỉ không hợp lệ");
-    }
-
-    const today = dayjs().startOf('day');
-    if (dayOffDate.isBefore(today)) {
-      throw new BadRequestError("Không thể đăng ký ngày nghỉ trong quá khứ");
-    }
-
-    // 2. Kiểm tra xem đã đăng ký nghỉ chưa
-    const existingDayOff = await db.DoctorDayOff.findOne({
-      where: {
-        doctor_id,
-        off_date: dayOffDate.format('YYYY-MM-DD'),
-        status: "active"
-      },
-      transaction: t
-    });
-
-    // Nếu đã có ngày nghỉ, kiểm tra xem có thể đăng ký thêm không
-    if (existingDayOff) {
-      if (time_off === 'all') {
-        throw new BadRequestError("Bạn đã đăng ký nghỉ vào ngày này");
-      }
-      if (time_off === 'morning' && existingDayOff.off_morning) {
-        throw new BadRequestError("Bạn đã đăng ký nghỉ buổi sáng của ngày này");
-      }
-      if (time_off === 'afternoon' && existingDayOff.off_afternoon) {
-        throw new BadRequestError("Bạn đã đăng ký nghỉ buổi chiều của ngày này");
-      }
-
-      // Cập nhật thêm buổi nghỉ mới
-      if (time_off === 'morning') {
-        await existingDayOff.update({
-          off_morning: true,
-          reason: existingDayOff.reason + "; " + reason
-        }, { transaction: t });
-      } else if (time_off === 'afternoon') {
-        await existingDayOff.update({
-          off_afternoon: true,
-          reason: existingDayOff.reason + "; " + reason
-        }, { transaction: t });
-      }
-
-      // Tìm và cập nhật các lịch hẹn bị ảnh hưởng
-      const affectedAppointments = await db.Appointment.findAll({
-        where: {
-          doctor_id,
-          status: "accepted",
-          [Op.and]: [
-            Sequelize.where(Sequelize.fn('DATE', Sequelize.col('appointment_datetime')), dayOffDate.format('YYYY-MM-DD')),
-            time_off === 'morning' 
-              ? Sequelize.where(Sequelize.fn('HOUR', Sequelize.col('appointment_datetime')), '<', 12)
-              : Sequelize.where(Sequelize.fn('HOUR', Sequelize.col('appointment_datetime')), '>=', 12)
-          ]
-        },
-        include: [{
-          model: db.Patient,
-          as: 'patient',
-          include: [{
-            model: db.User,
-            as: 'user',
-            attributes: ['email']
-          }]
-        }],
-        transaction: t
-      });
-
-      // Cập nhật trạng thái các lịch hẹn bị ảnh hưởng
-      if (affectedAppointments.length > 0) {
-        await db.Appointment.update(
-          { status: "doctor_day_off" },
-          {
-            where: {
-              appointment_id: affectedAppointments.map(apt => apt.appointment_id)
-            },
-            transaction: t
-          }
-        );
-      }
-
-      await t.commit();
-
-      return {
-        success: true,
-        message: "Cập nhật ngày nghỉ thành công",
-        data: {
-          id: existingDayOff.day_off_id,
-          date: existingDayOff.off_date,
-          morning: existingDayOff.off_morning,
-          afternoon: existingDayOff.off_afternoon,
-          reason: existingDayOff.reason,
-          created_at: existingDayOff.createdAt,
-          affected_appointments: affectedAppointments.map(apt => ({
-            id: apt.appointment_id,
-            datetime: apt.appointment_datetime,
-            patient: {
-              email: apt.patient.user.email
-            }
-          }))
-        }
-      };
-    }
-
-    // 3. Tạo ngày nghỉ mới
-    const newDayOff = await db.DoctorDayOff.create({
-      doctor_id,
-      off_date: dayOffDate.format('YYYY-MM-DD'),
-      off_morning: time_off === 'morning' || time_off === 'all',
-      off_afternoon: time_off === 'afternoon' || time_off === 'all',
-      reason,
-      status: "active"
-    }, { transaction: t });
-
-    // 4. Tìm các lịch hẹn bị ảnh hưởng
-    const affectedAppointments = await db.Appointment.findAll({
-      where: {
-        doctor_id,
-        status: "accepted",
-        [Op.and]: [
-          Sequelize.where(Sequelize.fn('DATE', Sequelize.col('appointment_datetime')), dayOffDate.format('YYYY-MM-DD')),
-          time_off === 'all'
-            ? {}
-            : time_off === 'morning'
-              ? Sequelize.where(Sequelize.fn('HOUR', Sequelize.col('appointment_datetime')), '<', 12)
-              : Sequelize.where(Sequelize.fn('HOUR', Sequelize.col('appointment_datetime')), '>=', 12)
-        ]
-      },
-      include: [{
-        model: db.Patient,
-        as: 'patient',
-        include: [{
-          model: db.User,
-          as: 'user',
-          attributes: ['email']
-        }]
-      }],
-      transaction: t
-    });
-
-    // 5. Cập nhật trạng thái các lịch hẹn bị ảnh hưởng
-    if (affectedAppointments.length > 0) {
-      await db.Appointment.update(
-        { status: "doctor_day_off" },
-        {
-          where: {
-            appointment_id: affectedAppointments.map(apt => apt.appointment_id)
-          },
-          transaction: t
-        }
-      );
-    }
-
-    await t.commit();
-
-    return {
-      success: true,
-      message: "Đăng ký ngày nghỉ thành công",
-      data: {
-        id: newDayOff.day_off_id,
-        date: newDayOff.off_date,
-        morning: newDayOff.off_morning,
-        afternoon: newDayOff.off_afternoon,
-        reason: newDayOff.reason,
-        created_at: newDayOff.createdAt,
-        affected_appointments: affectedAppointments.map(apt => ({
-          id: apt.appointment_id,
-          datetime: apt.appointment_datetime,
-          patient: {
-            email: apt.patient.user.email
-          }
-        }))
-      }
-    };
-  } catch (error) {
-    await t.rollback();
-    throw error;
-  }
-};
 
 export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
   // Kiểm tra ngày nghỉ tồn tại
@@ -412,8 +205,8 @@ export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
         Sequelize.where(Sequelize.fn('DATE', Sequelize.col('appointment_datetime')), dayOff.off_date),
         {
           [Op.or]: [
-            cancelMorning ? Sequelize.where(Sequelize.fn('HOUR', Sequelize.col('appointment_datetime')), '<', 12) : null,
-            cancelAfternoon ? Sequelize.where(Sequelize.fn('HOUR', Sequelize.col('appointment_datetime')), '>=', 12) : null
+            cancelMorning ? Sequelize.where(Sequelize.fn('TIME', Sequelize.col('appointment_datetime')), '<', '12:00:00') : null,
+            cancelAfternoon ? Sequelize.where(Sequelize.fn('TIME', Sequelize.col('appointment_datetime')), '>=', '12:00:00') : null
           ].filter(Boolean)
         }
       ]
@@ -483,9 +276,9 @@ export const getDoctorAppointments = async ({ doctor_id, filter_date, status, st
     whereClause.status = status;
   }
 
-  // Xử lý điều kiện lọc theo ngày
+  // Xử lý điều kiện lọc theo ngày với múi giờ Việt Nam
   if (filter_date) {
-    const filterDay = dayjs(filter_date).startOf('day');
+    const filterDay = dayjs.tz(filter_date, 'Asia/Ho_Chi_Minh').startOf('day');
     whereClause.appointment_datetime = {
       [Op.between]: [
         filterDay.format('YYYY-MM-DD HH:mm:ss'),
@@ -495,8 +288,8 @@ export const getDoctorAppointments = async ({ doctor_id, filter_date, status, st
   } else if (start_date && end_date) {
     whereClause.appointment_datetime = {
       [Op.between]: [
-        dayjs(start_date).startOf('day').format('YYYY-MM-DD HH:mm:ss'),
-        dayjs(end_date).endOf('day').format('YYYY-MM-DD HH:mm:ss')
+        dayjs.tz(start_date, 'Asia/Ho_Chi_Minh').startOf('day').format('YYYY-MM-DD HH:mm:ss'),
+        dayjs.tz(end_date, 'Asia/Ho_Chi_Minh').endOf('day').format('YYYY-MM-DD HH:mm:ss')
       ]
     };
   }
@@ -518,7 +311,7 @@ export const getDoctorAppointments = async ({ doctor_id, filter_date, status, st
     order: [["appointment_datetime", "ASC"]],
   });
 
-  // Format dữ liệu trả về
+  // Format dữ liệu trả về với múi giờ Việt Nam
   return {
     success: true,
     message: "Lấy danh sách lịch hẹn thành công",
@@ -527,7 +320,8 @@ export const getDoctorAppointments = async ({ doctor_id, filter_date, status, st
       patient_name: appointment.patient.user.username,
       patient_email: appointment.patient.user.email,
       appointment_datetime: dayjs(appointment.appointment_datetime)
-        .format('YYYY-MM-DDTHH:mm:ss'), // Giữ nguyên giờ như trong DB
+        .tz('Asia/Ho_Chi_Minh')
+        .format('YYYY-MM-DDTHH:mm:ss'), // Chuyển đổi sang múi giờ Việt Nam
       status: appointment.status,
       fees: appointment.fees,
       doctor_id: appointment.doctor_id
@@ -856,17 +650,21 @@ export const getDoctorDayOffs = async (doctor_id, start, end) => {
     status: "active"
   };
 
+  // Xử lý điều kiện lọc theo ngày với múi giờ Việt Nam
   if (start && end) {
     whereClause.off_date = {
-      [Op.between]: [start, end]
+      [Op.between]: [
+        dayjs.tz(start, 'Asia/Ho_Chi_Minh').startOf('day').format('YYYY-MM-DD'),
+        dayjs.tz(end, 'Asia/Ho_Chi_Minh').endOf('day').format('YYYY-MM-DD')
+      ]
     };
   } else if (start) {
     whereClause.off_date = {
-      [Op.gte]: start
+      [Op.gte]: dayjs.tz(start, 'Asia/Ho_Chi_Minh').startOf('day').format('YYYY-MM-DD')
     };
   } else if (end) {
     whereClause.off_date = {
-      [Op.lte]: end
+      [Op.lte]: dayjs.tz(end, 'Asia/Ho_Chi_Minh').endOf('day').format('YYYY-MM-DD')
     };
   }
 
@@ -875,14 +673,14 @@ export const getDoctorDayOffs = async (doctor_id, start, end) => {
     order: [['off_date', 'ASC']]
   });
 
-  // Format response
+  // Format response với múi giờ Việt Nam
   const formattedDayOffs = dayOffs.map(dayOff => ({
     id: dayOff.day_off_id,
-    date: dayOff.off_date,
+    date: dayjs(dayOff.off_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD'),
     morning: dayOff.off_morning,
     afternoon: dayOff.off_afternoon,
     reason: dayOff.reason,
-    created_at: dayOff.createdAt
+    created_at: dayjs(dayOff.createdAt).tz('Asia/Ho_Chi_Minh').format()
   }));
 
   return {
@@ -950,45 +748,232 @@ export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
   };
 };
 
-export const createDayOff = async (req, res, next) => {
-  try {
-    console.log('Request body:', req.body);
-    const doctor_id = req.user.user_id;
-    
-    // Destructure request body
-    const { off_date, time_off, reason } = req.body;
-    
-    console.log('Doctor ID:', doctor_id);
-    console.log('Off date:', off_date);
-    console.log('Time off:', time_off);
-    console.log('Reason:', reason);
+export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) => {
+  // Bắt đầu transaction
+  const t = await db.sequelize.transaction();
 
-    // Validate input
+  try {
+    // 1. Validate thời gian nghỉ
     if (!off_date || !time_off) {
-      console.log('Validation failed - missing required fields');
       throw new BadRequestError("Thiếu thông tin ngày nghỉ hoặc buổi nghỉ");
     }
 
-    // Gọi service với các tham số riêng lẻ
-    const result = await createDoctorDayOff(
-      doctor_id,
-      off_date,  // Truyền trực tiếp giá trị off_date
-      time_off,  // Truyền trực tiếp giá trị time_off
-      reason || ''  // Truyền trực tiếp giá trị reason
-    );
-    
-    res.status(201).json(result);
-  } catch (error) {
-    console.error('Error in createDayOff:', error);
-    next(error);
-  }
-};
+    if (!['morning', 'afternoon', 'all'].includes(time_off)) {
+      throw new BadRequestError("Buổi nghỉ không hợp lệ");
+    }
 
-export const cancelDayOff = async (req, res, next) => {
-  try {
-    const result = await cancelDoctorDayOff(req.user.user_id, req.params.day_off_id);
-    res.status(200).json(result);
+    // Chuyển đổi ngày nghỉ sang múi giờ Việt Nam và lấy đầu ngày
+    const dayOffDate = dayjs.tz(off_date, 'Asia/Ho_Chi_Minh').startOf('day');
+    if (!dayOffDate.isValid()) {
+      throw new BadRequestError("Ngày nghỉ không hợp lệ");
+    }
+
+    // So sánh với thời gian hiện tại ở múi giờ Việt Nam (đầu ngày)
+    const today = dayjs().tz('Asia/Ho_Chi_Minh').startOf('day');
+    if (dayOffDate.isBefore(today)) {
+      throw new BadRequestError("Không thể đăng ký ngày nghỉ trong quá khứ");
+    }
+
+    // Hàm trợ giúp để lấy điều kiện thời gian dựa trên time_off
+    const getTimeCondition = (timeOffType) => {
+      if (timeOffType === 'morning') {
+        return Sequelize.where(
+          Sequelize.fn('HOUR', Sequelize.fn('CONVERT_TZ', Sequelize.col('appointment_datetime'), '+00:00', '+07:00')),
+          {
+            [Op.between]: [8, 11]
+          }
+        );
+      } else if (timeOffType === 'afternoon') {
+        return Sequelize.where(
+          Sequelize.fn('HOUR', Sequelize.fn('CONVERT_TZ', Sequelize.col('appointment_datetime'), '+00:00', '+07:00')),
+          {
+            [Op.between]: [13, 16]
+          }
+        );
+      } else {
+        return {};
+      }
+    };
+
+    // 2. Kiểm tra xem đã đăng ký nghỉ chưa
+    const existingDayOff = await db.DoctorDayOff.findOne({
+      where: {
+        doctor_id,
+        off_date: dayOffDate.format('YYYY-MM-DD'),
+        status: "active"
+      },
+      transaction: t
+    });
+
+    let affectedAppointments = [];
+    let message = "Đăng ký ngày nghỉ thành công";
+    let updatedDayOff;
+
+    // Nếu đã có ngày nghỉ, kiểm tra xem có thể đăng ký thêm không
+    if (existingDayOff) {
+      if (time_off === 'all') {
+        throw new BadRequestError("Bạn đã đăng ký nghỉ vào ngày này");
+      }
+      if (time_off === 'morning' && existingDayOff.off_morning) {
+        throw new BadRequestError("Bạn đã đăng ký nghỉ buổi sáng của ngày này");
+      }
+      if (time_off === 'afternoon' && existingDayOff.off_afternoon) {
+        throw new BadRequestError("Bạn đã đăng ký nghỉ buổi chiều của ngày này");
+      }
+
+      const updateData = {};
+      let reasonUpdate = existingDayOff.reason || "";
+
+      if (time_off === 'morning' && !existingDayOff.off_morning) {
+        updateData.off_morning = true;
+        reasonUpdate = reasonUpdate ? `${reasonUpdate}; ${reason}` : reason;
+      } else if (time_off === 'afternoon' && !existingDayOff.off_afternoon) {
+        updateData.off_afternoon = true;
+        reasonUpdate = reasonUpdate ? `${reasonUpdate}; ${reason}` : reason;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        updateData.reason = reasonUpdate;
+        await existingDayOff.update(updateData, { transaction: t });
+        updatedDayOff = await db.DoctorDayOff.findByPk(existingDayOff.day_off_id, { transaction: t });
+        message = "Cập nhật ngày nghỉ thành công";
+
+        // Tìm và cập nhật các lịch hẹn bị ảnh hưởng
+        const timeCondition = getTimeCondition(time_off);
+
+        const foundAppointments = await db.Appointment.findAll({
+          where: {
+            doctor_id,
+            status: {
+              [Op.in]: ["accepted", "waiting_for_confirmation"]
+            },
+            [Op.and]: [
+              Sequelize.where(
+                Sequelize.fn('DATE', Sequelize.col('appointment_datetime')),
+                dayOffDate.format('YYYY-MM-DD')
+              ),
+              timeCondition
+            ]
+          },
+          include: [{
+            model: db.Patient,
+            as: 'patient',
+            include: [{
+              model: db.User,
+              as: 'user',
+              attributes: ['email']
+            }]
+          }],
+          transaction: t
+        });
+
+        // Cập nhật trạng thái các lịch hẹn bị ảnh hưởng
+        if (foundAppointments.length > 0) {
+          await db.Appointment.update(
+            { status: "doctor_day_off" },
+            {
+              where: {
+                appointment_id: foundAppointments.map(apt => apt.appointment_id)
+              },
+              transaction: t
+            }
+          );
+          affectedAppointments = foundAppointments;
+        }
+      } else {
+        return {
+          success: true,
+          message: "Ngày nghỉ này đã được đăng ký cho buổi này",
+          data: {
+            id: existingDayOff.day_off_id,
+            date: dayjs(existingDayOff.off_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD'),
+            morning: existingDayOff.off_morning,
+            afternoon: existingDayOff.off_afternoon,
+            reason: existingDayOff.reason,
+            created_at: dayjs(existingDayOff.createdAt).tz('Asia/Ho_Chi_Minh').format(),
+            affected_appointments: []
+          }
+        };
+      }
+    } else {
+      // 3. Tạo ngày nghỉ mới
+      const newDayOff = await db.DoctorDayOff.create({
+        doctor_id,
+        off_date: dayOffDate.format('YYYY-MM-DD'),
+        off_morning: time_off === 'morning' || time_off === 'all',
+        off_afternoon: time_off === 'afternoon' || time_off === 'all',
+        reason,
+        status: "active"
+      }, { transaction: t });
+      updatedDayOff = newDayOff;
+
+      // 4. Tìm các lịch hẹn bị ảnh hưởng
+      const timeCondition = getTimeCondition(time_off);
+
+      const foundAppointments = await db.Appointment.findAll({
+        where: {
+          doctor_id,
+          status: {
+            [Op.in]: ["accepted", "waiting_for_confirmation"]
+          },
+          [Op.and]: [
+            Sequelize.where(
+              Sequelize.fn('DATE', Sequelize.col('appointment_datetime')),
+              dayOffDate.format('YYYY-MM-DD')
+            ),
+            timeCondition
+          ]
+        },
+        include: [{
+          model: db.Patient,
+          as: 'patient',
+          include: [{
+            model: db.User,
+            as: 'user',
+            attributes: ['email']
+          }]
+        }],
+        transaction: t
+      });
+
+      // Cập nhật trạng thái của các lịch hẹn bị ảnh hưởng
+      if (foundAppointments.length > 0) {
+        await db.Appointment.update(
+          { status: "doctor_day_off" },
+          {
+            where: {
+              appointment_id: foundAppointments.map(apt => apt.appointment_id)
+            },
+            transaction: t
+          }
+        );
+        affectedAppointments = foundAppointments;
+      }
+    }
+
+    await t.commit();
+
+    return {
+      success: true,
+      message,
+      data: {
+        id: updatedDayOff.day_off_id,
+        date: dayjs(updatedDayOff.off_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD'),
+        morning: updatedDayOff.off_morning,
+        afternoon: updatedDayOff.off_afternoon,
+        reason: updatedDayOff.reason,
+        created_at: dayjs(updatedDayOff.createdAt).tz('Asia/Ho_Chi_Minh').format(),
+        affected_appointments: affectedAppointments.map(apt => ({
+          id: apt.appointment_id,
+          datetime: dayjs(apt.appointment_datetime).tz('Asia/Ho_Chi_Minh').format(),
+          patient: {
+            email: apt.patient.user.email
+          }
+        }))
+      }
+    };
   } catch (error) {
-    next(error);
+    await t.rollback();
+    throw error;
   }
 };
