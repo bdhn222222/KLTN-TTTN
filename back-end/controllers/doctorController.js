@@ -3,7 +3,7 @@ import {
   loginDoctor,
   updateDoctorProfile,
   createDoctorDayOff,
-  // cancelDoctorDayOff,
+  cancelDoctorDayOff,
   getDoctorAppointments,
   getDoctorSummary,
   getDoctorAppointmentStats,
@@ -125,9 +125,9 @@ export const completeAppointmentController = asyncHandler(async (req, res) => {
 export const getDoctorDayOffsController = asyncHandler(async (req, res, next) => {
   try {
     const doctor_id = req.user.user_id;
-    const { start, end } = req.query;
+    const { start, end, status, date } = req.query;
 
-    const result = await getDoctorDayOffs(doctor_id, start, end);
+    const result = await getDoctorDayOffs(doctor_id, start, end, status, date);
     res.status(200).json(result);
   } catch (error) {
     if (error instanceof BadRequestError) {
@@ -160,12 +160,18 @@ export const createDoctorDayOffController = asyncHandler(async (req, res) => {
     throw new Error(result.message || 'Đã có lỗi xảy ra khi đăng ký ngày nghỉ');
   }
 });
-// export const cancelDoctorDayOffController = asyncHandler(async (req, res) => {
-//   const doctor_id = req.user.user_id;
-//   const day_off_id = req.params.id;
-//   const { time_off } = req.body;
+export const cancelDoctorDayOffController = asyncHandler(async (req, res) => {
+  const doctor_id = req.user.user_id; // Lấy từ token
+  const day_off_id = req.params.id;
+  const { time_off } = req.body;
 
-//   const result = await cancelDoctorDayOff(doctor_id, day_off_id, time_off);
+  if (!time_off) {
+    throw new BadRequestError("Thiếu thông tin buổi nghỉ cần hủy");
+  }
 
-//   res.status(200).json(result);
-// });
+  // Gọi service cancelDoctorDayOff để xử lý
+  const result = await cancelDoctorDayOff(doctor_id, day_off_id, time_off);
+
+  // Trả về kết quả cho người dùng
+  res.status(200).json(result);
+});

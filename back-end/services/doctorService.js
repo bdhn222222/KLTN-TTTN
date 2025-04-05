@@ -129,142 +129,6 @@ export const updateDoctorProfile = async (user_id, data, authenticatedUser) => {
   };
 };
 
-
-
-
-export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
-  // Kiểm tra ngày nghỉ tồn tại
-  const dayOff = await DoctorDayOff.findOne({
-    where: {
-      day_off_id,
-      doctor_id,
-      status: "active"
-    }
-  });
-
-  if (!dayOff) {
-    throw new NotFoundError("Không tìm thấy ngày nghỉ");
-  }
-
-  // Kiểm tra tham số time_off hợp lệ
-  if (!['morning', 'afternoon', 'full'].includes(time_off)) {
-    throw new BadRequestError("Buổi nghỉ không hợp lệ. Chỉ có thể hủy 'morning', 'afternoon', hoặc 'full'.");
-  }
-
-  // Kiểm tra thời gian hủy
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const offDate = new Date(dayOff.off_date);
-  if (offDate <= today) {
-    throw new BadRequestError("Không thể hủy ngày nghỉ trong quá khứ hoặc hôm nay");
-  }
-
-  // Kiểm tra xem có đăng ký nghỉ buổi đó không
-  if (time_off === 'morning' && !dayOff.off_morning) {
-    throw new BadRequestError("Bạn không có đăng ký nghỉ buổi sáng");
-  }
-  if (time_off === 'afternoon' && !dayOff.off_afternoon) {
-    throw new BadRequestError("Bạn không có đăng ký nghỉ buổi chiều");
-  }
-  if (time_off === 'full' && (!dayOff.off_morning && !dayOff.off_afternoon)) {
-    throw new BadRequestError("Bạn không có đăng ký nghỉ cả ngày");
-  }
-
-  // Xác định thực sự cần hủy buổi nào
-  let cancelMorning = false;
-  let cancelAfternoon = false;
-  let message = '';
-
-  if (time_off === 'full') {
-    // Nếu yêu cầu hủy cả ngày nhưng chỉ đăng ký một buổi
-    if (dayOff.off_morning && !dayOff.off_afternoon) {
-      cancelMorning = true;
-      message = "Chỉ có lịch nghỉ buổi sáng được hủy. Buổi chiều vẫn làm việc bình thường.";
-    } else if (!dayOff.off_morning && dayOff.off_afternoon) {
-      cancelAfternoon = true;
-      message = "Chỉ có lịch nghỉ buổi chiều được hủy. Buổi sáng vẫn làm việc bình thường.";
-    } else {
-      cancelMorning = true;
-      cancelAfternoon = true;
-      message = "Đã hủy lịch nghỉ cả ngày thành công.";
-    }
-  } else if (time_off === 'morning') {
-    cancelMorning = true;
-    message = "Đã hủy lịch nghỉ buổi sáng thành công. Buổi chiều vẫn giữ nguyên trạng thái.";
-  } else {
-    cancelAfternoon = true;
-    message = "Đã hủy lịch nghỉ buổi chiều thành công. Buổi sáng vẫn giữ nguyên trạng thái.";
-  }
-
-  // Tìm các lịch hẹn bị ảnh hưởng
-  const affectedAppointments = await db.Appointment.findAll({
-    where: {
-      doctor_id,
-      status: "doctor_day_off",
-      [Op.and]: [
-        Sequelize.where(Sequelize.fn('DATE', Sequelize.col('appointment_datetime')), dayOff.off_date),
-        {
-          [Op.or]: [
-            cancelMorning ? Sequelize.where(Sequelize.fn('TIME', Sequelize.col('appointment_datetime')), '<', '12:00:00') : null,
-            cancelAfternoon ? Sequelize.where(Sequelize.fn('TIME', Sequelize.col('appointment_datetime')), '>=', '12:00:00') : null
-          ].filter(Boolean)
-        }
-      ]
-    },
-    include: [{
-      model: db.Patient,
-      as: 'patient',
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['email']
-      }]
-    }]
-  });
-
-  // Cập nhật trạng thái ngày nghỉ
-  if (cancelMorning && cancelAfternoon) {
-    await dayOff.update({ status: "cancelled" });
-  } else {
-    await dayOff.update({
-      off_morning: cancelMorning ? false : dayOff.off_morning,
-      off_afternoon: cancelAfternoon ? false : dayOff.off_afternoon
-    });
-  }
-
-  // Khôi phục trạng thái các lịch hẹn
-  if (affectedAppointments.length > 0) {
-    await db.Appointment.update(
-      { status: "waiting_for_confirmation" },
-      {
-        where: {
-          appointment_id: affectedAppointments.map(apt => apt.appointment_id)
-        }
-      }
-    );
-  }
-
-  return {
-    success: true,
-    message: message,
-    data: {
-      day_off: {
-        ...dayOff.dataValues,
-        remaining_morning: !cancelMorning && dayOff.off_morning,
-        remaining_afternoon: !cancelAfternoon && dayOff.off_afternoon
-      },
-      affected_appointments: affectedAppointments.map(apt => ({
-        id: apt.appointment_id,
-        datetime: apt.appointment_datetime,
-        patient: {
-          email: apt.patient.user.email
-        }
-      }))
-    }
-  };
-};
-
-
 export const getDoctorAppointments = async ({ doctor_id, filter_date, status, start_date, end_date }) => {
   // Xây dựng điều kiện where cho query
   const whereClause = {
@@ -295,14 +159,14 @@ export const getDoctorAppointments = async ({ doctor_id, filter_date, status, st
   }
 
   // Lấy danh sách lịch hẹn
-  const appointments = await db.Appointment.findAll({
+  const appointments = await Appointment.findAll({
     where: whereClause,
     include: [
       {
-        model: db.Patient,
+        model: Patient,
         as: "patient",
         include: {
-          model: db.User,
+          model: User,
           as: "user",
           attributes: ["user_id", "username", "email"],
         },
@@ -321,7 +185,7 @@ export const getDoctorAppointments = async ({ doctor_id, filter_date, status, st
       patient_email: appointment.patient.user.email,
       appointment_datetime: dayjs(appointment.appointment_datetime)
         .tz('Asia/Ho_Chi_Minh')
-        .format('YYYY-MM-DDTHH:mm:ss'), // Chuyển đổi sang múi giờ Việt Nam
+        .format('YYYY-MM-DDTHH:mm:ss'),
       status: appointment.status,
       fees: appointment.fees,
       doctor_id: appointment.doctor_id
@@ -338,7 +202,7 @@ export const getDoctorSummary = async (doctor_id) => {
     distinct: true,
     where: { doctor_id },
   });
-  const appointmentsByStatus = await db.Appointment.findAll({
+  const appointmentsByStatus = await db.Appointment.findfull({
     where: { doctor_id },
     attributes: [
       "status",
@@ -376,7 +240,7 @@ export const getDoctorAppointmentStats = async (doctor_id, start, end) => {
     };
   }
 
-  const appointments = await db.Appointment.findAll({
+  const appointments = await db.Appointment.findfull({
     where: whereClause,
     include: [
       {
@@ -644,50 +508,101 @@ export const completeAppointment = async (appointment_id, doctor_id) => {
   };
 };
 
-export const getDoctorDayOffs = async (doctor_id, start, end) => {
-  let whereClause = {
-    doctor_id,
-    status: "active"
-  };
+export const getDoctorDayOffs = async (doctor_id, start, end, status, date) => {
+  try {
+    let whereClause = {
+      doctor_id
+    };
 
-  // Xử lý điều kiện lọc theo ngày với múi giờ Việt Nam
-  if (start && end) {
-    whereClause.off_date = {
-      [Op.between]: [
-        dayjs.tz(start, 'Asia/Ho_Chi_Minh').startOf('day').format('YYYY-MM-DD'),
-        dayjs.tz(end, 'Asia/Ho_Chi_Minh').endOf('day').format('YYYY-MM-DD')
-      ]
+    // Thêm điều kiện lọc theo trạng thái nếu có
+    if (status) {
+      whereClause.status = status;
+    } else {
+      // Mặc định chỉ lấy các ngày nghỉ còn active
+      whereClause.status = "active";
+    }
+
+    // Xử lý điều kiện lọc theo ngày với múi giờ Việt Nam
+    if (date) {
+      // Nếu có date, lấy ngày nghỉ của ngày cụ thể
+      const targetDate = dayjs.tz(date, 'Asia/Ho_Chi_Minh').format('YYYY-MM-DD');
+      whereClause.off_date = targetDate;
+    } else if (start && end) {
+      whereClause.off_date = {
+        [Op.between]: [
+          dayjs.tz(start, 'Asia/Ho_Chi_Minh').startOf('day').format('YYYY-MM-DD'),
+          dayjs.tz(end, 'Asia/Ho_Chi_Minh').endOf('day').format('YYYY-MM-DD')
+        ]
+      };
+    } else if (start) {
+      // Nếu chỉ có ngày bắt đầu, lấy từ ngày đó đến hiện tại
+      whereClause.off_date = {
+        [Op.gte]: dayjs.tz(start, 'Asia/Ho_Chi_Minh').startOf('day').format('YYYY-MM-DD')
+      };
+    } else if (end) {
+      // Nếu chỉ có ngày kết thúc, lấy từ quá khứ đến ngày đó
+      whereClause.off_date = {
+        [Op.lte]: dayjs.tz(end, 'Asia/Ho_Chi_Minh').endOf('day').format('YYYY-MM-DD')
+      };
+    }
+
+    const dayOffs = await DoctorDayOff.findAll({
+      where: whereClause,
+      order: [['off_date', 'ASC']]
+    });
+
+    // Format response với múi giờ Việt Nam và lấy thông tin các cuộc hẹn bị ảnh hưởng
+    const formattedDayOffs = await Promise.all(dayOffs.map(async dayOff => {
+      // Tìm các cuộc hẹn bị ảnh hưởng
+      const affectedAppointments = await Appointment.findAll({
+        where: {
+          doctor_id,
+          status: "doctor_day_off",
+          appointment_datetime: {
+            [Op.between]: [
+              dayjs.tz(dayOff.off_date, 'Asia/Ho_Chi_Minh').startOf('day').format('YYYY-MM-DD HH:mm:ss'),
+              dayjs.tz(dayOff.off_date, 'Asia/Ho_Chi_Minh').endOf('day').format('YYYY-MM-DD HH:mm:ss')
+            ]
+          }
+        },
+        include: [{
+          model: Patient,
+          as: 'patient',
+          include: [{
+            model: User,
+            as: 'user',
+            attributes: ['email']
+          }]
+        }]
+      });
+
+      return {
+        id: dayOff.day_off_id,
+        date: dayjs(dayOff.off_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD'),
+        morning: dayOff.off_morning,
+        afternoon: dayOff.off_afternoon,
+        reason: dayOff.reason,
+        status: dayOff.status,
+        created_at: dayjs(dayOff.createdAt).tz('Asia/Ho_Chi_Minh').format(),
+        affected_appointments: affectedAppointments.map(apt => ({
+          id: apt.appointment_id,
+          datetime: dayjs(apt.appointment_datetime).tz('Asia/Ho_Chi_Minh').format(),
+          patient: {
+            email: apt.patient.user.email
+          }
+        }))
+      };
+    }));
+
+    return {
+      success: true,
+      message: "Lấy danh sách ngày nghỉ thành công",
+      data: formattedDayOffs
     };
-  } else if (start) {
-    whereClause.off_date = {
-      [Op.gte]: dayjs.tz(start, 'Asia/Ho_Chi_Minh').startOf('day').format('YYYY-MM-DD')
-    };
-  } else if (end) {
-    whereClause.off_date = {
-      [Op.lte]: dayjs.tz(end, 'Asia/Ho_Chi_Minh').endOf('day').format('YYYY-MM-DD')
-    };
+  } catch (error) {
+    console.error('Error in getDoctorDayOffs:', error);
+    throw new InternalServerError("Có lỗi xảy ra khi lấy danh sách ngày nghỉ");
   }
-
-  const dayOffs = await DoctorDayOff.findAll({
-    where: whereClause,
-    order: [['off_date', 'ASC']]
-  });
-
-  // Format response với múi giờ Việt Nam
-  const formattedDayOffs = dayOffs.map(dayOff => ({
-    id: dayOff.day_off_id,
-    date: dayjs(dayOff.off_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD'),
-    morning: dayOff.off_morning,
-    afternoon: dayOff.off_afternoon,
-    reason: dayOff.reason,
-    created_at: dayjs(dayOff.createdAt).tz('Asia/Ho_Chi_Minh').format()
-  }));
-
-  return {
-    success: true,
-    message: "Lấy danh sách ngày nghỉ thành công",
-    data: formattedDayOffs
-  };
 };
 
 export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
@@ -758,7 +673,7 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
       throw new BadRequestError("Thiếu thông tin ngày nghỉ hoặc buổi nghỉ");
     }
 
-    if (!['morning', 'afternoon', 'all'].includes(time_off)) {
+    if (!['morning', 'afternoon', 'full'].includes(time_off)) {
       throw new BadRequestError("Buổi nghỉ không hợp lệ");
     }
 
@@ -811,13 +726,16 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
 
     // Nếu đã có ngày nghỉ, kiểm tra xem có thể đăng ký thêm không
     if (existingDayOff) {
-      if (time_off === 'all') {
-        throw new BadRequestError("Bạn đã đăng ký nghỉ vào ngày này");
-      }
-      if (time_off === 'morning' && existingDayOff.off_morning) {
+      if (time_off === 'full') {
+        // Nếu đã đăng ký cả hai buổi, báo lỗi
+        if (existingDayOff.off_morning && existingDayOff.off_afternoon) {
+          throw new BadRequestError("Bạn đã đăng ký nghỉ cả ngày này");
+        }
+        // Nếu đã đăng ký một buổi, cho phép đăng ký thêm buổi còn lại
+        message = "Cập nhật ngày nghỉ thành công";
+      } else if (time_off === 'morning' && existingDayOff.off_morning) {
         throw new BadRequestError("Bạn đã đăng ký nghỉ buổi sáng của ngày này");
-      }
-      if (time_off === 'afternoon' && existingDayOff.off_afternoon) {
+      } else if (time_off === 'afternoon' && existingDayOff.off_afternoon) {
         throw new BadRequestError("Bạn đã đăng ký nghỉ buổi chiều của ngày này");
       }
 
@@ -829,6 +747,15 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
         reasonUpdate = reasonUpdate ? `${reasonUpdate}; ${reason}` : reason;
       } else if (time_off === 'afternoon' && !existingDayOff.off_afternoon) {
         updateData.off_afternoon = true;
+        reasonUpdate = reasonUpdate ? `${reasonUpdate}; ${reason}` : reason;
+      } else if (time_off === 'full') {
+        // Nếu đăng ký full, cập nhật buổi còn lại
+        if (!existingDayOff.off_morning) {
+          updateData.off_morning = true;
+        }
+        if (!existingDayOff.off_afternoon) {
+          updateData.off_afternoon = true;
+        }
         reasonUpdate = reasonUpdate ? `${reasonUpdate}; ${reason}` : reason;
       }
 
@@ -900,8 +827,8 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
       const newDayOff = await db.DoctorDayOff.create({
         doctor_id,
         off_date: dayOffDate.format('YYYY-MM-DD'),
-        off_morning: time_off === 'morning' || time_off === 'all',
-        off_afternoon: time_off === 'afternoon' || time_off === 'all',
+        off_morning: time_off === 'morning' || time_off === 'full',
+        off_afternoon: time_off === 'afternoon' || time_off === 'full',
         reason,
         status: "active"
       }, { transaction: t });
@@ -971,6 +898,147 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
           }
         }))
       }
+    };
+  } catch (error) {
+    await t.rollback();
+    throw error;
+  }
+};
+export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
+  // Bắt đầu transaction
+  const t = await db.sequelize.transaction();
+
+  try {
+    // 1. Kiểm tra ngày nghỉ tồn tại
+    const dayOff = await db.DoctorDayOff.findOne({
+      where: {
+        doctor_id,
+        day_off_id,
+        status: "active",
+      },
+      transaction: t,
+    });
+
+    if (!dayOff) {
+      throw new NotFoundError("Không tìm thấy ngày nghỉ");
+    }
+
+    // 2. Kiểm tra thời gian hủy
+    const today = dayjs().tz('Asia/Ho_Chi_Minh').startOf('day');
+    const offDate = dayjs(dayOff.off_date).tz('Asia/Ho_Chi_Minh').startOf('day');
+    if (offDate.isBefore(today) || offDate.isSame(today, 'day')) {
+      throw new BadRequestError("Không thể hủy ngày nghỉ trong quá khứ hoặc hôm nay");
+    }
+
+    // 3. Kiểm tra time_off hợp lệ
+    if (!['morning', 'afternoon', 'full'].includes(time_off)) {
+      throw new BadRequestError("Buổi nghỉ không hợp lệ");
+    }
+
+    // 4. Kiểm tra xem có đăng ký nghỉ buổi đó không
+    if (time_off === 'morning' && !dayOff.off_morning) {
+      throw new BadRequestError("Bạn chưa đăng ký nghỉ buổi sáng");
+    }
+    if (time_off === 'afternoon' && !dayOff.off_afternoon) {
+      throw new BadRequestError("Bạn chưa đăng ký nghỉ buổi chiều");
+    }
+
+    // 5. Tìm các lịch hẹn bị ảnh hưởng dựa trên buổi được chọn
+    const whereClause = {
+      doctor_id,
+      status: "doctor_day_off",
+      [Op.and]: [
+        Sequelize.where(
+          Sequelize.fn('DATE', Sequelize.col('appointment_datetime')),
+          dayOff.off_date
+        )
+      ]
+    };
+
+    // Thêm điều kiện lọc theo thời gian
+    if (time_off === 'morning') {
+      whereClause[Op.and].push(
+        Sequelize.where(
+          Sequelize.fn('TIME', Sequelize.fn('CONVERT_TZ', Sequelize.col('appointment_datetime'), '+00:00', '+07:00')),
+          {
+            [Op.between]: ['08:00:00', '11:30:00']
+          }
+        )
+      );
+    } else if (time_off === 'afternoon') {
+      whereClause[Op.and].push(
+        Sequelize.where(
+          Sequelize.fn('TIME', Sequelize.fn('CONVERT_TZ', Sequelize.col('appointment_datetime'), '+00:00', '+07:00')),
+          {
+            [Op.between]: ['13:30:00', '17:00:00']
+          }
+        )
+      );
+    }
+
+    const affectedAppointments = await db.Appointment.findAll({
+      where: whereClause,
+      include: [{
+        model: db.Patient,
+        as: 'patient',
+        include: [{
+          model: db.User,
+          as: 'user',
+          attributes: ['email']
+        }]
+      }],
+      transaction: t,
+    });
+
+    // 6. Cập nhật trạng thái ngày nghỉ
+    const updateData = {};
+    if (time_off === 'morning') {
+      updateData.off_morning = false;
+    } else if (time_off === 'afternoon') {
+      updateData.off_afternoon = false;
+    } else {
+      updateData.status = "cancelled";
+    }
+
+    // Nếu cả hai buổi đều false thì đánh dấu là đã hủy
+    if (time_off !== 'full' && 
+        ((time_off === 'morning' && !dayOff.off_afternoon) || 
+         (time_off === 'afternoon' && !dayOff.off_morning))) {
+      updateData.status = "cancelled";
+    }
+
+    await dayOff.update(updateData, { transaction: t });
+
+    // 7. Khôi phục trạng thái lịch hẹn
+    if (affectedAppointments.length > 0) {
+      await db.Appointment.update(
+        { status: "waiting_for_confirmation" },
+        {
+          where: {
+            appointment_id: affectedAppointments.map(apt => apt.appointment_id),
+          },
+          transaction: t,
+        }
+      );
+    }
+
+    await t.commit();
+
+    return {
+      success: true,
+      message: "Hủy ngày nghỉ thành công",
+      data: {
+        day_off: dayOff,
+        affected_appointments: affectedAppointments.length > 0
+          ? affectedAppointments.map(apt => ({
+              id: apt.appointment_id,
+              datetime: dayjs(apt.appointment_datetime)
+                .tz('Asia/Ho_Chi_Minh')
+                .format('YYYY-MM-DDTHH:mm:ssZ'),
+              patient_email: apt.patient.user.email,
+            }))
+          : [],
+      },
     };
   } catch (error) {
     await t.rollback();
