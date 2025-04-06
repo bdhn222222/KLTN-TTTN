@@ -1,7 +1,7 @@
 "use strict";
 
-export async function up(queryInterface, Sequelize) {
-  await queryInterface.createTable("DoctorDayOffs", {
+export const up = async (queryInterface, Sequelize) => {
+  await queryInterface.createTable('DoctorDayOffs', {
     day_off_id: {
       type: Sequelize.INTEGER,
       autoIncrement: true,
@@ -12,43 +12,51 @@ export async function up(queryInterface, Sequelize) {
       type: Sequelize.INTEGER,
       allowNull: false,
       references: {
-        model: "Doctors",
-        key: "doctor_id",
+        model: 'Doctors',
+        key: 'doctor_id'
       },
-      onUpdate: "CASCADE",
-      onDelete: "CASCADE",
     },
     off_date: {
       type: Sequelize.DATEONLY,
       allowNull: false,
+      comment: 'Ngày nghỉ'
     },
     off_morning: {
       type: Sequelize.BOOLEAN,
-      defaultValue: false,
       allowNull: false,
+      defaultValue: false,
+      comment: 'Nghỉ buổi sáng'
     },
     off_afternoon: {
       type: Sequelize.BOOLEAN,
-      defaultValue: false,
       allowNull: false,
+      defaultValue: false,
+      comment: 'Nghỉ buổi chiều'
+    },
+    status: {
+      type: Sequelize.ENUM("active", "cancelled"),
+      allowNull: false,
+      defaultValue: "active",
+      comment: 'Trạng thái của ngày nghỉ'
     },
     reason: {
       type: Sequelize.STRING,
       allowNull: true,
+      comment: 'Lý do nghỉ'
     },
-    createdAt: {
+    created_at: {
       type: Sequelize.DATE,
       allowNull: false,
-      defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+      defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
     },
-    updatedAt: {
+    updated_at: {
       type: Sequelize.DATE,
       allowNull: false,
-      defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
-    },
+      defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+    }
   });
-}
+};
 
-export async function down(queryInterface, Sequelize) {
-  await queryInterface.dropTable("DoctorDayOffs");
-}
+export const down = async (queryInterface, Sequelize) => {
+  await queryInterface.dropTable('DoctorDayOffs');
+};

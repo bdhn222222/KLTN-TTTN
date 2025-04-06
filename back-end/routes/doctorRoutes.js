@@ -15,7 +15,7 @@ import {
   cancelDoctorDayOffController,
 } from "../controllers/doctorController.js";
 import validate from "../middleware/validate.js";
-import { body } from "express-validator";
+import { body, param } from "express-validator";
 import { authenticateUser } from "../middleware/authentication.js";
 import authorize from "../middleware/authorization.js";
 import {
@@ -87,17 +87,15 @@ router.get(
   getAppointmentDetailsController
 );
 router.put(
-  "/appointments/:id/accept",
+  "/appointments/:appointment_id/accept",
   authenticateUser,
   authorize(["doctor"]),
+  validate([
+    param("appointment_id").notEmpty().withMessage("Thiếu mã cuộc hẹn")
+  ]),
   acceptAppointmentController
 );
-router.put(
-  "/appointments/:id/cancel",
-  authenticateUser,
-  authorize(["doctor"]),
-  cancelAppointmentController
-);
+
 router.put(
   "/appointments/:id/mark-not-coming",
   authenticateUser,
@@ -122,5 +120,26 @@ router.put(
   authorize(["doctor"]),
   cancelDoctorDayOffController
 );
+
+router.put(
+  '/appointments/:id/cancel',
+  authenticateUser,
+  authorize(['doctor']),
+  validate([
+    param('id')
+      .notEmpty()
+      .withMessage('Thiếu mã cuộc hẹn')
+      .isInt()
+      .withMessage('Mã cuộc hẹn phải là số'),
+    body('reason')
+      .notEmpty()
+      .withMessage('Vui lòng nhập lý do nghỉ')
+      .trim()
+      .isLength({ min: 3, max: 200 })
+      .withMessage('Lý do nghỉ phải từ 3 đến 200 ký tự'),
+  ]),
+  cancelAppointmentController
+);
+
 
 export default router;

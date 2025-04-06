@@ -1,46 +1,48 @@
 import { Sequelize } from "sequelize";
 import dbConfig from "../config/config.js";
-import UserModel from "./user.js";
-import PatientModel from "./patients.js";
-import DoctorModel from "./doctors.js";
-import PharmacistModel from "./pharmacists.js";
-import AdminModel from "./admins.js";
-import SpecializationModel from "./specialization.js";
-import AppointmentModel from "./appointment.js";
-import FeedbackModel from "./feedbacks.js";
-import PrescriptionModel from "./prescriptions.js";
-import MedicineModel from "./medicines.js";
-import PrescriptionMedicineModel from "./prescription-medicines.js";
-import PrescriptionPaymentModel from "./prescription-payments.js";
-import PaymentModel from "./payments.js";
-import MedicalRecordModel from "./medicalRecords.js";
-import ScheduleModel from "./schedules.js";
-import DoctorDayOffModel from "./doctor-day-offs.js";
+import User from "./user.js";
+import Patient from "./patients.js";
+import Doctor from "./doctors.js";
+import Pharmacist from "./pharmacists.js";
+import Admin from "./admins.js";
+import Specialization from "./specialization.js";
+import Appointment from "./appointment.js";
+import Feedback from "./feedbacks.js";
+import Prescription from "./prescriptions.js";
+import Medicine from "./medicines.js";
+import PrescriptionMedicine from "./prescription-medicines.js";
+import PrescriptionPayment from "./prescription-payments.js";
+import Payment from "./payments.js";
+import MedicalRecord from "./medicalRecords.js";
+import Schedule from "./schedules.js";
+import DoctorDayOff from "./doctor-day-offs.js";
+import CompensationCode from "./compensationCode.js";
 
 const sequelize = new Sequelize(dbConfig.development);
 
 const db = {
   sequelize,
   Sequelize,
-  User: UserModel(sequelize, Sequelize.DataTypes),
-  Patient: PatientModel(sequelize, Sequelize.DataTypes),
-  Doctor: DoctorModel(sequelize, Sequelize.DataTypes),
-  DoctorDayOff: DoctorDayOffModel(sequelize, Sequelize.DataTypes),
-  Pharmacist: PharmacistModel(sequelize, Sequelize.DataTypes),
-  Admin: AdminModel(sequelize, Sequelize.DataTypes),
-  Specialization: SpecializationModel(sequelize, Sequelize.DataTypes),
-  Appointment: AppointmentModel(sequelize, Sequelize.DataTypes),
-  Feedback: FeedbackModel(sequelize, Sequelize.DataTypes),
-  Prescription: PrescriptionModel(sequelize, Sequelize.DataTypes),
-  Medicine: MedicineModel(sequelize, Sequelize.DataTypes),
-  PrescriptionMedicine: PrescriptionMedicineModel(
+  User: User(sequelize, Sequelize.DataTypes),
+  Patient: Patient(sequelize, Sequelize.DataTypes),
+  Doctor: Doctor(sequelize, Sequelize.DataTypes),
+  DoctorDayOff: DoctorDayOff(sequelize, Sequelize.DataTypes),
+  Pharmacist: Pharmacist(sequelize, Sequelize.DataTypes),
+  Admin: Admin(sequelize, Sequelize.DataTypes),
+  Specialization: Specialization(sequelize, Sequelize.DataTypes),
+  Appointment: Appointment(sequelize, Sequelize.DataTypes),
+  Feedback: Feedback(sequelize, Sequelize.DataTypes),
+  Prescription: Prescription(sequelize, Sequelize.DataTypes),
+  Medicine: Medicine(sequelize, Sequelize.DataTypes),
+  PrescriptionMedicine: PrescriptionMedicine(
     sequelize,
     Sequelize.DataTypes
   ),
-  PrescriptionPayment: PrescriptionPaymentModel(sequelize, Sequelize.DataTypes),
-  Payment: PaymentModel(sequelize, Sequelize.DataTypes),
-  MedicalRecord: MedicalRecordModel(sequelize, Sequelize.DataTypes),
-  Schedule: ScheduleModel(sequelize, Sequelize.DataTypes),
+  PrescriptionPayment: PrescriptionPayment(sequelize, Sequelize.DataTypes),
+  Payment: Payment(sequelize, Sequelize.DataTypes),
+  MedicalRecord: MedicalRecord(sequelize, Sequelize.DataTypes),
+  Schedule: Schedule(sequelize, Sequelize.DataTypes),
+  CompensationCode: CompensationCode(sequelize, Sequelize.DataTypes)
 };
 
 // Thiết lập các quan hệ giữa các bảng (nếu có)

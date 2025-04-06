@@ -3,12 +3,26 @@ import { Model, DataTypes } from "sequelize";
 export default (sequelize) => {
   class Appointment extends Model {
     static associate(models) {
-      Appointment.belongsTo(models.Doctor, { foreignKey: "doctor_id", as: "doctor" });
-      Appointment.belongsTo(models.Patient, { foreignKey: "patient_id", as: "patient" });
-      Appointment.hasOne(models.Feedback, { foreignKey: "appointment_id", as: "feedback" });
-      Appointment.hasOne(models.Prescription, { foreignKey: "appointment_id", as: "prescription" });
-      Appointment.hasOne(models.MedicalRecord, { foreignKey: "appointment_id", as: "medicalRecord" });
-      Appointment.hasOne(models.Payment, { foreignKey: "appointment_id", as: "payments" });
+      Appointment.belongsTo(models.Doctor, { foreignKey: "doctor_id", as: "Doctor" });
+      Appointment.belongsTo(models.Patient, { foreignKey: "patient_id", as: "Patient" });
+      Appointment.hasOne(models.Feedback, { foreignKey: "appointment_id", as: "Feedback" });
+      Appointment.hasOne(models.Prescription, { foreignKey: "appointment_id", as: "Prescription" });
+      Appointment.hasOne(models.MedicalRecord, { foreignKey: "appointment_id", as: "MedicalRecord" });
+      Appointment.hasOne(models.Payment, { foreignKey: "appointment_id", as: "Payments" });
+      Appointment.belongsToMany(models.DoctorDayOff, {
+        through: 'Day_off_appointments',
+        foreignKey: 'appointment_id',
+        otherKey: 'day_off_id',
+        as: 'DoctorDayOffs'
+      });
+      Appointment.hasOne(models.CompensationCode, {
+        foreignKey: 'appointment_id',
+        as: 'CompensationCode'
+      });
+      Appointment.hasOne(models.CompensationCode, {
+        foreignKey: 'used_appointment_id',
+        as: 'UsedCompensationCode'
+      });
     }
   }
 
@@ -19,6 +33,7 @@ export default (sequelize) => {
         autoIncrement: true,
         primaryKey: true,
         allowNull: false,
+        comment: 'ID của lịch hẹn'
       },
       patient_id: {
         type: DataTypes.INTEGER,
@@ -29,6 +44,7 @@ export default (sequelize) => {
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
+        comment: 'ID của bệnh nhân'
       },
       doctor_id: {
         type: DataTypes.INTEGER,
@@ -39,10 +55,12 @@ export default (sequelize) => {
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
+        comment: 'ID của bác sĩ'
       },
       appointment_datetime: {
         type: DataTypes.DATE,
         allowNull: false,
+        comment: 'Thời gian hẹn'
       },
       status: {
         type: DataTypes.ENUM(
@@ -55,19 +73,47 @@ export default (sequelize) => {
         ),
         allowNull: false,
         defaultValue: "waiting_for_confirmation",
+        comment: 'Trạng thái của lịch hẹn'
       },
       fees: {
         type: DataTypes.INTEGER,
         allowNull: true,
+        comment: 'Phí khám'
       },
+      cancelled_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Thời gian hủy lịch hẹn'
+      },
+      cancelled_by: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'Người hủy lịch hẹn'
+      },
+      cancel_reason: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'Lý do hủy lịch hẹn'
+      },
+      created_at: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW,
+        comment: 'Ngày tạo'
+      },
+      updated_at: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW,
+        comment: 'Ngày cập nhật'
+      }
     },
     {
       sequelize,
       modelName: "Appointment",
       tableName: "Appointments",
       timestamps: true,
-      createdAt: "createdAt",
-      updatedAt: "updatedAt",
+      underscored: true
     }
   );
 

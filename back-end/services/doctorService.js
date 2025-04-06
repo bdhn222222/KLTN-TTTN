@@ -6,11 +6,11 @@ import UnauthorizedError from "../errors/unauthorized.js";
 import NotFoundError from "../errors/not_found.js";
 import ForbiddenError from "../errors/forbidden.js";
 import { Op, Sequelize } from "sequelize";
-const { User, Doctor, DoctorDayOff, Appointment, Patient } = db;
+const { User, Doctor, DoctorDayOff, Appointment, Patient, CompensationCode } = db;
 import dayjs from "dayjs";
 import utc from 'dayjs/plugin/utc.js';  // Sử dụng phần mở rộng .js
 import timezone from 'dayjs/plugin/timezone.js';  // Sử dụng phần mở rộng .js
-
+import { v4 as uuidv4 } from 'uuid';
 
 dayjs.extend(timezone);
 dayjs.extend(utc);
@@ -47,7 +47,6 @@ export const registerDoctor = async ({
 
   return { message: "Đăng ký account Bác sĩ thành công", doctor: newDoctor };
 };
-
 export const loginDoctor = async ({ email, password }) => {
   const user = await User.findOne({
     where: { email, role: "doctor" },
@@ -78,7 +77,6 @@ export const loginDoctor = async ({ email, password }) => {
     },
   };
 };
-
 export const updateDoctorProfile = async (user_id, data, authenticatedUser) => {
   if (
     authenticatedUser.user_id !== user_id &&
@@ -128,7 +126,6 @@ export const updateDoctorProfile = async (user_id, data, authenticatedUser) => {
     },
   };
 };
-
 export const getDoctorAppointments = async ({ doctor_id, filter_date, status, start_date, end_date }) => {
   // Xây dựng điều kiện where cho query
   const whereClause = {
@@ -192,8 +189,6 @@ export const getDoctorAppointments = async ({ doctor_id, filter_date, status, st
     }))
   };
 };
-
-
 export const getDoctorSummary = async (doctor_id) => {
   const totalAppointments = await db.Appointment.count({
     where: { doctor_id },
@@ -339,14 +334,6 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
     throw new NotFoundError("Lịch hẹn không tồn tại");
   }
 
-  // Tính tổng tiền thuốc nếu có đơn thuốc
-  let totalMedicineCost = 0;
-  if (appointment.prescription && appointment.prescription.prescriptionMedicines) {
-    totalMedicineCost = appointment.prescription.prescriptionMedicines.reduce((total, pm) => {
-      return total + (pm.medicine.price * pm.quantity || 0);
-    }, 0);
-  }
-
   return {
     success: true,
     message: "Lấy chi tiết lịch hẹn thành công",
@@ -384,7 +371,6 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
           total: pm.quantity * pm.medicine.price,
           note: pm.note
         })),
-        total_cost: totalMedicineCost,
         created_at: appointment.prescription.createdAt
       } : null,
       payment: appointment.payments ? {
@@ -402,54 +388,201 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
     }
   };
 }
-export const acceptAppointment = async (appointment_id, doctor_id) => {
-  const appointment = await db.Appointment.findOne({
-    where: { appointment_id, doctor_id },
-  });
-  if (!appointment) {
-    throw new NotFoundError("Lịch hẹn không tồn tại");
-  }
-  if (appointment.status !== "waiting_for_confirmation") {
-    throw new BadRequestError("Lịch hẹn này không thể xác nhận");
-  }
-  appointment.status = "accepted";
-  await appointment.save();
-  return {
-    success: true,
-    message: "Xác nhận lịch hẹn thành công",
-    data: {
-      id: appointment.appointment_id,
-      status: appointment.status,
+export const cancelAppointment = async (appointment_id, doctor_id, reason, cancelled_by = 'doctor', is_emergency = false) => {
+  const t = await db.sequelize.transaction();
+
+  try {
+    const appointment = await db.Appointment.findOne({
+      where: { appointment_id, doctor_id },
+      include: [
+        {
+          model: db.Patient,
+          as: 'patient',
+          include: [{
+            model: db.User,
+            as: 'user',
+            attributes: ['email', 'username'],
+          }],
+        },
+        {
+          model: db.Doctor,
+          as: 'doctor',
+          include: [{
+            model: db.User,
+            as: 'user',
+            attributes: ['email', 'username'],
+          }],
+        },
+      ],
+      transaction: t,
+    });
+
+    if (!appointment) {
+      throw new NotFoundError('Lịch hẹn không tồn tại');
     }
-  }
-  
-}
-export const cancelAppointment = async (appointment_id, doctor_id) => {
-  const appointment = await db.Appointment.findOne({
-    where: { appointment_id, doctor_id },
-  });
-  if (!appointment) {
-    throw new NotFoundError("Lịch hẹn không tồn tại");
-  }
-  if (appointment.status === "cancelled" || appointment.status === "completed") {
-    throw new BadRequestError("Lịch hẹn đã bị huỷ hoặc hoàn tất, không thể huỷ lại");
-  }
-  const now = dayjs();
-  const appointmentTime = dayjs(appointment.appointment_datetime);
-  if (appointmentTime.diff(now, "hour") < 3) {
-    throw new BadRequestError("Chỉ được huỷ lịch hẹn trước giờ khám ít nhất 3 tiếng");
-  }
-  appointment.status = "cancelled";
-  await appointment.save();
-  return {
-    success: true,
-    message: "Huỷ lịch hẹn thành công",
-    data: {
-      id: appointment.appointment_id,
-      status: appointment.status,
+
+    const invalidStatuses = ['cancelled', 'completed', 'doctor_day_off', 'patient_not_coming'];
+    if (invalidStatuses.includes(appointment.status)) {
+      throw new BadRequestError(`Không thể hủy lịch hẹn đã ${
+        appointment.status === 'cancelled' ? 'bị hủy' :
+        appointment.status === 'completed' ? 'hoàn thành' : 
+        appointment.status === 'doctor_day_off' ? 'bị nghỉ' : 'được đánh dấu bệnh nhân không đến'
+      }`);
     }
+
+    const appointmentTime = dayjs(appointment.appointment_datetime).tz('Asia/Ho_Chi_Minh');
+    const now = dayjs().tz('Asia/Ho_Chi_Minh');
+    const hoursBeforeAppointment = appointmentTime.diff(now, 'hour');
+    const daysBeforeAppointment = appointmentTime.diff(now, 'day');
+
+    let compensation = 0;
+    let discountPercentage = 0;
+    let cancelMessage = '';
+    let compensationCode = null;
+
+    if (daysBeforeAppointment >= 1) {
+      // Hủy trước 1 ngày - không cần đền bù
+      compensation = 0;
+      discountPercentage = 0;
+      cancelMessage = 'Huỷ lịch hẹn thành công';
+    } else if (hoursBeforeAppointment >= 3 && hoursBeforeAppointment < 24) {
+      // Hủy trong khoảng 3-24 giờ
+      if (cancelled_by === 'doctor' && !is_emergency) {
+        throw new BadRequestError('Bác sĩ chỉ được hủy lịch hẹn trong vòng 3-24 giờ trong trường hợp cấp bách');
+      }
+      if (cancelled_by === 'doctor' && is_emergency) {
+        // Hủy cấp bách - đền bù 5%
+        compensation = appointment.fees * 0.05;
+        discountPercentage = 5;
+        cancelMessage = 'Huỷ lịch hẹn cấp bách thành công. Bệnh nhân sẽ được đền bù 5% phí khám.';
+        
+        const code = `COMP-${uuidv4().substring(0, 8).toUpperCase()}`;
+        const expiryDate = dayjs().add(30, 'day').toDate();
+        
+        compensationCode = await db.CompensationCode.create({
+          appointment_id: appointment.appointment_id,
+          patient_id: appointment.patient_id,
+          doctor_id: appointment.doctor_id,
+          code: code,
+          amount: compensation,
+          discount_percentage: discountPercentage,
+          expiry_date: expiryDate,
+        }, { transaction: t });
+
+        // Áp dụng giới hạn tối đa dựa trên tỷ lệ giảm giá
+        if (compensationCode.discount_percentage === 5) {
+          // Giới hạn tối đa 100.000đ cho giảm giá 5%
+          compensation = Math.min(compensation, 100000);
+        } else if (compensationCode.discount_percentage === 20) {
+          // Giới hạn tối đa 300.000đ cho giảm giá 20%
+          compensation = Math.min(compensation, 300000);
+        }
+      }
+    } else if (hoursBeforeAppointment < 3) {
+      // Hủy trong vòng 3 giờ - giảm giá 20% cho lần khám tiếp theo
+      if (cancelled_by === 'doctor' && !is_emergency) {
+        throw new BadRequestError('Bác sĩ chỉ được hủy lịch hẹn trong vòng 3 giờ trong trường hợp cấp bách');
+      }
+      if (cancelled_by === 'doctor' && is_emergency) {
+        // Hủy cấp bách - giảm giá 20% cho lần khám tiếp theo
+        compensation = appointment.fees * 0.2;
+        discountPercentage = 20;
+        cancelMessage = 'Huỷ lịch hẹn cấp bách thành công. Bệnh nhân sẽ được giảm 20% phí khám cho lần khám tiếp theo.';
+        
+        const code = `COMP-${uuidv4().substring(0, 8).toUpperCase()}`;
+        const expiryDate = dayjs().add(30, 'day').toDate();
+        
+        compensationCode = await db.CompensationCode.create({
+          appointment_id: appointment.appointment_id,
+          patient_id: appointment.patient_id,
+          doctor_id: appointment.doctor_id,
+          code: code,
+          amount: compensation,
+          discount_percentage: discountPercentage,
+          expiry_date: expiryDate,
+        }, { transaction: t });
+
+        // Áp dụng giới hạn tối đa dựa trên tỷ lệ giảm giá
+        if (compensationCode.discount_percentage === 5) {
+          // Giới hạn tối đa 100.000đ cho giảm giá 5%
+          compensation = Math.min(compensation, 100000);
+        } else if (compensationCode.discount_percentage === 20) {
+          // Giới hạn tối đa 300.000đ cho giảm giá 20%
+          compensation = Math.min(compensation, 300000);
+        }
+      }
+    } else {
+      throw new BadRequestError('Không thể hủy lịch hẹn trong vòng 3 giờ trước giờ hẹn');
+    }
+
+    appointment.status = 'cancelled';
+    appointment.cancelled_at = now.toDate();
+    appointment.cancelled_by = cancelled_by;
+    appointment.cancel_reason = reason;
+    appointment.compensation_amount = compensation;
+    appointment.is_emergency_cancel = is_emergency;
+    await appointment.save({ transaction: t });
+
+    await t.commit();
+
+    const emailInfo = {
+      to: cancelled_by === 'doctor' ? appointment.patient.user.email : appointment.doctor.user.email,
+      appointmentDate: appointmentTime.format('DD/MM/YYYY HH:mm'),
+      cancelledBy: cancelled_by === 'doctor' ? 'Bác sĩ' : 'Bệnh nhân',
+      reason: reason,
+      compensation: compensation > 0 ? `Bạn sẽ được đền bù ${compensation.toLocaleString('vi-VN')} VND` : null,
+      discountPercentage: discountPercentage > 0 ? `Bạn sẽ được giảm ${discountPercentage}% phí khám cho lần khám tiếp theo` : null,
+      compensationCode: compensationCode ? `Mã bồi thường của bạn là: ${compensationCode.code}` : null,
+      isEmergency: is_emergency,
+    };
+
+    // TODO: Implement email notification
+    // await sendEmailNotification(emailInfo);
+
+    return {
+      success: true,
+      message: cancelMessage,
+      data: {
+        appointment_id: appointment.appointment_id,
+        status: appointment.status,
+        patient: {
+          name: appointment.patient.user.username,
+          email: appointment.patient.user.email,
+        },
+        doctor: {
+          name: appointment.doctor.user.username,
+          email: appointment.doctor.user.email,
+        },
+        datetime: appointmentTime.format('YYYY-MM-DDTHH:mm:ssZ'),
+        cancelled_at: dayjs(appointment.cancelled_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DDTHH:mm:ssZ'),
+        cancelled_by: cancelled_by === 'doctor' ? appointment.doctor.user.username : appointment.patient.user.username,
+        cancel_reason: appointment.cancel_reason,
+        is_emergency: is_emergency,
+        compensation_amount: compensation,
+        discount_percentage: discountPercentage,
+        compensation_code: compensationCode ? {
+          code: compensationCode.code,
+          amount: compensationCode.amount,
+          discount_percentage: compensationCode.discount_percentage,
+          expiry_date: dayjs(compensationCode.expiry_date).format('YYYY-MM-DD'),
+          max_discount_limit: compensationCode.discount_percentage === 5 ? 100000 : 300000,
+        } : null,
+      },
+    };
+  } catch (error) {
+    await t.rollback();
+    throw error;
   }
-}
+};
+
+// Hàm gửi thông báo (email hoặc SMS) cho bệnh nhân
+// const sendNotificationToPatient = (email, message) => {
+//   // Ví dụ về cách gửi email hoặc SMS
+//   // Đây là chỗ bạn sẽ tích hợp các dịch vụ gửi email/SMS sau
+//   // sendEmail(email, message);
+//   // sendSMS(phone_number, message);
+// };
+
 export const markPatientNotComing = async (appointment_id, doctor_id) => {
   const appointment = await db.Appointment.findOne({
     where: { appointment_id, doctor_id },
@@ -507,7 +640,6 @@ export const completeAppointment = async (appointment_id, doctor_id) => {
     },
   };
 };
-
 export const getDoctorDayOffs = async (doctor_id, start, end, status, date) => {
   try {
     let whereClause = {
@@ -604,7 +736,6 @@ export const getDoctorDayOffs = async (doctor_id, start, end, status, date) => {
     throw new InternalServerError("Có lỗi xảy ra khi lấy danh sách ngày nghỉ");
   }
 };
-
 export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
   // Lấy thông tin lịch hẹn
   const appointment = await db.Appointment.findOne({
@@ -662,7 +793,6 @@ export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
     data: medicalRecord,
   };
 };
-
 export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) => {
   // Bắt đầu transaction
   const t = await db.sequelize.transaction();
@@ -1044,4 +1174,63 @@ export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
     await t.rollback();
     throw error;
   }
+};
+
+/**
+ * Xác nhận lịch hẹn
+ * @param {number} appointment_id - ID của lịch hẹn
+ * @param {number} doctor_id - ID của bác sĩ
+ * @returns {Promise<Object>} - Thông tin về lịch hẹn đã xác nhận
+ */
+export const acceptAppointment = async (appointment_id, doctor_id) => {
+  // Kiểm tra xem lịch hẹn có tồn tại không
+  const appointment = await Appointment.findOne({
+    where: {
+      appointment_id,
+      doctor_id
+    }
+  });
+
+  if (!appointment) {
+    throw new Error('Không tìm thấy lịch hẹn hoặc lịch hẹn không thuộc về bác sĩ này');
+  }
+
+  // Kiểm tra xem lịch hẹn đã được chấp nhận chưa
+  if (appointment.status === 'accepted') {
+    throw new Error('Lịch hẹn đã được chấp nhận trước đó');
+  }
+
+  // Kiểm tra xem lịch hẹn đã hoàn thành chưa
+  if (appointment.status === 'completed') {
+    throw new Error('Lịch hẹn đã hoàn thành');
+  }
+
+  // Kiểm tra xem có lịch hẹn nào khác trùng thời gian không
+  const conflictingAppointment = await Appointment.findOne({
+    where: {
+      doctor_id,
+      appointment_datetime: appointment.appointment_datetime,
+      status: 'accepted',
+      appointment_id: {
+        [db.Sequelize.Op.ne]: appointment_id
+      }
+    }
+  });
+
+  if (conflictingAppointment) {
+    throw new Error('Đã có lịch hẹn khác trong thời gian này');
+  }
+
+  // Cập nhật trạng thái lịch hẹn
+  await appointment.update({
+    status: 'accepted'
+  });
+
+  // TODO: Gửi email thông báo cho bệnh nhân
+
+  return {
+    success: true,
+    message: 'Đã chấp nhận lịch hẹn thành công',
+    data: appointment
+  };
 };

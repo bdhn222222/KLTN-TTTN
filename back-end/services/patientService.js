@@ -9,6 +9,7 @@ import { Op } from "sequelize";
 import sequelize from "sequelize";
 import utc from 'dayjs/plugin/utc.js';  // Sử dụng phần mở rộng .js
 import timezone from 'dayjs/plugin/timezone.js';  // Sử dụng phần mở rộng .js
+import CompensationCode from '../models/compensationCode.js';
 
 // Kích hoạt các plugin
 dayjs.extend(utc);
@@ -342,4 +343,133 @@ export const bookAppointment = async (user_id, doctor_id, appointment_datetime) 
     message: "Đặt lịch hẹn thành công",
     data: responseData
   };
+};
+
+/**
+ * Áp dụng mã bồi thường cho lịch hẹn mới
+ * @param {string} code - Mã bồi thường
+ * @param {number} appointment_id - ID của lịch hẹn mới
+ * @param {number} patient_id - ID của bệnh nhân
+ * @returns {Promise<Object>} - Thông tin về mã bồi thường đã áp dụng
+ */
+export const applyCompensationCode = async (code, appointment_id, patient_id) => {
+  // Bắt đầu transaction
+  const t = await db.sequelize.transaction();
+
+  try {
+    // 1. Kiểm tra mã bồi thường tồn tại
+    const compensationCode = await CompensationCode.findOne({
+      where: { 
+        code,
+        patient_id,
+        is_used: false
+      },
+      transaction: t
+    });
+
+    if (!compensationCode) {
+      throw new NotFoundError('Mã bồi thường không tồn tại hoặc đã được sử dụng');
+    }
+
+    // 2. Kiểm tra mã còn hiệu lực
+    const now = dayjs();
+    const expiryDate = dayjs(compensationCode.expiry_date);
+    
+    if (now.isAfter(expiryDate)) {
+      throw new BadRequestError('Mã bồi thường đã hết hạn');
+    }
+
+    // 3. Kiểm tra lịch hẹn mới tồn tại và thuộc bệnh nhân này
+    const appointment = await db.Appointment.findOne({
+      where: { 
+        appointment_id,
+        patient_id,
+        status: 'waiting_for_confirmation'
+      },
+      transaction: t
+    });
+
+    if (!appointment) {
+      throw new NotFoundError('Lịch hẹn không tồn tại hoặc không thuộc quyền của bạn');
+    }
+
+    // 4. Cập nhật trạng thái mã bồi thường
+    compensationCode.is_used = true;
+    compensationCode.used_appointment_id = appointment_id;
+    await compensationCode.save({ transaction: t });
+
+    // 5. Cập nhật thông tin bồi thường cho lịch hẹn mới
+    appointment.compensation_code_id = compensationCode.compensation_id;
+    
+    // Tính toán số tiền giảm giá dựa trên tỷ lệ phần trăm và giới hạn tối đa
+    let discountAmount = appointment.fees * (compensationCode.discount_percentage / 100);
+    
+    // Áp dụng giới hạn tối đa dựa trên tỷ lệ giảm giá
+    if (compensationCode.discount_percentage === 5) {
+      // Giới hạn tối đa 100.000đ cho giảm giá 5%
+      discountAmount = Math.min(discountAmount, 100000);
+    } else if (compensationCode.discount_percentage === 20) {
+      // Giới hạn tối đa 300.000đ cho giảm giá 20%
+      discountAmount = Math.min(discountAmount, 300000);
+    }
+    
+    appointment.compensation_amount = discountAmount;
+    
+    // Cập nhật phí khám sau khi áp dụng giảm giá
+    appointment.fees = appointment.fees - discountAmount;
+    
+    await appointment.save({ transaction: t });
+
+    // 6. Commit transaction
+    await t.commit();
+
+    return {
+      success: true,
+      message: 'Áp dụng mã bồi thường thành công',
+      data: {
+        appointment_id: appointment.appointment_id,
+        original_fees: appointment.fees + discountAmount,
+        discounted_fees: appointment.fees,
+        discount_percentage: compensationCode.discount_percentage,
+        discount_amount: discountAmount,
+        max_discount_limit: compensationCode.discount_percentage === 5 ? 100000 : 300000,
+        compensation_code: {
+          code: compensationCode.code,
+          expiry_date: dayjs(compensationCode.expiry_date).format('YYYY-MM-DD')
+        }
+      }
+    };
+  } catch (error) {
+    await t.rollback();
+    throw error;
+  }
+};
+
+/**
+ * Lấy danh sách mã bồi thường của bệnh nhân
+ * @param {number} patient_id - ID của bệnh nhân
+ * @returns {Promise<Object>} - Danh sách mã bồi thường
+ */
+export const getPatientCompensationCodes = async (patient_id) => {
+  try {
+    const compensationCodes = await CompensationCode.findAll({
+      where: { patient_id },
+      order: [['created_at', 'DESC']]
+    });
+
+    return {
+      success: true,
+      message: 'Lấy danh sách mã bồi thường thành công',
+      data: compensationCodes.map(code => ({
+        code: code.code,
+        amount: code.amount,
+        is_used: code.is_used,
+        used_appointment_id: code.used_appointment_id,
+        expiry_date: dayjs(code.expiry_date).format('YYYY-MM-DD'),
+        created_at: dayjs(code.created_at).format('YYYY-MM-DDTHH:mm:ssZ')
+      }))
+    };
+  } catch (error) {
+    throw error;
+  }
 };
