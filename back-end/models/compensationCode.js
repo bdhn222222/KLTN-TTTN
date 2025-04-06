@@ -66,13 +66,14 @@ CompensationCode.init(
     },
     amount: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
+      allowNull: true,
+      defaultValue: null,
       comment: 'Số tiền bồi thường'
     },
     discount_percentage: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: false,
-      defaultValue: 10.00,
+      defaultValue: 0.00,
       comment: 'Phần trăm giảm giá của mã bồi thường'
     },
     is_used: {
@@ -113,7 +114,8 @@ CompensationCode.init(
     modelName: 'CompensationCode',
     tableName: 'Compensation_codes',
     timestamps: true,
-    underscored: true
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
   }
 );
 

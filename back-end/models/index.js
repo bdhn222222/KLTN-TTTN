@@ -16,6 +16,7 @@ import Payment from "./payments.js";
 import MedicalRecord from "./medicalRecords.js";
 import Schedule from "./schedules.js";
 import DoctorDayOff from "./doctor-day-offs.js";
+import DayOffAppointment from "./day-off-appointments.js";
 import CompensationCode from "./compensationCode.js";
 
 const sequelize = new Sequelize(dbConfig.development);
@@ -27,6 +28,7 @@ const db = {
   Patient: Patient(sequelize, Sequelize.DataTypes),
   Doctor: Doctor(sequelize, Sequelize.DataTypes),
   DoctorDayOff: DoctorDayOff(sequelize, Sequelize.DataTypes),
+  DayOffAppointment: DayOffAppointment(sequelize, Sequelize.DataTypes),
   Pharmacist: Pharmacist(sequelize, Sequelize.DataTypes),
   Admin: Admin(sequelize, Sequelize.DataTypes),
   Specialization: Specialization(sequelize, Sequelize.DataTypes),
@@ -34,10 +36,7 @@ const db = {
   Feedback: Feedback(sequelize, Sequelize.DataTypes),
   Prescription: Prescription(sequelize, Sequelize.DataTypes),
   Medicine: Medicine(sequelize, Sequelize.DataTypes),
-  PrescriptionMedicine: PrescriptionMedicine(
-    sequelize,
-    Sequelize.DataTypes
-  ),
+  PrescriptionMedicine: PrescriptionMedicine(sequelize, Sequelize.DataTypes),
   PrescriptionPayment: PrescriptionPayment(sequelize, Sequelize.DataTypes),
   Payment: Payment(sequelize, Sequelize.DataTypes),
   MedicalRecord: MedicalRecord(sequelize, Sequelize.DataTypes),

@@ -9,7 +9,7 @@ export default (sequelize) => {
         as: "Doctor",
       });
       DoctorDayOff.belongsToMany(models.Appointment, {
-        through: 'day_off_appointments',
+        through: 'Day_off_appointments',
         foreignKey: 'day_off_id',
         otherKey: 'appointment_id',
         as: 'AffectedAppointments'

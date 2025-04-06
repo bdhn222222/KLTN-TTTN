@@ -187,32 +187,38 @@ export const getDoctorProfile = async (doctor_id) => {
   };
 };
 export const bookAppointment = async (user_id, doctor_id, appointment_datetime) => {
+  // 0. Lấy patient_id từ user_id
+  const patient = await db.Patient.findOne({
+    where: { user_id }
+  });
+
+  if (!patient) {
+    throw new NotFoundError("Không tìm thấy thông tin bệnh nhân");
+  }
+
   // 1. Kiểm tra bác sĩ tồn tại
   const doctor = await db.Doctor.findByPk(doctor_id, {
     include: [
       { model: db.Specialization, as: "specialization" },
       { model: db.Schedule, as: "schedule" },
+      { 
+        model: db.User,
+        as: "user",
+        attributes: ['username']
+      }
     ],
   });
   if (!doctor) {
     throw new NotFoundError("Không tìm thấy bác sĩ");
   }
 
-  // 1.5 Lấy patient_id từ user_id
-  const patient = await db.Patient.findOne({
-    where: { user_id }
-  });
-  if (!patient) {
-    throw new NotFoundError("Không tìm thấy thông tin bệnh nhân");
-  }
-
   // 2. Validate thời gian đặt lịch
-  const apptTime = dayjs(appointment_datetime).local(); // Chuyển múi giờ về múi giờ địa phương
+  const apptTime = dayjs(appointment_datetime).tz('Asia/Ho_Chi_Minh'); // Chuyển múi giờ về múi giờ Việt Nam
   if (!apptTime.isValid()) {
     throw new BadRequestError("Thời gian không hợp lệ");
   }
 
-  const now = dayjs().local(); // Đảm bảo giờ hiện tại cũng được tính theo múi giờ địa phương
+  const now = dayjs().tz('Asia/Ho_Chi_Minh'); // Đảm bảo giờ hiện tại cũng được tính theo múi giờ Việt Nam
   if (apptTime.isBefore(now)) {
     throw new BadRequestError("Không thể đặt lịch trong quá khứ");
   }
@@ -248,28 +254,42 @@ export const bookAppointment = async (user_id, doctor_id, appointment_datetime) 
   const timeStr = appointment_datetime.split('T')[1];
   const [hours, minutes] = timeStr.split(':').map(Number);
 
-  let isValidTime = false;
-  // Kiểm tra buổi sáng từ 8:00 - 11:00
-  if (hours >= 8 && hours < 11) {
-    isValidTime = true;
-  } else if (hours === 11 && minutes === 0) {
-    isValidTime = true;
-  }
-  // Kiểm tra buổi chiều từ 13:30 - 17:00
-  else if (hours > 13 && hours < 17) {
-    isValidTime = true;
-  } else if (hours === 13 && minutes >= 30) {
-    isValidTime = true;
-  } else if (hours === 17 && minutes === 0) {
-    isValidTime = true;
+  // Kiểm tra xem thời gian có đúng là các mốc 30 phút không
+  if (minutes !== 0 && minutes !== 30) {
+    throw new BadRequestError("Thời gian đặt lịch phải là các mốc 30 phút (ví dụ: 8:00, 8:30, 9:00,...)");
   }
 
-  if (!isValidTime) {
-    if (hours < 12) {
-      throw new BadRequestError("Thời gian làm việc buổi sáng: 8:00 - 11:00");
-    } else {
-      throw new BadRequestError("Thời gian làm việc buổi chiều: 13:30 - 17:00");
+  // Tạo danh sách các ca làm việc hợp lệ
+  const morningSlots = [];
+  const afternoonSlots = [];
+
+  // Ca sáng: 8:00 - 11:30
+  for (let h = 8; h <= 11; h++) {
+    for (let m of [0, 30]) {
+      // Nếu là 11:30 thì bỏ qua
+      if (h === 11 && m === 30) continue;
+      morningSlots.push({ hours: h, minutes: m });
     }
+  }
+
+  // Ca chiều: 13:30 - 17:00
+  for (let h = 13; h <= 17; h++) {
+    for (let m of [0, 30]) {
+      // Bỏ qua 13:00 và sau 17:00
+      if ((h === 13 && m === 0) || (h === 17 && m === 30)) continue;
+      afternoonSlots.push({ hours: h, minutes: m });
+    }
+  }
+
+  // Kiểm tra xem thời gian đặt lịch có nằm trong các ca hợp lệ không
+  const isValidSlot = [...morningSlots, ...afternoonSlots].some(
+    slot => slot.hours === hours && slot.minutes === minutes
+  );
+
+  if (!isValidSlot) {
+    throw new BadRequestError(
+      "Thời gian không hợp lệ. Các ca sáng: 8:00-11:00 (mỗi 30 phút). Các ca chiều: 13:30-17:00 (mỗi 30 phút)"
+    );
   }
 
   // 5. Kiểm tra ngày nghỉ của bác sĩ
@@ -314,13 +334,25 @@ export const bookAppointment = async (user_id, doctor_id, appointment_datetime) 
       doctor_id,
       appointment_datetime,
       status: {
-        [Op.notIn]: ['cancelled', 'completed', 'doctor_day_off', 'patient_not_coming']
+        [Op.in]: ['accepted', 'waiting_for_confirmation', 'doctor_day_off']
       }
     }
   });
 
   if (existingAppointment) {
-    throw new BadRequestError("Đã có lịch hẹn khác trong thời gian này");
+    let errorMessage = "Không thể đặt lịch hẹn vào khung giờ này. ";
+    switch (existingAppointment.status) {
+      case 'accepted':
+        errorMessage += "Bác sĩ đã có lịch hẹn khác.";
+        break;
+      case 'waiting_for_confirmation':
+        errorMessage += "Đã có bệnh nhân khác đặt lịch và đang chờ xác nhận.";
+        break;
+      case 'doctor_day_off':
+        errorMessage += "Bác sĩ đã đăng ký nghỉ vào thời gian này.";
+        break;
+    }
+    throw new BadRequestError(errorMessage);
   }
 
   // 7. Tạo lịch hẹn mới
@@ -339,7 +371,7 @@ export const bookAppointment = async (user_id, doctor_id, appointment_datetime) 
       appointment_id: appointment.appointment_id,
       doctor_name: doctor.user ? doctor.user.username : null,
       specialization: doctor.specialization ? doctor.specialization.name : null,
-      appointment_datetime: appointment.appointment_datetime,
+      appointment_datetime: apptTime.format('YYYY-MM-DDTHH:mm:ssZ'),
       status: appointment.status,
       fees: appointment.fees,
       createdAt: appointment.createdAt
