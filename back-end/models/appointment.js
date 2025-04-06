@@ -95,13 +95,13 @@ export default (sequelize) => {
         allowNull: true,
         comment: 'Lý do hủy lịch hẹn'
       },
-      created_at: {
+      createdAt: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
         comment: 'Ngày tạo'
       },
-      updated_at: {
+      updatedAt: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
@@ -113,7 +113,8 @@ export default (sequelize) => {
       modelName: "Appointment",
       tableName: "Appointments",
       timestamps: true,
-      underscored: true
+      createdAt: "createdAt",
+      updatedAt: "updatedAt"
     }
   );
 

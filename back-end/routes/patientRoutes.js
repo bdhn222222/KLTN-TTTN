@@ -51,6 +51,18 @@ router.post(
   "/appointments",
   authenticateUser,
   authorize(["patient"]),
+  validate([
+    body("doctor_id")
+      .notEmpty()
+      .withMessage("ID bác sĩ không được để trống")
+      .isInt()
+      .withMessage("ID bác sĩ phải là số"),
+    body("appointment_datetime")
+      .notEmpty()
+      .withMessage("Thời gian hẹn không được để trống")
+      .isISO8601()
+      .withMessage("Thời gian hẹn không hợp lệ")
+  ]),
   bookAppointmentController
 );
 export default router;

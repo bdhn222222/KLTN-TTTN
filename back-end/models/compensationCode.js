@@ -95,13 +95,13 @@ CompensationCode.init(
       allowNull: false,
       comment: 'Ngày hết hạn của mã bồi thường (6 tháng kể từ ngày tạo)'
     },
-    created_at: {
+    createdAt: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
       comment: 'Ngày tạo mã bồi thường'
     },
-    updated_at: {
+    updatedAt: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,

@@ -343,8 +343,8 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
         datetime: appointment.appointment_datetime,
         status: appointment.status,
         fees: appointment.fees,
-        created_at: appointment.createdAt,
-        updated_at: appointment.updatedAt
+        createdAt: appointment.createdAt,
+        updatedAt: appointment.updatedAt
       },
       patient: {
         id: appointment.patient.patient_id,
@@ -357,7 +357,7 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
         diagnosis: appointment.medicalRecord.diagnosis,
         treatment: appointment.medicalRecord.treatment,
         notes: appointment.medicalRecord.notes,
-        created_at: appointment.medicalRecord.createdAt
+        createdAt: appointment.medicalRecord.createdAt
       } : null,
       prescription: appointment.prescription ? {
         id: appointment.prescription.prescription_id,
@@ -371,7 +371,7 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
           total: pm.quantity * pm.medicine.price,
           note: pm.note
         })),
-        created_at: appointment.prescription.createdAt
+        createdAt: appointment.prescription.createdAt
       } : null,
       payment: appointment.payments ? {
         id: appointment.payments.payment_id,
@@ -383,7 +383,7 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
       feedback: appointment.feedback ? {
         rating: appointment.feedback.rating,
         comment: appointment.feedback.comment,
-        created_at: appointment.feedback.createdAt
+        createdAt: appointment.feedback.createdAt
       } : null
     }
   };
@@ -715,7 +715,7 @@ export const getDoctorDayOffs = async (doctor_id, start, end, status, date) => {
         afternoon: dayOff.off_afternoon,
         reason: dayOff.reason,
         status: dayOff.status,
-        created_at: dayjs(dayOff.createdAt).tz('Asia/Ho_Chi_Minh').format(),
+        createdAt: dayjs(dayOff.createdAt).tz('Asia/Ho_Chi_Minh').format(),
         affected_appointments: affectedAppointments.map(apt => ({
           id: apt.appointment_id,
           datetime: dayjs(apt.appointment_datetime).tz('Asia/Ho_Chi_Minh').format(),
@@ -947,7 +947,7 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
             morning: existingDayOff.off_morning,
             afternoon: existingDayOff.off_afternoon,
             reason: existingDayOff.reason,
-            created_at: dayjs(existingDayOff.createdAt).tz('Asia/Ho_Chi_Minh').format(),
+            createdAt: dayjs(existingDayOff.createdAt).tz('Asia/Ho_Chi_Minh').format(),
             affected_appointments: []
           }
         };
@@ -1019,7 +1019,7 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
         morning: updatedDayOff.off_morning,
         afternoon: updatedDayOff.off_afternoon,
         reason: updatedDayOff.reason,
-        created_at: dayjs(updatedDayOff.createdAt).tz('Asia/Ho_Chi_Minh').format(),
+        createdAt: dayjs(updatedDayOff.createdAt).tz('Asia/Ho_Chi_Minh').format(),
         affected_appointments: affectedAppointments.map(apt => ({
           id: apt.appointment_id,
           datetime: dayjs(apt.appointment_datetime).tz('Asia/Ho_Chi_Minh').format(),

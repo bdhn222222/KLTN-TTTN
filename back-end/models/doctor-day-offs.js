@@ -67,13 +67,13 @@ export default (sequelize) => {
         defaultValue: false,
         comment: 'Có phải là nghỉ khẩn cấp không'
       },
-      created_at: {
+      createdAt: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
         comment: 'Ngày tạo'
       },
-      updated_at: {
+      updatedAt: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
@@ -85,7 +85,8 @@ export default (sequelize) => {
       modelName: "DoctorDayOffs",
       tableName: "DoctorDayOffs",
       timestamps: true,
-      underscored: true
+      createdAt: "createdAt",
+      updatedAt: "updatedAt"
     }
   );
 

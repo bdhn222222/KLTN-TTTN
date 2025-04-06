@@ -44,12 +44,12 @@ export const up = async (queryInterface, Sequelize) => {
       allowNull: true,
       comment: 'Lý do nghỉ'
     },
-    created_at: {
+    createdAt: {
       type: Sequelize.DATE,
       allowNull: false,
       defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
     },
-    updated_at: {
+    updatedAt: {
       type: Sequelize.DATE,
       allowNull: false,
       defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
