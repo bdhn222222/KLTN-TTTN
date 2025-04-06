@@ -114,12 +114,6 @@ export const markPatientNotComingController = asyncHandler(async (req, res) => {
   const result = await markPatientNotComing(appointment_id, doctor_id);
   res.status(200).json(result);
 });
-export const completeAppointmentController = asyncHandler(async (req, res) => {
-  const doctor_id = req.user.user_id;
-  const appointment_id = req.params.id;
-  const result = await completeAppointment(appointment_id, doctor_id);
-  res.status(200).json(result);
-});
 export const getDoctorDayOffsController = asyncHandler(async (req, res, next) => {
   try {
     const doctor_id = req.user.user_id;
@@ -369,3 +363,41 @@ function generateCompensationCode() {
   }
   return code;
 }
+
+export const createMedicalRecordController = async (req, res) => {
+  try {
+    const doctor_id = req.user.user_id;
+    const { appointment_id, data } = req.body;
+    const result = await createMedicalRecord(doctor_id, appointment_id, data);
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(error.status || 500).json({ message: error.message });
+  }
+};
+export const completeAppointmentController = async (req, res) => {
+  try {
+    const { appointment_id } = req.body;
+    const doctor_id = req.user.user_id;
+    
+    if (!appointment_id) {
+      throw new BadRequestError("Thiếu mã cuộc hẹn");
+    }
+
+    const result = await completeAppointment(appointment_id, doctor_id);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error in completeAppointmentController:', error);
+    
+    if (error instanceof BadRequestError) {
+      res.status(400).json({ success: false, message: error.message });
+    } else if (error instanceof NotFoundError) {
+      res.status(404).json({ success: false, message: error.message });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: "Có lỗi xảy ra khi hoàn thành cuộc hẹn",
+        error: error.message 
+      });
+    }
+  }
+};

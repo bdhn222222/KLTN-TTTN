@@ -471,7 +471,7 @@ export const cancelAppointment = async (appointment_id, doctor_id, reason, cance
       cancelMessage = 'Huỷ lịch hẹn thành công. Bệnh nhân sẽ được giảm 5% phí khám cho lần khám tiếp theo.';
       
       const code = `COMP-${uuidv4().substring(0, 8).toUpperCase()}`;
-      const expiryDate = dayjs().add(30, 'day').toDate();
+      const expiryDate = dayjs().add(180, 'day').toDate();
       
       compensationCode = await db.CompensationCode.create({
         appointment_id: appointment.appointment_id,
@@ -494,7 +494,7 @@ export const cancelAppointment = async (appointment_id, doctor_id, reason, cance
         cancelMessage = 'Huỷ lịch hẹn cấp bách thành công. Bệnh nhân sẽ được giảm 20% phí khám cho lần khám tiếp theo.';
         
         const code = `COMP-${uuidv4().substring(0, 8).toUpperCase()}`;
-        const expiryDate = dayjs().add(30, 'day').toDate();
+        const expiryDate = dayjs().add(180, 'day').toDate();
         
         compensationCode = await db.CompensationCode.create({
           appointment_id: appointment.appointment_id,
@@ -567,7 +567,6 @@ export const cancelAppointment = async (appointment_id, doctor_id, reason, cance
     throw error;
   }
 };
-
 // Hàm gửi thông báo (email hoặc SMS) cho bệnh nhân
 // const sendNotificationToPatient = (email, message) => {
 //   // Ví dụ về cách gửi email hoặc SMS
@@ -603,6 +602,7 @@ export const markPatientNotComing = async (appointment_id, doctor_id) => {
   };
 };
 export const completeAppointment = async (appointment_id, doctor_id) => {
+  // Kiểm tra cuộc hẹn
   const appointment = await db.Appointment.findOne({
     where: { appointment_id, doctor_id },
   });
@@ -621,8 +621,32 @@ export const completeAppointment = async (appointment_id, doctor_id) => {
     throw new BadRequestError("Chưa đến giờ hẹn, không thể hoàn thành");
   }
 
+  // Kiểm tra hồ sơ bệnh án
+  const medicalRecord = await db.MedicalRecord.findOne({
+    where: { appointment_id }
+  });
+
+  if (!medicalRecord) {
+    throw new BadRequestError("Vui lòng tạo hồ sơ bệnh án trước khi hoàn thành cuộc hẹn");
+  }
+
+  // Cập nhật trạng thái cuộc hẹn
   appointment.status = "completed";
   await appointment.save();
+
+  // Cập nhật trạng thái hồ sơ bệnh án
+  medicalRecord.completed_at = new Date();
+  medicalRecord.completed_by = doctor_id;
+  await medicalRecord.save();
+
+  // // Tạo thông báo cho bệnh nhân
+  // await db.Notification.create({
+  //   user_id: appointment.patient_id,
+  //   title: "Cuộc hẹn đã hoàn thành",
+  //   content: "Bác sĩ đã hoàn thành cuộc hẹn và tạo hồ sơ bệnh án. Vui lòng thanh toán để xem kết quả khám.",
+  //   type: "appointment_completed",
+  //   reference_id: appointment_id
+  // });
 
   return {
     success: true,
@@ -630,6 +654,9 @@ export const completeAppointment = async (appointment_id, doctor_id) => {
     data: {
       appointment_id: appointment.appointment_id,
       status: appointment.status,
+      medical_record: {
+        record_id: medicalRecord.record_id,
+      }
     },
   };
 };
@@ -728,63 +755,6 @@ export const getDoctorDayOffs = async (doctor_id, start, end, status, date) => {
     console.error('Error in getDoctorDayOffs:', error);
     throw new InternalServerError("Có lỗi xảy ra khi lấy danh sách ngày nghỉ");
   }
-};
-export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
-  // Lấy thông tin lịch hẹn
-  const appointment = await db.Appointment.findOne({
-    where: { appointment_id },
-    include: {
-      model: db.Patient,
-      as: "patient",
-    },
-  });
-
-  if (!appointment) {
-    throw new NotFoundError("Lịch hẹn không tồn tại");
-  }
-
-  // Kiểm tra bác sĩ có quyền tạo hồ sơ cho lịch hẹn này
-  if (appointment.doctor_id !== doctor_id) {
-    throw new ForbiddenError("Bạn không có quyền tạo hồ sơ cho lịch hẹn này");
-  }
-
-  // Kiểm tra trạng thái lịch hẹn có phải là 'accepted' (đã khám)
-  if (appointment.status !== "accepted") {
-    throw new BadRequestError("Chỉ có thể tạo hồ sơ bệnh án sau khi lịch hẹn đã được chấp nhận");
-  }
-
-  // Kiểm tra thời gian tạo hồ sơ phải sau thời gian lịch hẹn
-  if (new Date() < new Date(appointment.appointment_datetime)) {
-    throw new BadRequestError("Không thể tạo hồ sơ trước thời gian khám");
-  }
-
-  // Kiểm tra xem đã có hồ sơ bệnh án cho lịch hẹn này chưa
-  const existingRecord = await db.MedicalRecord.findOne({
-    where: { appointment_id },
-  });
-
-  if (existingRecord) {
-    throw new BadRequestError("Đã có hồ sơ bệnh án cho lịch hẹn này");
-  }
-
-  // Thiếu validate dữ liệu đầu vào
-  if (!data.diagnosis || !data.treatment) {
-    throw new BadRequestError("Thiếu thông tin chẩn đoán hoặc phương pháp điều trị");
-  }
-
-  // Tạo hồ sơ bệnh án
-  const medicalRecord = await db.MedicalRecord.create({
-    appointment_id,
-    diagnosis: data.diagnosis,
-    treatment: data.treatment,
-    notes: data.notes,
-  });
-
-  return {
-    success: true,
-    message: "Tạo hồ sơ bệnh án thành công",
-    data: medicalRecord,
-  };
 };
 export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) => {
   // Bắt đầu transaction
@@ -1168,7 +1138,6 @@ export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
     throw error;
   }
 };
-
 /**
  * Xác nhận lịch hẹn
  * @param {number} appointment_id - ID của lịch hẹn
@@ -1305,6 +1274,75 @@ export const acceptAppointment = async (appointment_id, doctor_id) => {
         patient_email: app.Patient.user.email,
         status: 'cancelled'
       }))
+    }
+  };
+};
+export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
+  // Lấy thông tin lịch hẹn
+  const appointment = await db.Appointment.findOne({
+    where: { appointment_id },
+    include: {
+      model: db.Patient,
+      as: "Patient",
+    },
+  });
+
+  if (!appointment) {
+    throw new NotFoundError("Lịch hẹn không tồn tại");
+  }
+
+  // Kiểm tra bác sĩ có quyền tạo hồ sơ cho lịch hẹn này
+  if (appointment.doctor_id !== doctor_id) {
+    throw new ForbiddenError("Bạn không có quyền tạo hồ sơ cho lịch hẹn này");
+  }
+
+  // Kiểm tra trạng thái lịch hẹn có phải là 'accepted' (đã khám)
+  if (appointment.status !== "accepted") {
+    throw new BadRequestError("Chỉ có thể tạo hồ sơ bệnh án sau khi lịch hẹn đã được chấp nhận");
+  }
+
+  // Kiểm tra thời gian tạo hồ sơ phải sau thời gian lịch hẹn
+  // if (new Date() < new Date(appointment.appointment_datetime)) {
+  //   throw new BadRequestError("Không thể tạo hồ sơ trước thời gian khám");
+  // }
+
+  // Kiểm tra xem đã có hồ sơ bệnh án cho lịch hẹn này chưa
+  const existingRecord = await db.MedicalRecord.findOne({
+    where: { appointment_id },
+  });
+
+  if (existingRecord) {
+    throw new BadRequestError("Đã có hồ sơ bệnh án cho lịch hẹn này");
+  }
+
+  // Thiếu validate dữ liệu đầu vào
+  if (!data.diagnosis || !data.treatment) {
+    throw new BadRequestError("Thiếu thông tin chẩn đoán hoặc phương pháp điều trị");
+  }
+
+  // Tạo hồ sơ bệnh án
+  const medicalRecord = await db.MedicalRecord.create({
+    appointment_id,
+    patient_id: appointment.patient_id,
+    doctor_id,
+    diagnosis: data.diagnosis,
+    treatment: data.treatment,
+    notes: data.notes,
+    is_visible_to_patient: false, // Bệnh nhân không thể xem cho đến khi thanh toán
+    completed_at: new Date(),
+    completed_by: doctor_id
+  });
+
+  // Cập nhật trạng thái lịch hẹn thành completed
+  await appointment.update({
+    status: 'completed'
+  });
+
+  return {
+    success: true,
+    message: "Tạo hồ sơ bệnh án thành công. Bệnh nhân cần thanh toán để xem kết quả.",
+    data: {
+      record_id: medicalRecord.record_id
     }
   };
 };

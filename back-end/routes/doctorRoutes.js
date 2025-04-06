@@ -13,6 +13,7 @@ import {
   completeAppointmentController,
   getDoctorDayOffsController,
   cancelDoctorDayOffController,
+  createMedicalRecordController
 } from "../controllers/doctorController.js";
 import validate from "../middleware/validate.js";
 import { body, param } from "express-validator";
@@ -23,6 +24,7 @@ import {
   registerLimiter,
   forgotPasswordLimiter,
 } from "../middleware/rateLimiter.js";
+
 const router = express.Router();
 const app = express();
 app.use(express.json());
@@ -140,6 +142,7 @@ router.put(
   ]),
   cancelAppointmentController
 );
-
+router.post('/medical-records', authenticateUser, authorize(['doctor']), createMedicalRecordController);
+router.put('/appointments/complete', authenticateUser, authorize(['doctor']), completeAppointmentController);
 
 export default router;

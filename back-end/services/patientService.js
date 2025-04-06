@@ -11,6 +11,7 @@ import utc from 'dayjs/plugin/utc.js';  // Sử dụng phần mở rộng .js
 import timezone from 'dayjs/plugin/timezone.js';  // Sử dụng phần mở rộng .js
 import CompensationCode from '../models/compensationCode.js';
 import { Model, DataTypes } from "sequelize";
+import ForbiddenError from "../errors/forbidden.js";
 
 // Kích hoạt các plugin
 dayjs.extend(utc);
@@ -20,7 +21,7 @@ dayjs.extend(timezone);
 const apptTime = dayjs('2025-04-29T16:00:00').tz('Asia/Ho_Chi_Minh', true);
 console.log(apptTime.format());  // In ra thời gian đã chuyển đổi
 
-const { User, Patient } = db;
+const { User, Patient, MedicalRecord, Doctor, Payment } = db;
 
 export const registerPatient = async ({
   username,
@@ -377,4 +378,120 @@ export const bookAppointment = async (user_id, doctor_id, appointment_datetime) 
       createdAt: appointment.createdAt
     }
   };
+};
+
+export const viewMedicalRecord = async (patient_id, record_id) => {
+  try {
+    // Kiểm tra hồ sơ bệnh án tồn tại
+    const medicalRecord = await MedicalRecord.findByPk(record_id, {
+      include: [
+        {
+          model: Doctor,
+          as: 'doctor',
+          attributes: ['doctor_id', 'full_name', 'specialization']
+        }
+      ]
+    });
+
+    if (!medicalRecord) {
+      throw new Error('Hồ sơ bệnh án không tồn tại');
+    }
+
+    // Kiểm tra quyền truy cập
+    if (medicalRecord.patient_id !== patient_id) {
+      throw new Error('Bạn không có quyền xem hồ sơ bệnh án này');
+    }
+
+    // Kiểm tra trạng thái thanh toán
+    const payment = await Payment.findOne({
+      where: {
+        appointment_id: medicalRecord.appointment_id,
+        status: 'paid' // Chỉ chấp nhận thanh toán đã hoàn thành
+      }
+    });
+
+    if (!payment) {
+      // Kiểm tra xem có thanh toán nào đang chờ xử lý không
+      const pendingPayment = await Payment.findOne({
+        where: {
+          appointment_id: medicalRecord.appointment_id,
+          status: 'pending'
+        }
+      });
+
+      if (pendingPayment) {
+        throw new Error('Thanh toán của bạn đang được xử lý. Vui lòng đợi xác nhận thanh toán để xem hồ sơ bệnh án.');
+      } else {
+        throw new Error('Bạn cần thanh toán để xem hồ sơ bệnh án này');
+      }
+    }
+
+    // Tạo PDF cho hồ sơ bệnh án
+    const pdfBuffer = await generateMedicalRecordPDF(medicalRecord);
+
+    // Cập nhật trạng thái đã xem
+    await medicalRecord.update({
+      is_visible_to_patient: true,
+      viewed_at: new Date()
+    });
+
+    // Trả về thông tin hồ sơ và URL để tải PDF
+    return {
+      success: true,
+      message: 'Xem hồ sơ bệnh án thành công',
+      data: {
+        record_id: medicalRecord.record_id,
+        doctor: medicalRecord.doctor,
+        diagnosis: medicalRecord.diagnosis,
+        treatment: medicalRecord.treatment,
+        notes: medicalRecord.notes,
+        pdf_url: `/api/medical-records/${medicalRecord.record_id}/pdf`
+      }
+    };
+  } catch (error) {
+    console.error('Lỗi khi xem hồ sơ bệnh án:', error);
+    throw error;
+  }
+};
+
+// Hàm tạo file PDF từ hồ sơ bệnh án
+const generateMedicalRecordPDF = async (medicalRecord) => {
+  // Sử dụng thư viện PDF như PDFKit để tạo file PDF
+  // Đây là phần giả định, bạn cần cài đặt thư viện và triển khai chi tiết
+  const PDFDocument = require('pdfkit');
+  const doc = new PDFDocument();
+  
+  // Thêm nội dung vào PDF
+  doc.fontSize(20).text('KẾT QUẢ KHÁM BỆNH', { align: 'center' });
+  doc.moveDown();
+  
+  doc.fontSize(12).text(`Bác sĩ: ${medicalRecord.doctor.full_name}`);
+  doc.text(`Ngày khám: ${new Date(medicalRecord.appointment_datetime).toLocaleDateString('vi-VN')}`);
+  doc.moveDown();
+  
+  doc.fontSize(14).text('CHẨN ĐOÁN:', { underline: true });
+  doc.fontSize(12).text(medicalRecord.diagnosis);
+  doc.moveDown();
+  
+  doc.fontSize(14).text('PHƯƠNG PHÁP ĐIỀU TRỊ:', { underline: true });
+  doc.fontSize(12).text(medicalRecord.treatment);
+  doc.moveDown();
+  
+  if (medicalRecord.notes) {
+    doc.fontSize(14).text('GHI CHÚ:', { underline: true });
+    doc.fontSize(12).text(medicalRecord.notes);
+  }
+  
+  // Thêm footer
+  doc.fontSize(10).text('Tài liệu này được tạo tự động bởi hệ thống Booking Doctor', { align: 'center' });
+  
+  // Lưu PDF vào buffer
+  const chunks = [];
+  doc.on('data', chunk => chunks.push(chunk));
+  
+  return new Promise((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    doc.end();
+  });
 };
