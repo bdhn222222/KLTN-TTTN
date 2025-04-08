@@ -13,7 +13,8 @@ import {
   completeAppointmentController,
   getDoctorDayOffsController,
   cancelDoctorDayOffController,
-  createMedicalRecordController
+  createMedicalRecordController,
+  createPrescriptionsController
 } from "../controllers/doctorController.js";
 import validate from "../middleware/validate.js";
 import { body, param } from "express-validator";
@@ -144,5 +145,46 @@ router.put(
 );
 router.post('/medical-records', authenticateUser, authorize(['doctor']), createMedicalRecordController);
 router.put('/appointments/complete', authenticateUser, authorize(['doctor']), completeAppointmentController);
+router.post('/prescriptions/medicines', 
+  authenticateUser, 
+  authorize(['doctor']), 
+  validate([
+    body('appointment_id')
+      .notEmpty()
+      .withMessage('Mã cuộc hẹn là bắt buộc')
+      .isInt()
+      .withMessage('Mã cuộc hẹn phải là số'),
+    body('medicines')
+      .isArray()
+      .withMessage('Danh sách thuốc phải là mảng')
+      .notEmpty()
+      .withMessage('Danh sách thuốc không được rỗng'),
+    body('medicines.*.medicine_id')
+      .notEmpty()
+      .withMessage('ID thuốc là bắt buộc')
+      .isInt()
+      .withMessage('ID thuốc phải là số'),
+    body('medicines.*.quantity')
+      .notEmpty()
+      .withMessage('Số lượng thuốc là bắt buộc')
+      .isInt({ min: 1 })
+      .withMessage('Số lượng thuốc phải là số dương'),
+    body('medicines.*.dosage')
+      .notEmpty()
+      .withMessage('Liều dùng là bắt buộc')
+      .isLength({ max: 100 })
+      .withMessage('Liều dùng tối đa 100 ký tự'),
+    body('medicines.*.frequency')
+      .notEmpty()
+      .withMessage('Tần suất dùng là bắt buộc')
+      .isLength({ max: 100 })
+      .withMessage('Tần suất dùng tối đa 100 ký tự'),
+    body('medicines.*.instructions')
+      .optional()
+      .isLength({ max: 255 })
+      .withMessage('Hướng dẫn tối đa 255 ký tự')
+  ]),
+  createPrescriptionsController
+);
 
 export default router;

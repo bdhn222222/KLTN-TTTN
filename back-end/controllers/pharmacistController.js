@@ -4,7 +4,7 @@ import {
   //getPendingPrescriptions,
   getPrescriptionDetails,
   updatePrescriptionItem,
-  confirmPrescription,
+  completePrescription,
   getAllMedicines,
   addMedicine,
   updateMedicine,
@@ -13,10 +13,13 @@ import {
   getPharmacistProfile,
   updatePharmacistProfile,
   changePharmacistPassword,
+  getAllPrescriptions,
+  confirmPrescriptionPreparation,
 } from "../services/pharmacistService.js";
 import BadRequestError from "../errors/bad_request.js";
 import asyncHandler from "express-async-handler";
 import InternalServerError from "../errors/internalServerError.js";
+import NotFoundError from "../errors/not_found.js";
 
 // export const registerPharmacistController = async (req, res, next) => {
 //   try {
@@ -52,41 +55,6 @@ export const loginPharmacistController = asyncHandler(async (req, res) => {
   const pharmacist = await loginPharmacist(req.body);
   res.status(200).json(pharmacist);
 });
-
-// export const getPendingPrescriptionsController = async (req, res, next) => {
-//   try {
-//     const prescriptions = await getPendingPrescriptions(); // 👈 Đảm bảo dòng này có
-//     res.status(200).json({
-//       message: "Lấy danh sách đơn thuốc cần xác nhận thành công",
-//       prescriptions,
-//     });
-//   } catch (error) {
-//     next(new InternalServerError(error.message));
-//   }
-// };
-// export const getPrescriptionDetailsController = async (req, res, next) => {
-//   try {
-//     const prescription_id = req.params.prescription_id;
-//     const prescription = await getPrescriptionDetails(prescription_id);
-//     res.status(200).json({
-//       message: "Lấy thông tin đơn thuốc thành công",
-//       prescription,
-//     });
-//   } catch (error) {
-//     next(new InternalServerError(error.message));
-//   }
-// };
-
-// export const getPendingPrescriptionsController = asyncHandler(
-//   async (req, res) => {
-//     const prescriptions = await getPendingPrescriptions();
-//     res.status(200).json({
-//       message: "Lấy danh sách đơn thuốc cần xác nhận thành công",
-//       prescriptions,
-//     });
-//   }
-// );
-
 export const getPrescriptionDetailsController = asyncHandler(
   async (req, res, next) => {
     const { prescription_id } = req.params;
@@ -107,27 +75,45 @@ export const getPrescriptionDetailsController = asyncHandler(
     }
   }
 );
-// export const updatePrescriptionItemController = async (req, res, next) => {
-//   try {
-//     const { prescription_id } = req.params;
-//     const { original_medicine_id, new_medicine_id, actual_quantity, note } =
-//       req.body;
+export const getAllPrescriptionsController = async (req, res) => {
+  try {
+    const { user_id } = req.user; // Lấy từ JWT token
+    const { 
+      start_date,
+      end_date,
+      payment_status,
+      dispensed_status,
+      page = 1,
+      limit = 10
+    } = req.query;
 
-//     if (
-//       !original_medicine_id ||
-//       !new_medicine_id ||
-//       actual_quantity === undefined
-//     ) {
-//       throw new BadRequestError("Thiếu thông tin cập nhật thuốc");
-//     }
+    const result = await getAllPrescriptions({
+      patient_id: user_id,
+      start_date,
+      end_date,
+      payment_status,
+      dispensed_status,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
 
-//     const result = await updatePrescriptionItem(
-//       prescription_id,
-//       original_medicine_id,
-//       new_medicine_id,
-//       actual_quantity,
-//       note
-//     );
+    res.json(result);
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof BadRequestError) {
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    } else {
+      console.error("Error in getAllPrescriptionsController:", error);
+      res.status(500).json({
+        success: false,
+        message: "Đã có lỗi xảy ra khi lấy danh sách đơn thuốc"
+      });
+    }
+  }
+};
+
 
 //     res.status(200).json(result);
 //   } catch (error) {
@@ -156,8 +142,15 @@ export const getPrescriptionDetailsController = asyncHandler(
 export const updatePrescriptionItemController = asyncHandler(
   async (req, res) => {
     const { prescription_id } = req.params;
-    const { original_medicine_id, new_medicine_id, actual_quantity, note } =
-      req.body;
+    const { 
+      original_medicine_id, 
+      new_medicine_id, 
+      actual_quantity,
+      dosage,
+      frequency,
+      duration,
+      instructions
+    } = req.body;
 
     if (
       !original_medicine_id ||
@@ -172,21 +165,34 @@ export const updatePrescriptionItemController = asyncHandler(
       original_medicine_id,
       new_medicine_id,
       actual_quantity,
-      note
+      dosage,
+      frequency,
+      duration,
+      instructions
     );
 
     res.status(200).json(result);
   }
 );
 
-export const confirmPrescriptionController = asyncHandler(async (req, res) => {
+export const completePrescriptionController = asyncHandler(async (req, res) => {
   const { prescription_id } = req.params;
   const pharmacist_id = req.user.user_id;
 
-  const result = await confirmPrescription(prescription_id, pharmacist_id);
+  const result = await completePrescription(prescription_id, pharmacist_id);
 
   res.status(200).json(result);
 });
+
+export const confirmPrescriptionPreparationController = asyncHandler(async (req, res) => {
+  const { prescription_id } = req.params;
+  const pharmacist_id = req.user.pharmacist_id;
+
+  const result = await confirmPrescriptionPreparation(prescription_id, pharmacist_id);
+
+  res.status(200).json(result);
+});
+
 // export const getAllMedicinesController = async (req, res, next) => {
 //   try {
 //     const { search, expiry_before, page } = req.query;

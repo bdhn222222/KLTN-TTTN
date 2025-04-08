@@ -5,7 +5,7 @@ import {
   //  getPendingPrescriptionsController,
   getPrescriptionDetailsController,
   updatePrescriptionItemController,
-  confirmPrescriptionController,
+  completePrescriptionController,
   getAllMedicinesController,
   addMedicineController,
   updateMedicineController,
@@ -14,9 +14,11 @@ import {
   getPharmacistProfileController,
   updatePharmacistProfileController,
   changePharmacistPasswordController,
+  getAllPrescriptionsController,
+  confirmPrescriptionPreparationController
 } from "../controllers/pharmacistController.js";
 import validate from "../middleware/validate.js";
-import { body } from "express-validator";
+import { body, query } from "express-validator";
 import { authenticateUser } from "../middleware/authentication.js";
 import authorize from "../middleware/authorization.js";
 import e from "express";
@@ -67,7 +69,13 @@ router.patch(
   "/prescriptions/:prescription_id/confirm",
   authenticateUser,
   authorize(["pharmacist"]),
-  confirmPrescriptionController
+  completePrescriptionController
+);
+router.patch(
+  "/prescriptions/:prescription_id/confirm-preparation",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  confirmPrescriptionPreparationController
 );
 router.get(
   "/medicines",
@@ -158,5 +166,19 @@ router.put(
   authorize(["pharmacist"]),
   changePharmacistPasswordController
 );
-
+router.get(
+  "/prescriptions",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  validate([
+    query("start_date").optional().isISO8601().withMessage("Ngày bắt đầu không hợp lệ"),
+    query("end_date").optional().isISO8601().withMessage("Ngày kết thúc không hợp lệ"),
+    query("date").optional().isISO8601().withMessage("Ngày không hợp lệ"),
+    query("payment_status").optional().isIn(["pending", "paid", "cancelled"]).withMessage("Trạng thái thanh toán không hợp lệ"),
+    query("dispensed_status").optional().isBoolean().withMessage("Trạng thái phát thuốc không hợp lệ"),
+    query("page").optional().isInt({ min: 1 }).withMessage("Số trang phải lớn hơn 0"),
+    query("limit").optional().isInt({ min: 1, max: 100 }).withMessage("Số bản ghi trên mỗi trang phải từ 1-100")
+  ]),
+  getAllPrescriptionsController
+);
 export default router;

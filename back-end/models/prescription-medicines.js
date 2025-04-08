@@ -52,6 +52,38 @@ export default (sequelize) => {
         type: DataTypes.INTEGER,
         allowNull: true,
       },
+      dosage: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: "Liều dùng (VD: 1 viên/lần)"
+      },
+      frequency: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: "Tần suất sử dụng (VD: 2 lần/ngày)"
+      },
+      duration: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: "Thời gian dùng thuốc (VD: 5 ngày)"
+      },
+      instructions: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: "Hướng dẫn sử dụng"
+      },
+      unit_price: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: "Đơn giá thuốc"
+      },
+      total_price: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: "Thành tiền = số lượng * đơn giá"
+      },
       note: {
         type: DataTypes.STRING,
         allowNull: true,

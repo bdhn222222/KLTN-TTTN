@@ -5,12 +5,13 @@ import {
   getAllSpecializationsController,
   getAllDoctorsController,
   getDoctorProfileController,
-  bookAppointmentController,
+  bookAppointmentController
 } from "../controllers/patientController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
 import { authenticateUser } from "../middleware/authentication.js";
 import authorize from "../middleware/authorization.js";
+import { query } from "express-validator";
 const router = express.Router();
 import { loginLimiter, registerLimiter } from "../middleware/rateLimiter.js";
 router.post(
@@ -65,6 +66,7 @@ router.post(
   ]),
   bookAppointmentController
 );
+
 export default router;
 
 // import upload from "../middleware/uploadHandler.js";

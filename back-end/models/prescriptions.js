@@ -8,14 +8,17 @@ export default (sequelize) => {
         foreignKey: "appointment_id",
         as: "appointment",
       });
+      // Liên kết với bảng PrescriptionMedicine (chi tiết đơn thuốc)
       Prescription.hasMany(models.PrescriptionMedicine, {
         foreignKey: "prescription_id",
         as: "prescriptionMedicines",
       });
+      // Liên kết với bảng PrescriptionPayment (thanh toán đơn thuốc)
       Prescription.hasOne(models.PrescriptionPayment, {
         foreignKey: "prescription_id",
         as: "prescriptionPayments",
       });
+      // Liên kết với bảng Pharmacist (dược sĩ phát thuốc)
       Prescription.belongsTo(models.Pharmacist, {
         foreignKey: "pharmacist_id",
         as: "pharmacist",
@@ -30,6 +33,7 @@ export default (sequelize) => {
         autoIncrement: true,
         primaryKey: true,
         allowNull: false,
+        comment: "ID đơn thuốc, tự động tăng"
       },
       pharmacist_id: {
         type: DataTypes.INTEGER,
@@ -40,6 +44,7 @@ export default (sequelize) => {
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
+        comment: "ID dược sĩ xác nhận phát thuốc, có thể null khi chưa phát thuốc"
       },
       appointment_id: {
         type: DataTypes.INTEGER,
@@ -50,22 +55,25 @@ export default (sequelize) => {
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
+        comment: "ID cuộc hẹn liên quan đến đơn thuốc này"
       },
       dispensed: {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
+        comment: "Trạng thái phát thuốc: true - đã phát thuốc, false - chưa phát thuốc"
       },
       medicine_details: {
         type: DataTypes.TEXT,
         allowNull: true,
-      },
+        comment: "Ghi chú thêm về đơn thuốc (nếu có)"
+      }
     },
     {
       sequelize,
       modelName: "Prescription",
       tableName: "Prescriptions",
       timestamps: true,
-      createdAt: "createdAt",
+      createdAt: "createdAt", // Thời gian tạo đơn thuốc
       updatedAt: false,
     }
   );

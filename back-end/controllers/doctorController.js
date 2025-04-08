@@ -13,7 +13,8 @@ import {
   markPatientNotComing,
   completeAppointment,
   getDoctorDayOffs,
-  createMedicalRecord
+  createMedicalRecord,
+  createPrescriptions
 } from "../services/doctorService.js";
 import BadRequestError from "../errors/bad_request.js";
 import InternalServerError from "../errors/internalServerError.js";
@@ -396,6 +397,30 @@ export const completeAppointmentController = async (req, res) => {
       res.status(500).json({ 
         success: false, 
         message: "Có lỗi xảy ra khi hoàn thành cuộc hẹn",
+        error: error.message 
+      });
+    }
+  }
+};
+
+export const createPrescriptionsController = async (req, res) => {
+  try {
+    const doctor_id = req.user.user_id;
+    const { appointment_id, note, medicines } = req.body;
+
+    const result = await createMedicines(appointment_id, doctor_id, note, medicines);
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('Error in createMedicinesController:', error);
+    
+    if (error instanceof BadRequestError) {
+      res.status(400).json({ success: false, message: error.message });
+    } else if (error instanceof NotFoundError) {
+      res.status(404).json({ success: false, message: error.message });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: "Có lỗi xảy ra khi tạo đơn thuốc",
         error: error.message 
       });
     }

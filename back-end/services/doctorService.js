@@ -617,9 +617,9 @@ export const completeAppointment = async (appointment_id, doctor_id) => {
 
   const now = dayjs();
   const appointmentTime = dayjs(appointment.appointment_datetime);
-  if (now.isBefore(appointmentTime)) {
-    throw new BadRequestError("Chưa đến giờ hẹn, không thể hoàn thành");
-  }
+  // if (now.isBefore(appointmentTime)) {
+  //   throw new BadRequestError("Chưa đến giờ hẹn, không thể hoàn thành");
+  // }
 
   // Kiểm tra hồ sơ bệnh án
   const medicalRecord = await db.MedicalRecord.findOne({
@@ -628,6 +628,15 @@ export const completeAppointment = async (appointment_id, doctor_id) => {
 
   if (!medicalRecord) {
     throw new BadRequestError("Vui lòng tạo hồ sơ bệnh án trước khi hoàn thành cuộc hẹn");
+  }
+
+  // Kiểm tra đơn thuốc
+  const prescription = await db.Prescription.findOne({
+    where: { appointment_id }
+  });
+
+  if (!prescription) {
+    throw new BadRequestError("Vui lòng tạo đơn thuốc trước khi hoàn thành cuộc hẹn");
   }
 
   // Cập nhật trạng thái cuộc hẹn
@@ -656,6 +665,9 @@ export const completeAppointment = async (appointment_id, doctor_id) => {
       status: appointment.status,
       medical_record: {
         record_id: medicalRecord.record_id,
+      },
+      prescription: {
+        prescription_id: prescription.prescription_id
       }
     },
   };
@@ -1333,16 +1345,120 @@ export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
     completed_by: doctor_id
   });
 
-  // Cập nhật trạng thái lịch hẹn thành completed
-  await appointment.update({
-    status: 'completed'
-  });
-
   return {
     success: true,
     message: "Tạo hồ sơ bệnh án thành công. Bệnh nhân cần thanh toán để xem kết quả.",
     data: {
       record_id: medicalRecord.record_id
+    }
+  };
+};
+export const createPrescriptions = async (appointment_id, doctor_id, note, medicines) => {
+  // Kiểm tra cuộc hẹn
+  const appointment = await db.Appointment.findOne({
+    where: { 
+      appointment_id,
+      doctor_id
+    }
+  });
+
+  if (!appointment) {
+    throw new NotFoundError("Cuộc hẹn không tồn tại hoặc không thuộc về bác sĩ này");
+  }
+
+  if (appointment.status !== "accepted") {
+    throw new BadRequestError("Chỉ được tạo đơn thuốc cho cuộc hẹn đã được tiếp nhận");
+  }
+
+  // Kiểm tra xem đã có đơn thuốc chưa
+  const existingPrescription = await db.Prescription.findOne({
+    where: { appointment_id }
+  });
+
+  if (existingPrescription) {
+    throw new BadRequestError("Cuộc hẹn này đã có đơn thuốc");
+  }
+
+  // Lấy thông tin các thuốc
+  const medicineIds = medicines.map(m => m.medicine_id);
+  const medicineList = await db.Medicine.findAll({
+    where: {
+      medicine_id: {
+        [Op.in]: medicineIds
+      }
+    }
+  });
+
+  if (medicineList.length !== medicineIds.length) {
+    throw new BadRequestError("Một số thuốc không tồn tại trong hệ thống");
+  }
+
+  // Tạo đơn thuốc
+  const prescription = await db.Prescription.create({
+    appointment_id,
+    note: note || null,
+    created_by: doctor_id
+  });
+
+  // Tạo chi tiết đơn thuốc và tính tổng tiền
+  let total_amount = 0;
+  const prescriptionMedicines = [];
+
+  for (const medicine of medicines) {
+    const medicineInfo = medicineList.find(m => m.medicine_id === medicine.medicine_id);
+    const total_price = medicineInfo.price * medicine.quantity;
+    total_amount += total_price;
+
+    const prescriptionMedicine = await db.PrescriptionMedicine.create({
+      prescription_id: prescription.prescription_id,
+      medicine_id: medicine.medicine_id,
+      quantity: medicine.quantity,
+      dosage: medicine.dosage,
+      frequency: medicine.frequency,
+      duration: medicine.duration,
+      instructions: medicine.instructions,
+      unit_price: medicineInfo.price,
+      total_price: total_price
+    });
+
+    prescriptionMedicines.push({
+      prescription_medicine_id: prescriptionMedicine.prescription_medicine_id,
+      prescription_id: prescriptionMedicine.prescription_id,
+      medicine_id: medicine.medicine_id,
+      quantity: medicine.quantity,
+      medicine_name: medicineInfo.name,
+      unit: medicineInfo.unit,
+      price_details: medicineInfo.price ? `${medicineInfo.price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ'
+    });
+  }
+
+  // Cập nhật tổng tiền vào đơn thuốc
+  await prescription.update({
+    total_amount
+  });
+
+  // Tạo bản ghi thanh toán đơn thuốc
+  const prescriptionPayment = await db.PrescriptionPayment.create({
+    prescription_id: prescription.prescription_id,
+    amount: total_amount,
+    status: 'pending', // Các trạng thái có thể có: pending, paid, cancelled
+    payment_method: 'cash', // Mặc định là thanh toán tiền mặt
+    payment_date: null,
+    created_by: doctor_id
+  });
+
+  // Trả về kết quả
+  return {
+    success: true,
+    message: "Tạo đơn thuốc thành công",
+    data: {
+      prescription_id: prescription.prescription_id,
+      appointment_id,
+      medicines: prescriptionMedicines,
+      payment: {
+        amount: total_amount,
+        status: prescriptionPayment.status
+      }
     }
   };
 };
