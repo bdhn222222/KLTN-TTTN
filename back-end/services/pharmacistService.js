@@ -926,16 +926,16 @@ export const rejectPrescription = async (prescription_id, reason, user_id) => {
       throw new BadRequestError("Đơn thuốc này không sử dụng nhà thuốc bệnh viện");
     }
 
-    if (prescription.status === "completed" || prescription.status === "cancelled" || prescription.status === "rejected") {
-      throw new BadRequestError("Không thể từ chối đơn thuốc đã hoàn tất, đã hủy hoặc đã từ chối");
+    if (prescription.status === "completed" || prescription.status === "cancelled") {
+      throw new BadRequestError("Không thể từ chối đơn thuốc đã hoàn tất hoặc đã hủy");
     }
 
     // 4. Cập nhật đơn thuốc
     await prescription.update({
-      status: "rejected",
-      rejection_reason: reason,
-      rejected_at: new Date(),
-      rejected_by: pharmacist.pharmacist_id
+      status: "cancelled",
+      cancel_reason: reason,
+      cancelled_at: new Date(),
+      cancelled_by: pharmacist.pharmacist_id
     }, { transaction: t });
 
     // 5. Nếu đã có payment, cập nhật trạng thái payment thành cancelled
@@ -960,8 +960,8 @@ export const rejectPrescription = async (prescription_id, reason, user_id) => {
       message: "Từ chối đơn thuốc thành công",
       data: {
         prescription_id: prescription.prescription_id,
-        rejected_at: dayjs(prescription.rejected_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
-        rejection_reason: prescription.rejection_reason,
+        cancelled_at: dayjs(prescription.cancelled_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
+        cancel_reason: prescription.cancel_reason,
         pharmacist: {
           pharmacist_id: pharmacist.pharmacist_id,
           name: pharmacist.user.username
@@ -985,7 +985,7 @@ export const rejectPrescription = async (prescription_id, reason, user_id) => {
  * @param {string} params.end_date - Ngày kết thúc (YYYY-MM-DD)
  * @param {string} params.date - Ngày cụ thể (YYYY-MM-DD)
  * @param {string} params.payment_status - Trạng thái thanh toán (pending, paid, cancelled)
- * @param {string} params.status - Trạng thái đơn thuốc (pending_prepare, waiting_payment, completed, cancelled, rejected)
+ * @param {string} params.status - Trạng thái đơn thuốc (pending_prepare, waiting_payment, completed, cancelled)
  * @param {number} params.page - Trang hiện tại
  * @param {number} params.limit - Số bản ghi trên mỗi trang
  * @returns {Promise<Object>} Danh sách đơn thuốc và thông tin phân trang
@@ -1033,6 +1033,16 @@ export const getAllPrescriptions = async ({
     whereClause.status = status;
   }
 
+  // Log điều kiện tìm kiếm để debug
+  console.log('Search Conditions:', {
+    whereClause,
+    paymentWhereClause,
+    page,
+    limit,
+    offset
+  });
+
+  // Thực hiện truy vấn
   const { count, rows } = await db.Prescription.findAndCountAll({
     attributes: [
       'prescription_id',
@@ -1052,6 +1062,7 @@ export const getAllPrescriptions = async ({
       {
         model: db.PrescriptionMedicine,
         as: "prescriptionMedicines",
+        required: false,
         attributes: [
           "prescription_medicine_id",
           "medicine_id",
@@ -1138,6 +1149,12 @@ export const getAllPrescriptions = async ({
     limit,
     offset,
     distinct: true
+  });
+
+  // Log kết quả truy vấn để debug
+  console.log('Query Results:', {
+    totalRecords: count,
+    recordsReturned: rows.length
   });
 
   const prescriptions = rows.map(prescription => ({

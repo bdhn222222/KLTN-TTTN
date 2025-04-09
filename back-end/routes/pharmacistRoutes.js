@@ -17,7 +17,7 @@ import {
   getAllPrescriptionsController,
   confirmPrescriptionPreparationController,
   updatePrescriptionPaymentStatusController,
-  cancelPrescriptionController
+  rejectPrescriptionController
 } from "../controllers/pharmacistController.js";
 import validate from "../middleware/validate.js";
 import { body, query, param } from "express-validator";
@@ -86,13 +86,13 @@ router.patch(
   confirmPrescriptionPreparationController
 );
 router.patch(
-  "/prescriptions/:prescription_id/cancel",
+  "/prescriptions/:prescription_id/reject",
   authenticateUser,
   authorize(["pharmacist"]),
   validate([
-    body("reason").notEmpty().withMessage("Lý do hủy không được để trống"),
+    body("reason").notEmpty().withMessage("Lý do từ chối không được để trống"),
   ]),
-  cancelPrescriptionController
+  rejectPrescriptionController
 );
 router.get(
   "/medicines",

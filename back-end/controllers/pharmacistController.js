@@ -322,22 +322,14 @@ export const updatePrescriptionPaymentStatusController = asyncHandler(async (req
 });
 
 /**
- * Controller xử lý hủy đơn thuốc
+ * Controller xử lý từ chối đơn thuốc
  */
-export const cancelPrescriptionController = async (req, res, next) => {
-  try {
-    const { prescription_id } = req.params;
-    const { reason } = req.body;
-    const pharmacist_id = req.user.user_id;
+export const rejectPrescriptionController = asyncHandler(async (req, res) => {
+  const { prescription_id } = req.params;
+  const { reason } = req.body;
+  const user_id = req.user.user_id;
 
-    const result = await cancelPrescription(prescription_id, reason, pharmacist_id);
-    
-    res.json({
-      success: true,
-      message: "Hủy đơn thuốc thành công",
-      data: result
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  const result = await rejectPrescription(prescription_id, reason, user_id);
+  
+  res.status(200).json(result);
+});
