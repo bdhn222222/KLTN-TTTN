@@ -15,6 +15,8 @@ import {
   changePharmacistPassword,
   getAllPrescriptions,
   confirmPrescriptionPreparation,
+  updatePrescriptionPaymentStatus,
+  rejectPrescription,
 } from "../services/pharmacistService.js";
 import BadRequestError from "../errors/bad_request.js";
 import asyncHandler from "express-async-handler";
@@ -75,44 +77,29 @@ export const getPrescriptionDetailsController = asyncHandler(
     }
   }
 );
-export const getAllPrescriptionsController = async (req, res) => {
-  try {
-    const { user_id } = req.user; // Lấy từ JWT token
-    const { 
-      start_date,
-      end_date,
-      payment_status,
-      dispensed_status,
-      page = 1,
-      limit = 10
-    } = req.query;
+export const getAllPrescriptionsController = asyncHandler(async (req, res) => {
+  const { 
+    start_date,
+    end_date,
+    date,
+    payment_status,
+    status,
+    page = 1,
+    limit = 10
+  } = req.query;
 
-    const result = await getAllPrescriptions({
-      patient_id: user_id,
-      start_date,
-      end_date,
-      payment_status,
-      dispensed_status,
-      page: parseInt(page),
-      limit: parseInt(limit)
-    });
+  const result = await getAllPrescriptions({
+    start_date,
+    end_date,
+    date,
+    payment_status,
+    status,
+    page: parseInt(page),
+    limit: parseInt(limit)
+  });
 
-    res.json(result);
-  } catch (error) {
-    if (error instanceof NotFoundError || error instanceof BadRequestError) {
-      res.status(400).json({
-        success: false,
-        message: error.message
-      });
-    } else {
-      console.error("Error in getAllPrescriptionsController:", error);
-      res.status(500).json({
-        success: false,
-        message: "Đã có lỗi xảy ra khi lấy danh sách đơn thuốc"
-      });
-    }
-  }
-};
+  res.status(200).json(result);
+});
 
 
 //     res.status(200).json(result);
@@ -186,7 +173,11 @@ export const completePrescriptionController = asyncHandler(async (req, res) => {
 
 export const confirmPrescriptionPreparationController = asyncHandler(async (req, res) => {
   const { prescription_id } = req.params;
-  const pharmacist_id = req.user.pharmacist_id;
+  const pharmacist_id = req.user.user_id;
+  
+  // Thêm log để debug
+  console.log('User from token:', req.user);
+  console.log('Pharmacist ID:', pharmacist_id);
 
   const result = await confirmPrescriptionPreparation(prescription_id, pharmacist_id);
 
@@ -296,3 +287,57 @@ export const changePharmacistPasswordController = asyncHandler(
     res.status(200).json(result);
   }
 );
+
+/**
+ * Controller xử lý cập nhật trạng thái thanh toán đơn thuốc
+ */
+export const updatePrescriptionPaymentStatusController = asyncHandler(async (req, res) => {
+  const user_id = req.user.user_id;
+  const { prescription_payment_id } = req.params;
+  const { payment_method, note } = req.body;
+
+  // Validate input
+  if (!prescription_payment_id) {
+    throw new BadRequestError("Thiếu mã thanh toán đơn thuốc");
+  }
+
+  if (!payment_method) {
+    throw new BadRequestError("Thiếu phương thức thanh toán");
+  }
+
+  // Validate payment method
+  const validPaymentMethods = ['cash', 'zalopay'];
+  if (!validPaymentMethods.includes(payment_method)) {
+    throw new BadRequestError("Phương thức thanh toán không hợp lệ");
+  }
+
+  const result = await updatePrescriptionPaymentStatus(
+    user_id,
+    prescription_payment_id,
+    payment_method,
+    note
+  );
+
+  res.status(200).json(result);
+});
+
+/**
+ * Controller xử lý hủy đơn thuốc
+ */
+export const cancelPrescriptionController = async (req, res, next) => {
+  try {
+    const { prescription_id } = req.params;
+    const { reason } = req.body;
+    const pharmacist_id = req.user.user_id;
+
+    const result = await cancelPrescription(prescription_id, reason, pharmacist_id);
+    
+    res.json({
+      success: true,
+      message: "Hủy đơn thuốc thành công",
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};

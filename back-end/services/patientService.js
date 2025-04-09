@@ -61,7 +61,7 @@ export const registerPatient = async ({
 export const loginPatient = async ({ email, password }) => {
   const user = await User.findOne({
     where: { email, role: "patient" },
-    include: { model: Patient, as: "patient" },
+    include: { model: Patient, as: "Patient" },
   });
   if (!user) {
     throw new NotFoundError("Bệnh nhân không tồn tại hoặc email không đúng");
@@ -84,13 +84,13 @@ export const loginPatient = async ({ email, password }) => {
       email: user.email,
       username: user.username,
       role: user.role,
-      date_of_birth: user.patient.date_of_birth,
-      gender: user.patient.gender,
-      address: user.patient.address,
-      phone_number: user.patient.phone_number,
-      insurance_number: user.patient.insurance_number,
-      id_number: user.patient.id_number,
-      is_verified: user.patient.is_verified,
+      date_of_birth: user.Patient.date_of_birth,
+      gender: user.Patient.gender,
+      address: user.Patient.address,
+      phone_number: user.Patient.phone_number,
+      insurance_number: user.Patient.insurance_number,
+      id_number: user.Patient.id_number,
+      is_verified: user.Patient.is_verified,
     },
   };
 };
@@ -122,7 +122,7 @@ export const getAllDoctors = async () => {
       },
       {
         model: db.Specialization,
-        as: "specialization",
+        as: "Specialization",
         attributes: ["specialization_id", "name", "fees", "image"],
       },
     ],
@@ -157,7 +157,7 @@ export const getDoctorProfile = async (doctor_id) => {
       },
       {
         model: db.Specialization,
-        as: "specialization",
+        as: "Specialization",
         attributes: ["specialization_id", "name", "fees", "image"],
       },
       {
@@ -200,8 +200,12 @@ export const bookAppointment = async (user_id, doctor_id, appointment_datetime) 
   // 1. Kiểm tra bác sĩ tồn tại
   const doctor = await db.Doctor.findByPk(doctor_id, {
     include: [
-      { model: db.Specialization, as: "specialization" },
-      { model: db.Schedule, as: "schedule" },
+      { 
+        model: db.Specialization, 
+        as: "Specialization",
+        attributes: ['name', 'fees']
+      },
+      { model: db.Schedule, as: "Schedule" },
       { 
         model: db.User,
         as: "user",
@@ -362,7 +366,7 @@ export const bookAppointment = async (user_id, doctor_id, appointment_datetime) 
     patient_id: patient.patient_id,
     appointment_datetime,
     status: "waiting_for_confirmation",
-    fees: doctor.fees || 0
+    fees: doctor.Specialization?.fees || 0  // Lấy fees từ Specialization
   });
 
   return {
@@ -371,10 +375,10 @@ export const bookAppointment = async (user_id, doctor_id, appointment_datetime) 
     data: {
       appointment_id: appointment.appointment_id,
       doctor_name: doctor.user ? doctor.user.username : null,
-      specialization: doctor.specialization ? doctor.specialization.name : null,
+      specialization: doctor.Specialization ? doctor.Specialization.name : null,
       appointment_datetime: apptTime.format('YYYY-MM-DDTHH:mm:ssZ'),
       status: appointment.status,
-      fees: appointment.fees,
+      fees: doctor.Specialization?.fees || 0,  // Trả về fees từ Specialization
       createdAt: appointment.createdAt
     }
   };

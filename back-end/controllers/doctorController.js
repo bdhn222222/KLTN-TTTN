@@ -3,6 +3,7 @@ import {
   loginDoctor,
   updateDoctorProfile,
   createDoctorDayOff,
+  createPrescriptions,  
   cancelDoctorDayOff,
   getDoctorAppointments,
   getDoctorSummary,
@@ -14,13 +15,15 @@ import {
   completeAppointment,
   getDoctorDayOffs,
   createMedicalRecord,
-  createPrescriptions
+  getAppointmentPayments,
+  updatePaymentStatus
 } from "../services/doctorService.js";
 import BadRequestError from "../errors/bad_request.js";
 import InternalServerError from "../errors/internalServerError.js";
 import asyncHandler from "express-async-handler";
 import NotFoundError from "../errors/not_found.js";
 import { Op } from "sequelize";
+import dayjs from "dayjs";
 
 export const registerDoctorController = async (req, res, next) => {
   try {
@@ -182,7 +185,7 @@ export const createDoctorDayOffController = async (req, res) => {
             patient_id: appointment.patient_id,
             doctor_id,
             code: generateCompensationCode(), // Hàm tạo mã ngẫu nhiên
-            amount: appointment.fees * 0.1, // 10% phí khám
+            amount: appointment.Doctor.Specialization.fees * 0.1, // 10% phí khám
             discount_percentage: 10,
             expiry_date: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000) // 6 tháng
           });
@@ -403,16 +406,80 @@ export const completeAppointmentController = async (req, res) => {
   }
 };
 
-export const createPrescriptionsController = async (req, res) => {
+export const createPrescriptionsController = asyncHandler(async (req, res) => {
+  const { appointment_id, note, medicines, use_hospital_pharmacy } = req.body;
+  const doctor_id = req.user.user_id;
+
+  if (use_hospital_pharmacy === undefined) {
+    throw new BadRequestError("Vui lòng chỉ định có sử dụng nhà thuốc bệnh viện hay không");
+  }
+
+  const result = await createPrescriptions(
+    appointment_id,
+    doctor_id,
+    note,
+    medicines,
+    use_hospital_pharmacy
+  );
+
+  res.status(201).json(result);
+});
+
+/**
+ * Lấy danh sách thanh toán của các cuộc hẹn
+ */
+export const getAppointmentPaymentsController = async (req, res) => {
   try {
     const doctor_id = req.user.user_id;
-    const { appointment_id, note, medicines } = req.body;
+    const { 
+      page = 1, 
+      limit = 10, 
+      payment_status, 
+      start_date, 
+      end_date, 
+      date 
+    } = req.query;
 
-    const result = await createMedicines(appointment_id, doctor_id, note, medicines);
-    res.status(201).json(result);
+    // Validate input
+    if (page && (isNaN(page) || page < 1)) {
+      throw new BadRequestError("Số trang không hợp lệ");
+    }
+
+    if (limit && (isNaN(limit) || limit < 1)) {
+      throw new BadRequestError("Giới hạn số lượng không hợp lệ");
+    }
+
+    if (date && !dayjs(date).isValid()) {
+      throw new BadRequestError("Ngày không hợp lệ");
+    }
+
+    if (start_date && !dayjs(start_date).isValid()) {
+      throw new BadRequestError("Ngày bắt đầu không hợp lệ");
+    }
+
+    if (end_date && !dayjs(end_date).isValid()) {
+      throw new BadRequestError("Ngày kết thúc không hợp lệ");
+    }
+
+    if (start_date && end_date && dayjs(end_date).isBefore(dayjs(start_date))) {
+      throw new BadRequestError("Ngày kết thúc phải sau ngày bắt đầu");
+    }
+
+    const result = await getAppointmentPayments(
+      doctor_id, 
+      {
+        payment_status,
+        start_date,
+        end_date,
+        date
+      }, 
+      parseInt(page), 
+      parseInt(limit)
+    );
+
+    res.status(200).json(result);
   } catch (error) {
-    console.error('Error in createMedicinesController:', error);
-    
+    console.error('Error in getAppointmentPaymentsController:', error);
     if (error instanceof BadRequestError) {
       res.status(400).json({ success: false, message: error.message });
     } else if (error instanceof NotFoundError) {
@@ -420,7 +487,42 @@ export const createPrescriptionsController = async (req, res) => {
     } else {
       res.status(500).json({ 
         success: false, 
-        message: "Có lỗi xảy ra khi tạo đơn thuốc",
+        message: "Có lỗi xảy ra khi lấy danh sách thanh toán",
+        error: error.message 
+      });
+    }
+  }
+};
+
+/**
+ * Cập nhật trạng thái thanh toán
+ */
+export const updatePaymentStatusController = async (req, res) => {
+  try {
+    const doctor_id = req.user.user_id;
+    const { payment_id } = req.params;
+    const { status, note } = req.body;
+
+    if (!payment_id) {
+      throw new BadRequestError("Thiếu mã thanh toán");
+    }
+
+    if (!status) {
+      throw new BadRequestError("Thiếu trạng thái thanh toán");
+    }
+
+    const result = await updatePaymentStatus(doctor_id, payment_id, status, note);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error in updatePaymentStatusController:', error);
+    if (error instanceof BadRequestError) {
+      res.status(400).json({ success: false, message: error.message });
+    } else if (error instanceof NotFoundError) {
+      res.status(404).json({ success: false, message: error.message });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: "Có lỗi xảy ra khi cập nhật trạng thái thanh toán",
         error: error.message 
       });
     }

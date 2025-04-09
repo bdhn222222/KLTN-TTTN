@@ -15,10 +15,12 @@ import {
   updatePharmacistProfileController,
   changePharmacistPasswordController,
   getAllPrescriptionsController,
-  confirmPrescriptionPreparationController
+  confirmPrescriptionPreparationController,
+  updatePrescriptionPaymentStatusController,
+  cancelPrescriptionController
 } from "../controllers/pharmacistController.js";
 import validate from "../middleware/validate.js";
-import { body, query } from "express-validator";
+import { body, query, param } from "express-validator";
 import { authenticateUser } from "../middleware/authentication.js";
 import authorize from "../middleware/authorization.js";
 import e from "express";
@@ -75,7 +77,22 @@ router.patch(
   "/prescriptions/:prescription_id/confirm-preparation",
   authenticateUser,
   authorize(["pharmacist"]),
+  validate([
+    body("payment_method")
+      .optional()
+      .isIn(['cash', 'card', 'transfer', 'momo', 'vnpay', 'zalopay'])
+      .withMessage("Phương thức thanh toán không hợp lệ")
+  ]),
   confirmPrescriptionPreparationController
+);
+router.patch(
+  "/prescriptions/:prescription_id/cancel",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  validate([
+    body("reason").notEmpty().withMessage("Lý do hủy không được để trống"),
+  ]),
+  cancelPrescriptionController
 );
 router.get(
   "/medicines",
@@ -180,5 +197,29 @@ router.get(
     query("limit").optional().isInt({ min: 1, max: 100 }).withMessage("Số bản ghi trên mỗi trang phải từ 1-100")
   ]),
   getAllPrescriptionsController
+);
+router.patch(
+  '/prescriptions/payments/:prescription_payment_id/status',
+  authenticateUser,
+  authorize(['pharmacist']),
+  validate([
+    param('prescription_payment_id')
+      .notEmpty()
+      .withMessage('Thiếu mã thanh toán đơn thuốc')
+      .isInt()
+      .withMessage('Mã thanh toán đơn thuốc phải là số'),
+    body('payment_method')
+      .notEmpty()
+      .withMessage('Thiếu phương thức thanh toán')
+      .isIn(['cash', 'zalopay'])
+      .withMessage('Phương thức thanh toán không hợp lệ'),
+    body('note')
+      .optional()
+      .isString()
+      .withMessage('Ghi chú phải là chuỗi')
+      .isLength({ max: 255 })
+      .withMessage('Ghi chú tối đa 255 ký tự')
+  ]),
+  updatePrescriptionPaymentStatusController
 );
 export default router;

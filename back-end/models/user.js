@@ -21,7 +21,7 @@ export default (sequelize) => {
       );
     }
     static associate(models) {
-      User.hasOne(models.Patient, { foreignKey: "user_id", as: "patient" });
+      User.hasOne(models.Patient, { foreignKey: "user_id", as: "Patient" });
       User.hasOne(models.Doctor, { foreignKey: "user_id", as: "doctor" });
       User.hasOne(models.Pharmacist, {
         foreignKey: "user_id",

@@ -6,19 +6,19 @@ export default (sequelize) => {
       Doctor.belongsTo(models.User, { foreignKey: "user_id", as: "user" });
       Doctor.belongsTo(models.Specialization, {
         foreignKey: "specialization_id",
-        as: "specialization",
+        as: "Specialization",
       });
       Doctor.hasMany(models.Appointment, {
         foreignKey: "doctor_id",
-        as: "appointments",
+        as: "Appointments",
       });
       Doctor.hasOne(models.Schedule, {
         foreignKey: "doctor_id",
-        as: "schedule",
+        as: "Schedule",
       });
       Doctor.hasMany(models.DoctorDayOff, {
         foreignKey: "doctor_id",
-        as: "dayOffs",
+        as: "DayOffs",
       });
     }
   }

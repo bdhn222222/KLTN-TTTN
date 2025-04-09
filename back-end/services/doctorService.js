@@ -23,12 +23,10 @@ export const registerDoctor = async ({
   degree,
   experience_years,
   description,
-  fees,
 }) => {
   const existingUser = await User.findOne({ where: { email } });
   if (existingUser) throw new BadRequestError("Email đã được đăng ký");
 
-  //const hashedPassword = await bcrypt.hash(password, 10);
   const newUser = await User.create({
     username,
     email,
@@ -42,21 +40,29 @@ export const registerDoctor = async ({
     degree,
     experience_years,
     description,
-    fees,
   });
 
-  return { message: "Đăng ký account Bác sĩ thành công", doctor: newDoctor };
+  return { message: "Đăng ký account Bác sĩ thành công", doctor: newDoctor };
 };
+
 export const loginDoctor = async ({ email, password }) => {
   const user = await User.findOne({
     where: { email, role: "doctor" },
-    include: { model: Doctor, as: "doctor" },
+    include: { 
+      model: Doctor, 
+      as: "doctor",
+      include: [{
+        model: db.Specialization,
+        as: "Specialization",
+        attributes: ["fees"]
+      }]
+    },
   });
   if (!user) {
-    throw new NotFoundError("Không tìm thấy tài khoản Bác sĩ");
+    throw new NotFoundError("Không tìm thấy tài khoản Bác sĩ");
   }
   const isPasswordValid = await bcrypt.compare(password, user.password);
-  if (!isPasswordValid) throw new UnauthorizedError("Mật khẩu không chính xác");
+  if (!isPasswordValid) throw new UnauthorizedError("Mật khẩu không chính xác");
   const token = jwt.sign(
     { user_id: user.user_id, role: user.role },
     process.env.JWT_SECRET,
@@ -73,10 +79,11 @@ export const loginDoctor = async ({ email, password }) => {
       specialization_id: user.doctor.specialization_id,
       degree: user.doctor.degree,
       experience_years: user.doctor.experience_years,
-      fees: user.doctor.fees,
+      fees: user.doctor.Specialization?.fees || 0,
     },
   };
 };
+
 export const updateDoctorProfile = async (user_id, data, authenticatedUser) => {
   if (
     authenticatedUser.user_id !== user_id &&
@@ -89,7 +96,15 @@ export const updateDoctorProfile = async (user_id, data, authenticatedUser) => {
 
   const user = await User.findOne({
     where: { user_id, role: "doctor" },
-    include: { model: Doctor, as: "doctor" },
+    include: { 
+      model: Doctor, 
+      as: "doctor",
+      include: [{
+        model: db.Specialization,
+        as: "Specialization",
+        attributes: ["fees"]
+      }]
+    },
   });
 
   if (!user) {
@@ -106,7 +121,6 @@ export const updateDoctorProfile = async (user_id, data, authenticatedUser) => {
   if (data.degree) user.doctor.degree = data.degree;
   if (data.experience_years)
     user.doctor.experience_years = data.experience_years;
-  if (data.fees) user.doctor.fees = data.fees;
   if (data.description) user.doctor.description = data.description;
 
   await user.save();
@@ -121,11 +135,12 @@ export const updateDoctorProfile = async (user_id, data, authenticatedUser) => {
       specialization_id: user.doctor.specialization_id,
       degree: user.doctor.degree,
       experience_years: user.doctor.experience_years,
-      fees: user.doctor.fees,
+      fees: user.doctor.Specialization?.fees || 0,
       description: user.doctor.description,
     },
   };
 };
+
 export const getDoctorAppointments = async ({ doctor_id, filter_date, status, start_date, end_date }) => {
   // Xây dựng điều kiện where cho query
   const whereClause = {
@@ -189,6 +204,7 @@ export const getDoctorAppointments = async ({ doctor_id, filter_date, status, st
     }))
   };
 };
+
 export const getDoctorSummary = async (doctor_id) => {
   const totalAppointments = await db.Appointment.count({
     where: { doctor_id },
@@ -214,8 +230,8 @@ export const getDoctorSummary = async (doctor_id) => {
       appointmentsByStatus,
     },
   };
-
 }
+
 export const getDoctorAppointmentStats = async (doctor_id, start, end) => {
   // Validate dates
   if (start && !dayjs(start).isValid()) {
@@ -240,7 +256,7 @@ export const getDoctorAppointmentStats = async (doctor_id, start, end) => {
     include: [
       {
         model: db.Patient,
-        as: "patient",
+        as: "Patient",
         include: {
           model: db.User,
           as: "user",
@@ -283,13 +299,14 @@ export const getDoctorAppointmentStats = async (doctor_id, start, end) => {
     },
   };
 }
+
 export const getAppointmentDetails = async (appointment_id, doctor_id) => {
   const appointment = await db.Appointment.findOne({
     where: { appointment_id, doctor_id },
     include: [
       {
         model: db.Patient,
-        as: "patient",
+        as: "Patient",
         include: {
           model: db.User,
           as: "user",
@@ -298,11 +315,11 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
       }, 
       {
         model: db.MedicalRecord,
-        as: "medicalRecord",
+        as: "MedicalRecord",
       },
       {
         model: db.Prescription,
-        as: "prescription",
+        as: "Prescription",
         include: [
           {
             model: db.PrescriptionMedicine,
@@ -319,12 +336,12 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
       },
       {
         model: db.Payment,
-        as: "payments",
+        as: "Payments",
         attributes: ["payment_id", "amount", "payment_method", "status", "createdAt"],
       },
       {
         model: db.Feedback,
-        as: "feedback",
+        as: "Feedback",
         attributes: ["rating", "comment", "createdAt"],
       }
     ]
@@ -347,23 +364,23 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
         updatedAt: appointment.updatedAt
       },
       patient: {
-        id: appointment.patient.patient_id,
-        user_id: appointment.patient.user.user_id,
-        name: appointment.patient.user.username,
-        email: appointment.patient.user.email
+        id: appointment.Patient.patient_id,
+        user_id: appointment.Patient.user.user_id,
+        name: appointment.Patient.user.username,
+        email: appointment.Patient.user.email
       },
-      medical_record: appointment.medicalRecord ? {
-        id: appointment.medicalRecord.record_id,
-        diagnosis: appointment.medicalRecord.diagnosis,
-        treatment: appointment.medicalRecord.treatment,
-        notes: appointment.medicalRecord.notes,
-        createdAt: appointment.medicalRecord.createdAt
+      medical_record: appointment.MedicalRecord ? {
+        id: appointment.MedicalRecord.record_id,
+        diagnosis: appointment.MedicalRecord.diagnosis,
+        treatment: appointment.MedicalRecord.treatment,
+        notes: appointment.MedicalRecord.notes,
+        createdAt: appointment.MedicalRecord.createdAt
       } : null,
-      prescription: appointment.prescription ? {
-        id: appointment.prescription.prescription_id,
-        status: appointment.prescription.dispensed ? "Đã phát thuốc" : "Chưa phát thuốc",
-        medicine_details: appointment.prescription.medicine_details,
-        medicines: appointment.prescription.prescriptionMedicines.map(pm => ({
+      prescription: appointment.Prescription ? {
+        id: appointment.Prescription.prescription_id,
+        status: appointment.Prescription.dispensed ? "Đã phát thuốc" : "Chưa phát thuốc",
+        medicine_details: appointment.Prescription.medicine_details,
+        medicines: appointment.Prescription.prescriptionMedicines.map(pm => ({
           id: pm.medicine.medicine_id,
           name: pm.medicine.name,
           quantity: pm.quantity,
@@ -371,23 +388,24 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
           total: pm.quantity * pm.medicine.price,
           note: pm.note
         })),
-        createdAt: appointment.prescription.createdAt
+        createdAt: appointment.Prescription.createdAt
       } : null,
-      payment: appointment.payments ? {
-        id: appointment.payments.payment_id,
-        amount: appointment.payments.amount,
-        status: appointment.payments.status,
-        payment_method: appointment.payments.payment_method,
-        payment_date: appointment.payments.createdAt
+      payment: appointment.Payments ? {
+        id: appointment.Payments.payment_id,
+        amount: appointment.Payments.amount,
+        status: appointment.Payments.status,
+        payment_method: appointment.Payments.payment_method,
+        payment_date: appointment.Payments.createdAt
       } : null,
-      feedback: appointment.feedback ? {
-        rating: appointment.feedback.rating,
-        comment: appointment.feedback.comment,
-        createdAt: appointment.feedback.createdAt
+      feedback: appointment.Feedback ? {
+        rating: appointment.Feedback.rating,
+        comment: appointment.Feedback.comment,
+        createdAt: appointment.Feedback.createdAt
       } : null
     }
   };
 }
+
 export const cancelAppointment = async (appointment_id, doctor_id, reason, cancelled_by = 'doctor') => {
   const t = await db.sequelize.transaction();
 
@@ -465,25 +483,25 @@ export const cancelAppointment = async (appointment_id, doctor_id, reason, cance
       
     } else if (hoursBeforeAppointment >= 3 && hoursBeforeAppointment < 24) {
       // Hủy trong khoảng 3-24 giờ - tự động giảm giá 5%
-      discountPercentage = 5;
+        discountPercentage = 5;
       compensation = 0;
       is_emergency = false;
       cancelMessage = 'Huỷ lịch hẹn thành công. Bệnh nhân sẽ được giảm 5% phí khám cho lần khám tiếp theo.';
-      
-      const code = `COMP-${uuidv4().substring(0, 8).toUpperCase()}`;
+        
+        const code = `COMP-${uuidv4().substring(0, 8).toUpperCase()}`;
       const expiryDate = dayjs().add(180, 'day').toDate();
-      
-      compensationCode = await db.CompensationCode.create({
-        appointment_id: appointment.appointment_id,
-        patient_id: appointment.patient_id,
-        doctor_id: appointment.doctor_id,
-        code: code,
+        
+        compensationCode = await db.CompensationCode.create({
+          appointment_id: appointment.appointment_id,
+          patient_id: appointment.patient_id,
+          doctor_id: appointment.doctor_id,
+          code: code,
         amount: null,
-        discount_percentage: discountPercentage,
-        expiry_date: expiryDate,
+          discount_percentage: discountPercentage,
+          expiry_date: expiryDate,
         max_discount: 100000 // Giới hạn tối đa 100.000đ cho giảm giá 5%
-      }, { transaction: t });
-      
+        }, { transaction: t });
+
     } else if (hoursBeforeAppointment < 3) {
       // Hủy trong vòng 3 giờ - tự động đánh dấu là khẩn cấp
       is_emergency = true;
@@ -567,13 +585,6 @@ export const cancelAppointment = async (appointment_id, doctor_id, reason, cance
     throw error;
   }
 };
-// Hàm gửi thông báo (email hoặc SMS) cho bệnh nhân
-// const sendNotificationToPatient = (email, message) => {
-//   // Ví dụ về cách gửi email hoặc SMS
-//   // Đây là chỗ bạn sẽ tích hợp các dịch vụ gửi email/SMS sau
-//   // sendEmail(email, message);
-//   // sendSMS(phone_number, message);
-// };
 
 export const markPatientNotComing = async (appointment_id, doctor_id) => {
   const appointment = await db.Appointment.findOne({
@@ -601,10 +612,20 @@ export const markPatientNotComing = async (appointment_id, doctor_id) => {
     },
   };
 };
-export const completeAppointment = async (appointment_id, doctor_id) => {
+
+export const completeAppointment = async (appointment_id, doctor_id, medical_data = null) => {
   // Kiểm tra cuộc hẹn
   const appointment = await db.Appointment.findOne({
     where: { appointment_id, doctor_id },
+    include: [{
+      model: db.Doctor,
+      as: "Doctor",
+      include: [{
+        model: db.Specialization,
+        as: "Specialization",
+        attributes: ["fees"]
+      }]
+    }]
   });
 
   if (!appointment) {
@@ -615,19 +636,21 @@ export const completeAppointment = async (appointment_id, doctor_id) => {
     throw new BadRequestError("Chỉ được hoàn thành lịch hẹn đã được tiếp nhận");
   }
 
-  const now = dayjs();
-  const appointmentTime = dayjs(appointment.appointment_datetime);
-  // if (now.isBefore(appointmentTime)) {
-  //   throw new BadRequestError("Chưa đến giờ hẹn, không thể hoàn thành");
-  // }
-
-  // Kiểm tra hồ sơ bệnh án
-  const medicalRecord = await db.MedicalRecord.findOne({
+  // Kiểm tra và tạo hồ sơ bệnh án nếu chưa có
+  let medicalRecord = await db.MedicalRecord.findOne({
     where: { appointment_id }
   });
 
-  if (!medicalRecord) {
-    throw new BadRequestError("Vui lòng tạo hồ sơ bệnh án trước khi hoàn thành cuộc hẹn");
+  if (!medicalRecord && medical_data) {
+    medicalRecord = await db.MedicalRecord.create({
+      appointment_id,
+      ...medical_data,
+      created_by: doctor_id,
+      completed_at: new Date(),
+      completed_by: doctor_id
+    });
+  } else if (!medicalRecord) {
+    throw new BadRequestError("Vui lòng cung cấp thông tin hồ sơ bệnh án");
   }
 
   // Kiểm tra đơn thuốc
@@ -639,23 +662,25 @@ export const completeAppointment = async (appointment_id, doctor_id) => {
     throw new BadRequestError("Vui lòng tạo đơn thuốc trước khi hoàn thành cuộc hẹn");
   }
 
+  // Tạo bản ghi thanh toán phí khám
+  const payment = await db.Payment.create({
+    appointment_id,
+    amount: appointment.Doctor.Specialization.fees || 0,
+    status: 'pending',
+    payment_method: 'cash',
+    created_by: doctor_id
+  });
+
   // Cập nhật trạng thái cuộc hẹn
   appointment.status = "completed";
   await appointment.save();
 
-  // Cập nhật trạng thái hồ sơ bệnh án
-  medicalRecord.completed_at = new Date();
-  medicalRecord.completed_by = doctor_id;
-  await medicalRecord.save();
-
-  // // Tạo thông báo cho bệnh nhân
-  // await db.Notification.create({
-  //   user_id: appointment.patient_id,
-  //   title: "Cuộc hẹn đã hoàn thành",
-  //   content: "Bác sĩ đã hoàn thành cuộc hẹn và tạo hồ sơ bệnh án. Vui lòng thanh toán để xem kết quả khám.",
-  //   type: "appointment_completed",
-  //   reference_id: appointment_id
-  // });
+  // Cập nhật trạng thái hồ sơ bệnh án nếu chưa hoàn thành
+  if (!medicalRecord.completed_at) {
+    medicalRecord.completed_at = new Date();
+    medicalRecord.completed_by = doctor_id;
+    await medicalRecord.save();
+  }
 
   return {
     success: true,
@@ -665,13 +690,20 @@ export const completeAppointment = async (appointment_id, doctor_id) => {
       status: appointment.status,
       medical_record: {
         record_id: medicalRecord.record_id,
+        completed_at: medicalRecord.completed_at
       },
       prescription: {
         prescription_id: prescription.prescription_id
+      },
+      payment: {
+        payment_id: payment.payment_id,
+        amount: payment.amount,
+        status: payment.status
       }
     },
   };
 };
+
 export const getDoctorDayOffs = async (doctor_id, start, end, status, date) => {
   try {
     let whereClause = {
@@ -768,6 +800,7 @@ export const getDoctorDayOffs = async (doctor_id, start, end, status, date) => {
     throw new InternalServerError("Có lỗi xảy ra khi lấy danh sách ngày nghỉ");
   }
 };
+
 export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) => {
   // Bắt đầu transaction
   const t = await db.sequelize.transaction();
@@ -1009,6 +1042,7 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
     throw error;
   }
 };
+
 export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
   // Bắt đầu transaction
   const t = await db.sequelize.transaction();
@@ -1150,6 +1184,7 @@ export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
     throw error;
   }
 };
+
 /**
  * Xác nhận lịch hẹn
  * @param {number} appointment_id - ID của lịch hẹn
@@ -1289,6 +1324,7 @@ export const acceptAppointment = async (appointment_id, doctor_id) => {
     }
   };
 };
+
 export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
   // Lấy thông tin lịch hẹn
   const appointment = await db.Appointment.findOne({
@@ -1340,7 +1376,7 @@ export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
     diagnosis: data.diagnosis,
     treatment: data.treatment,
     notes: data.notes,
-    is_visible_to_patient: false, // Bệnh nhân không thể xem cho đến khi thanh toán
+    is_visible_to_patient: false,
     completed_at: new Date(),
     completed_by: doctor_id
   });
@@ -1353,13 +1389,100 @@ export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
     }
   };
 };
-export const createPrescriptions = async (appointment_id, doctor_id, note, medicines) => {
+
+/**
+ * Tạo file PDF cho đơn thuốc
+ * @param {number} prescription_id - ID của đơn thuốc
+ * @returns {Promise<string>} - URL của file PDF
+ */
+const generatePrescriptionPDF = async (prescription_id) => {
+  // Lấy thông tin đơn thuốc
+  const prescription = await db.Prescription.findOne({
+    where: { prescription_id },
+    include: [
+      {
+        model: db.Appointment,
+        as: "Appointment",
+        include: [
+          {
+            model: db.Patient,
+            as: "Patient",
+            include: [
+              {
+                model: db.User,
+                as: "user",
+                attributes: ["username", "email"]
+              }
+            ]
+          },
+          {
+            model: db.Doctor,
+            as: "Doctor",
+            include: [
+              {
+                model: db.Specialization,
+                as: "Specialization",
+                attributes: ["name"]
+              },
+              {
+                model: db.User,
+                as: "user",
+                attributes: ["username"]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        model: db.PrescriptionMedicine,
+        as: "PrescriptionMedicines",
+        include: [
+          {
+            model: db.Medicine,
+            as: "Medicine",
+            attributes: ["name", "unit"]
+          }
+        ]
+      }
+    ]
+  });
+
+  if (!prescription) {
+    throw new NotFoundError("Không tìm thấy đơn thuốc");
+  }
+
+  // Tạo tên file PDF
+  const fileName = `prescription_${prescription_id}_${Date.now()}.pdf`;
+  const filePath = `uploads/prescriptions/${fileName}`;
+
+  // TODO: Implement PDF generation logic here
+  // For now, return a dummy URL
+  return `/prescriptions/${fileName}`;
+};
+
+export const createPrescriptions = async (
+  appointment_id,
+  doctor_id,
+  note,
+  medicines,
+  use_hospital_pharmacy
+) => {
   // Kiểm tra cuộc hẹn
   const appointment = await db.Appointment.findOne({
     where: { 
       appointment_id,
       doctor_id
-    }
+    },
+    include: [
+      {
+        model: db.Doctor,
+        as: "Doctor",
+        include: {
+          model: db.Specialization,
+          as: "Specialization"
+        }
+      }
+    ]
   });
 
   if (!appointment) {
@@ -1397,17 +1520,18 @@ export const createPrescriptions = async (appointment_id, doctor_id, note, medic
   const prescription = await db.Prescription.create({
     appointment_id,
     note: note || null,
-    created_by: doctor_id
+    created_by: doctor_id,
+    status: "pending_prepare",
+    use_hospital_pharmacy,
+    createdAt: new Date()
   });
 
-  // Tạo chi tiết đơn thuốc và tính tổng tiền
-  let total_amount = 0;
+  // Tạo chi tiết đơn thuốc
   const prescriptionMedicines = [];
 
   for (const medicine of medicines) {
     const medicineInfo = medicineList.find(m => m.medicine_id === medicine.medicine_id);
     const total_price = medicineInfo.price * medicine.quantity;
-    total_amount += total_price;
 
     const prescriptionMedicine = await db.PrescriptionMedicine.create({
       prescription_id: prescription.prescription_id,
@@ -1418,34 +1542,29 @@ export const createPrescriptions = async (appointment_id, doctor_id, note, medic
       duration: medicine.duration,
       instructions: medicine.instructions,
       unit_price: medicineInfo.price,
-      total_price: total_price
+      total_price: total_price,
+      createdAt: new Date()
     });
 
     prescriptionMedicines.push({
-      prescription_medicine_id: prescriptionMedicine.prescription_medicine_id,
-      prescription_id: prescriptionMedicine.prescription_id,
       medicine_id: medicine.medicine_id,
+      name: medicineInfo.name,
       quantity: medicine.quantity,
-      medicine_name: medicineInfo.name,
       unit: medicineInfo.unit,
-      price_details: medicineInfo.price ? `${medicineInfo.price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ'
+      price: medicineInfo.price,
+      total: total_price,
+      dosage: medicine.dosage,
+      frequency: medicine.frequency,
+      duration: medicine.duration,
+      instructions: medicine.instructions
     });
   }
 
-  // Cập nhật tổng tiền vào đơn thuốc
-  await prescription.update({
-    total_amount
-  });
-
-  // Tạo bản ghi thanh toán đơn thuốc
-  const prescriptionPayment = await db.PrescriptionPayment.create({
-    prescription_id: prescription.prescription_id,
-    amount: total_amount,
-    status: 'pending', // Các trạng thái có thể có: pending, paid, cancelled
-    payment_method: 'cash', // Mặc định là thanh toán tiền mặt
-    payment_date: null,
-    created_by: doctor_id
-  });
+  // Nếu không sử dụng nhà thuốc bệnh viện, tạo PDF ngay
+  if (!use_hospital_pharmacy) {
+    const pdfUrl = await generatePrescriptionPDF(prescription.prescription_id);
+    await prescription.update({ pdf_url: pdfUrl });
+  }
 
   // Trả về kết quả
   return {
@@ -1454,11 +1573,172 @@ export const createPrescriptions = async (appointment_id, doctor_id, note, medic
     data: {
       prescription_id: prescription.prescription_id,
       appointment_id,
-      medicines: prescriptionMedicines,
-      payment: {
-        amount: total_amount,
-        status: prescriptionPayment.status
+      status: prescription.status,
+      note: prescription.note,
+      medicines: prescriptionMedicines
+    }
+  };
+};
+
+/**
+ * Lấy danh sách thanh toán của các cuộc hẹn
+ * @param {number} doctor_id - ID của bác sĩ
+ * @param {Object} filters - Các bộ lọc (trạng thái, khoảng thời gian)
+ * @param {number} page - Trang hiện tại
+ * @param {number} limit - Số lượng item trên mỗi trang
+ * @returns {Promise<Object>} - Danh sách thanh toán
+ */
+export const getAppointmentPayments = async (doctor_id, filters = {}, page = 1, limit = 10) => {
+  const offset = (page - 1) * limit;
+  const whereClause = {};
+  const paymentWhereClause = {};
+
+  // Lọc theo trạng thái thanh toán
+  if (filters.payment_status) {
+    paymentWhereClause.status = filters.payment_status;
+  }
+
+  // Lọc theo khoảng thời gian
+  if (filters.date) {
+    // Nếu có tham số date, lọc theo ngày cụ thể
+    const targetDate = dayjs.tz(filters.date, 'Asia/Ho_Chi_Minh');
+    whereClause.appointment_datetime = {
+      [Op.between]: [
+        targetDate.startOf('day').toDate(),
+        targetDate.endOf('day').toDate()
+      ]
+    };
+  } else if (filters.start_date || filters.end_date) {
+    // Nếu không có date nhưng có start_date hoặc end_date, lọc theo khoảng thời gian
+    whereClause.appointment_datetime = {};
+    if (filters.start_date) {
+      whereClause.appointment_datetime[Op.gte] = dayjs.tz(filters.start_date, 'Asia/Ho_Chi_Minh').startOf('day').toDate();
+    }
+    if (filters.end_date) {
+      whereClause.appointment_datetime[Op.lte] = dayjs.tz(filters.end_date, 'Asia/Ho_Chi_Minh').endOf('day').toDate();
+    }
+  }
+
+  // Lấy danh sách cuộc hẹn có thanh toán
+  const { count, rows } = await db.Appointment.findAndCountAll({
+    where: {
+      ...whereClause,
+      doctor_id
+    },
+    include: [
+      {
+        model: db.Patient,
+        as: "Patient",
+        include: {
+          model: db.User,
+          as: "user",
+          attributes: ["username", "email"],
+        },
+      },
+      {
+        model: db.Payment,
+        as: "Payments",
+        where: paymentWhereClause,
+        required: true, // Luôn yêu cầu có thanh toán
+        attributes: ["payment_id", "amount", "payment_method", "status", "createdAt"],
+      }
+    ],
+    order: [['appointment_datetime', 'DESC']],
+    limit,
+    offset,
+    distinct: true
+  });
+
+  // Format dữ liệu trả về
+  const payments = rows.map(appointment => ({
+    appointment_id: appointment.appointment_id,
+    appointment_datetime: dayjs(appointment.appointment_datetime).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
+    patient: {
+      name: appointment.Patient?.user?.username || '',
+      email: appointment.Patient?.user?.email || ''
+    },
+    payment: appointment.Payments ? {
+      id: appointment.Payments.payment_id,
+      amount: appointment.Payments.amount ? 
+        `${appointment.Payments.amount.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
+      status: appointment.Payments.status,
+      payment_method: appointment.Payments.payment_method,
+      payment_date: dayjs(appointment.Payments.createdAt).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss')
+    } : null
+  }));
+
+  return {
+    success: true,
+    message: "Lấy danh sách thanh toán thành công",
+    data: {
+      payments,
+      pagination: {
+        current_page: page,
+        total_pages: Math.ceil(count / limit),
+        total_records: count,
+        per_page: limit
       }
     }
   };
+};
+
+/**
+ * Cập nhật trạng thái thanh toán
+ * @param {number} doctor_id - ID của bác sĩ
+ * @param {number} payment_id - ID của thanh toán
+ * @param {string} status - Trạng thái mới
+ * @param {string} note - Ghi chú (nếu có)
+ * @returns {Promise<Object>} - Thông tin thanh toán đã cập nhật
+ */
+export const updatePaymentStatus = async (doctor_id, payment_id, status, note = '') => {
+  const t = await db.sequelize.transaction();
+
+  try {
+    // Kiểm tra thanh toán tồn tại và thuộc về bác sĩ
+    const payment = await db.Payment.findOne({
+      where: { payment_id },
+      include: [{
+        model: db.Appointment,
+        as: "Appointment",
+        where: { doctor_id },
+        required: true
+      }],
+      transaction: t
+    });
+
+    if (!payment) {
+      throw new NotFoundError("Không tìm thấy thanh toán hoặc thanh toán không thuộc về bác sĩ này");
+    }
+
+    // Kiểm tra trạng thái hợp lệ
+    const validStatuses = ['paid', 'pending', 'cancel'];
+    if (!validStatuses.includes(status)) {
+      throw new BadRequestError("Trạng thái thanh toán không hợp lệ");
+    }
+
+    // Cập nhật trạng thái thanh toán
+    await payment.update({
+      status,
+      note: note || payment.note
+    }, { transaction: t });
+
+    await t.commit();
+
+    return {
+      success: true,
+      message: "Cập nhật trạng thái thanh toán thành công",
+      data: {
+        payment_id: payment.payment_id,
+        appointment_id: payment.appointment_id,
+        amount: `${payment.amount.toLocaleString('vi-VN')} VNĐ`,
+        status: payment.status,
+        payment_method: payment.payment_method,
+        payment_date: dayjs(payment.createdAt).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
+        note: payment.note
+      }
+    };
+  } catch (error) {
+    await t.rollback();
+    throw error;
+  }
 };

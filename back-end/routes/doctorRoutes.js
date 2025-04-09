@@ -14,7 +14,9 @@ import {
   getDoctorDayOffsController,
   cancelDoctorDayOffController,
   createMedicalRecordController,
-  createPrescriptionsController
+  createPrescriptionsController,
+  getAppointmentPaymentsController,
+  updatePaymentStatusController
 } from "../controllers/doctorController.js";
 import validate from "../middleware/validate.js";
 import { body, param } from "express-validator";
@@ -83,6 +85,19 @@ router.get(
   authorize(["doctor"]),
   getDoctorAppointmentStatsController
 );
+
+// Payment routes
+router.get('/appointments/payments', 
+  authenticateUser, 
+  authorize(['doctor']),
+  getAppointmentPaymentsController
+);
+router.patch('/appointments/payments/:payment_id/status', 
+  authenticateUser, 
+  authorize(['doctor']), 
+  updatePaymentStatusController
+);
+
 router.get(
   "/appointments/:appointment_id",
   authenticateUser,
@@ -145,45 +160,21 @@ router.put(
 );
 router.post('/medical-records', authenticateUser, authorize(['doctor']), createMedicalRecordController);
 router.put('/appointments/complete', authenticateUser, authorize(['doctor']), completeAppointmentController);
-router.post('/prescriptions/medicines', 
+router.post('/prescriptions', 
   authenticateUser, 
   authorize(['doctor']), 
-  validate([
-    body('appointment_id')
-      .notEmpty()
-      .withMessage('Mã cuộc hẹn là bắt buộc')
-      .isInt()
-      .withMessage('Mã cuộc hẹn phải là số'),
-    body('medicines')
-      .isArray()
-      .withMessage('Danh sách thuốc phải là mảng')
-      .notEmpty()
-      .withMessage('Danh sách thuốc không được rỗng'),
-    body('medicines.*.medicine_id')
-      .notEmpty()
-      .withMessage('ID thuốc là bắt buộc')
-      .isInt()
-      .withMessage('ID thuốc phải là số'),
-    body('medicines.*.quantity')
-      .notEmpty()
-      .withMessage('Số lượng thuốc là bắt buộc')
-      .isInt({ min: 1 })
-      .withMessage('Số lượng thuốc phải là số dương'),
-    body('medicines.*.dosage')
-      .notEmpty()
-      .withMessage('Liều dùng là bắt buộc')
-      .isLength({ max: 100 })
-      .withMessage('Liều dùng tối đa 100 ký tự'),
-    body('medicines.*.frequency')
-      .notEmpty()
-      .withMessage('Tần suất dùng là bắt buộc')
-      .isLength({ max: 100 })
-      .withMessage('Tần suất dùng tối đa 100 ký tự'),
-    body('medicines.*.instructions')
-      .optional()
-      .isLength({ max: 255 })
-      .withMessage('Hướng dẫn tối đa 255 ký tự')
-  ]),
+  [
+    body("appointment_id").notEmpty().withMessage("Thiếu mã cuộc hẹn"),
+    body("medicines").isArray().withMessage("Danh sách thuốc không hợp lệ"),
+    body("medicines.*.medicine_id").notEmpty().withMessage("Thiếu mã thuốc"),
+    body("medicines.*.quantity").isInt({ min: 1 }).withMessage("Số lượng thuốc không hợp lệ"),
+    body("medicines.*.dosage").notEmpty().withMessage("Thiếu liều dùng"),
+    body("medicines.*.frequency").notEmpty().withMessage("Thiếu tần suất dùng"),
+    body("medicines.*.duration").notEmpty().withMessage("Thiếu thời gian dùng"),
+    body("medicines.*.instructions").optional().isString().withMessage("Hướng dẫn sử dụng không hợp lệ"),
+    body("note").optional().isString().withMessage("Ghi chú không hợp lệ"),
+    body("use_hospital_pharmacy").notEmpty().withMessage("Thiếu thông tin sử dụng nhà thuốc bệnh viện").isBoolean().withMessage("Tham số use_hospital_pharmacy không hợp lệ")
+  ],
   createPrescriptionsController
 );
 

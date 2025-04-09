@@ -4,7 +4,7 @@ export default (sequelize) => {
   class Payment extends Model {
     static associate(models) {
       // Liên kết với bảng Appointments
-      Payment.belongsTo(models.Appointment, { foreignKey: "appointment_id", as: "appointment" });
+      Payment.belongsTo(models.Appointment, { foreignKey: "appointment_id", as: "Appointment" });
     }
   }
 
