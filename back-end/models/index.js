@@ -18,6 +18,9 @@ import Schedule from "./schedules.js";
 import DoctorDayOff from "./doctor-day-offs.js";
 import DayOffAppointment from "./day-off-appointments.js";
 import CompensationCode from "./compensationCode.js";
+import RetailPrescription from './retailPrescriptions.js';
+import RetailPrescriptionMedicine from './retailPrescriptionMedicines.js';
+import RetailPrescriptionPayment from './retailPrescriptionPayments.js';
 
 const sequelize = new Sequelize(dbConfig.development);
 
@@ -41,7 +44,10 @@ const db = {
   Payment: Payment(sequelize, Sequelize.DataTypes),
   MedicalRecord: MedicalRecord(sequelize, Sequelize.DataTypes),
   Schedule: Schedule(sequelize, Sequelize.DataTypes),
-  CompensationCode: CompensationCode(sequelize, Sequelize.DataTypes)
+  CompensationCode: CompensationCode(sequelize, Sequelize.DataTypes),
+  RetailPrescription: RetailPrescription(sequelize, Sequelize.DataTypes),
+  RetailPrescriptionMedicine: RetailPrescriptionMedicine(sequelize, Sequelize.DataTypes),
+  RetailPrescriptionPayment: RetailPrescriptionPayment(sequelize, Sequelize.DataTypes),
 };
 
 // Thiết lập các quan hệ giữa các bảng (nếu có)
@@ -50,5 +56,6 @@ Object.keys(db).forEach((modelName) => {
     db[modelName].associate(db);
   }
 });
+
 
 export default db;

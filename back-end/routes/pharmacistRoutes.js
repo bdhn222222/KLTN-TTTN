@@ -17,7 +17,17 @@ import {
   getAllPrescriptionsController,
   confirmPrescriptionPreparationController,
   updatePrescriptionPaymentStatusController,
-  rejectPrescriptionController
+  rejectPrescriptionController,
+  getAllPrescriptionPaymentsController,
+  createRetailPrescriptionController,
+  getAllRetailPrescriptionsController,
+  getRetailPrescriptionDetailsController,
+  updateRetailPrescriptionController,
+  updateRetailPrescriptionStatusController,
+  updateRetailPrescriptionPaymentStatusController,
+  completeRetailPrescriptionController,
+  getAllRetailPrescriptionPaymentsController,
+  cancelRetailPrescriptionController,
 } from "../controllers/pharmacistController.js";
 import validate from "../middleware/validate.js";
 import { body, query, param } from "express-validator";
@@ -55,6 +65,34 @@ router.post(
 //   authorize(["pharmacist"]),
 //   getPendingPrescriptionsController
 // );
+router.get(
+  '/prescriptions/payments',
+  authenticateUser,
+  authorize(['pharmacist']),
+  validate([
+    query('status')
+      .optional()
+      .isIn(['pending', 'paid', 'cancelled'])
+      .withMessage('Trạng thái thanh toán không hợp lệ'),
+    query('start_date')
+      .optional()
+      .isISO8601()
+      .withMessage('Ngày bắt đầu không hợp lệ'),
+    query('end_date')
+      .optional()
+      .isISO8601()
+      .withMessage('Ngày kết thúc không hợp lệ'),
+    query('page')
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage('Số trang phải lớn hơn 0'),
+    query('limit')
+      .optional()
+      .isInt({ min: 1, max: 100 })
+      .withMessage('Số bản ghi trên mỗi trang phải từ 1-100')
+  ]),
+  getAllPrescriptionPaymentsController
+);
 router.get(
   "/prescriptions/:prescription_id",
   authenticateUser,
@@ -221,5 +259,98 @@ router.patch(
       .withMessage('Ghi chú tối đa 255 ký tự')
   ]),
   updatePrescriptionPaymentStatusController
+);
+router.post(
+  '/prescriptions',
+  authenticateUser,
+  authorize(['pharmacist']),
+  validate([
+    body('patient_id')
+      .notEmpty()
+      .withMessage('Thiếu thông tin bệnh nhân')
+      .isInt({ min: 1 })
+      .withMessage('ID bệnh nhân không hợp lệ'),
+    body('note')
+      .optional()
+      .isString()
+      .withMessage('Ghi chú phải là chuỗi')
+      .isLength({ max: 1000 })
+      .withMessage('Ghi chú tối đa 1000 ký tự'),
+    body('medicines')
+      .isArray({ min: 1 })
+      .withMessage('Danh sách thuốc không được rỗng'),
+    body('medicines.*.medicine_id')
+      .notEmpty()
+      .withMessage('Thiếu ID thuốc')
+      .isInt({ min: 1 })
+      .withMessage('ID thuốc không hợp lệ'),
+    body('medicines.*.quantity')
+      .notEmpty()
+      .withMessage('Thiếu số lượng thuốc')
+      .isInt({ min: 1 })
+      .withMessage('Số lượng thuốc phải là số nguyên lớn hơn 0'),
+    body('medicines.*.dosage')
+      .notEmpty()
+      .withMessage('Thiếu liều dùng')
+      .isString()
+      .withMessage('Liều dùng phải là chuỗi'),
+    body('medicines.*.frequency')
+      .notEmpty()
+      .withMessage('Thiếu tần suất sử dụng')
+      .isString()
+      .withMessage('Tần suất sử dụng phải là chuỗi'),
+    body('medicines.*.duration')
+      .notEmpty()
+      .withMessage('Thiếu thời gian sử dụng')
+      .isString()
+      .withMessage('Thời gian sử dụng phải là chuỗi'),
+    body('medicines.*.instructions')
+      .notEmpty()
+      .withMessage('Thiếu hướng dẫn sử dụng')
+      .isString()
+      .withMessage('Hướng dẫn sử dụng phải là chuỗi')
+  ]),
+  createRetailPrescriptionController
+);
+router.post('/retail-prescriptions', 
+  authenticateUser, 
+  authorize(['pharmacist']),  // Chỉ cho phép dược sĩ tạo đơn thuốc
+  createRetailPrescriptionController
+);
+router.get("/retail-prescriptions", authenticateUser, getAllRetailPrescriptionsController);
+router.get("/retail-prescriptions/:retail_prescription_id", authenticateUser, getRetailPrescriptionDetailsController);
+router.put("/retail-prescriptions/:retail_prescription_id", authenticateUser, updateRetailPrescriptionController);
+router.patch("/retail-prescriptions/:retail_prescription_id/status", authenticateUser, updateRetailPrescriptionStatusController);
+router.put(
+  "/retail-prescriptions/payments/:payment_id/status",
+  authenticateUser,
+  updateRetailPrescriptionPaymentStatusController
+);
+router.patch(
+  "/retail-prescriptions/:retail_prescription_id/complete",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  completeRetailPrescriptionController
+);
+router.get(
+  "/retail-prescription-payments",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  getAllRetailPrescriptionPaymentsController
+);
+router.patch(
+  "/retail-prescriptions/:retail_prescription_id/cancel",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  validate([
+    body("reason")
+      .notEmpty()
+      .withMessage("Lý do hủy đơn không được để trống")
+      .isString()
+      .withMessage("Lý do hủy đơn phải là chuỗi")
+      .isLength({ max: 255 })
+      .withMessage("Lý do hủy đơn tối đa 255 ký tự")
+  ]),
+  cancelRetailPrescriptionController
 );
 export default router;

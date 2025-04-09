@@ -23,6 +23,11 @@ export default (sequelize) => {
         foreignKey: "pharmacist_id",
         as: "pharmacist",
       });
+      // Liên kết với bảng Patient
+      Prescription.belongsTo(models.Patient, {
+        foreignKey: "patient_id",
+        as: "patient",
+      });
     }
   }
 
@@ -34,6 +39,17 @@ export default (sequelize) => {
         primaryKey: true,
         allowNull: false,
         comment: "ID đơn thuốc, tự động tăng"
+      },
+      patient_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+          model: "Patients",
+          key: "patient_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
+        comment: "ID bệnh nhân của đơn thuốc"
       },
       pharmacist_id: {
         type: DataTypes.INTEGER,
@@ -48,14 +64,15 @@ export default (sequelize) => {
       },
       appointment_id: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: false, // Cho phép null vì đơn thuốc bán lẻ không có cuộc hẹn
         references: {
           model: "Appointments",
           key: "appointment_id",
         },
+        defaultValue: null,
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
-        comment: "ID cuộc hẹn liên quan đến đơn thuốc này"
+        comment: "ID cuộc hẹn liên quan đến đơn thuốc này (null nếu là đơn bán lẻ)"
       },
       status: {
         type: DataTypes.ENUM('pending_prepare', 'waiting_payment', 'completed', 'cancelled', 'rejected'),
@@ -140,6 +157,10 @@ export default (sequelize) => {
         {
           name: 'idx_prescriptions_appointment',
           fields: ['appointment_id']
+        },
+        {
+          name: 'idx_prescriptions_patient',
+          fields: ['patient_id']
         }
       ]
     }
