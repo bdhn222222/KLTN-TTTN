@@ -1,8 +1,8 @@
 import React from 'react'
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { doctors } from '../assets/assets'
-import { AppContext } from '../context/AppContext'
+import { doctors } from '../../assets/assets'
+import { AppContext } from '../../context/AppContext'
 const TopDoctors = () => {
     const navigate = useNavigate();
     const {doctors} = useContext(AppContext);

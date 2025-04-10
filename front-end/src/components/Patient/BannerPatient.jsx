@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { assets } from "../assets/assets";
+import { assets } from "../../assets/assets";
 
 const Banner = () => {
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ const Banner = () => {
             navigate("/login");
             scrollTo(0, 0);
           }}
-          className="bg-white text-sm sm:text-base text-grey-600 px-8 py-3 rounded-full mt-6 hover:scale-105 duration-300 transition-all"
+          className="!bg-blue-900 !text-white text-sm sm:text-base px-8 py-3 rounded-full mt-6  hover:bg-white hover:!text-blue-900 border border-blue-900 transition-colors"
         >
           Create Account
         </button>

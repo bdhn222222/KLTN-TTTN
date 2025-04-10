@@ -1,8 +1,8 @@
 import { useContext, useEffect, useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { AppContext } from "../context/AppContext";
-import { assets } from "../assets/assets";
-import RelatedDoctors from "../components/RelatedDoctors";
+import { AppContext } from "../../context/AppContext";
+import { assets } from "../../assets/assets";
+import RelatedDoctors from "../../components/Patient/RelatedDoctorsPatient";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 

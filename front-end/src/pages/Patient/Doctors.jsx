@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { AppContext } from "../context/AppContext";
-import { specialityData } from "../assets/assets";
+import { AppContext } from "../../context/AppContext";
+import { specialityData } from "../../assets/assets";
 import { FilterOutlined, CloseOutlined } from "@ant-design/icons";
 
 const Doctors = () => {

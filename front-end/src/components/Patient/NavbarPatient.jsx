@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { assets } from "../assets/assets";
+import { assets } from "../../assets/assets";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -93,7 +93,7 @@ function Navbar() {
         ) : (
           <button
             onClick={() => navigate("/login")}
-            className="bg-primary text-white px-6 py-2 rounded-full font-light hidden md:block hover:bg-primary/80 transition duration-300"
+            className="!bg-primary !text-white px-6 py-2 rounded-full font-light hidden md:block hover:!bg-blue-800 hover:!text-white border border-blue-800 transition duration-300"
           >
             Create Account
           </button>

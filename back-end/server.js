@@ -13,6 +13,14 @@ dotenv.config();
 
 const app = express();
 
+// Middleware để log tất cả requests
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  next();
+});
+
 app.use(cors());
 app.use(express.json());
 

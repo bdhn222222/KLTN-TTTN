@@ -35,12 +35,11 @@ export const registerPatient = async ({
 }) => {
   const existingPatient = await User.findOne({ where: { email } });
   if (existingPatient) throw new BadRequestError("Email đã được đăng ký");
-  // const hashedPassword = bcrypt.hashSync(password, 10);
+  const hashedPassword = bcrypt.hashSync(password, 10);
   const newUser = await User.create({
     username,
     email,
-    // password: hashedPassword,
-    password,
+    password: hashedPassword,
     role: "patient",
   });
   const newPatient = await Patient.create({
