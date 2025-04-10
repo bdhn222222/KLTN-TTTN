@@ -2,6 +2,7 @@ import {
   registerDoctor,
   loginDoctor,
   updateDoctorProfile,
+  getAllMedicines,
   createDoctorDayOff,
   createPrescriptions,  
   cancelDoctorDayOff,
@@ -371,11 +372,30 @@ function generateCompensationCode() {
 export const createMedicalRecordController = async (req, res) => {
   try {
     const doctor_id = req.user.user_id;
-    const { appointment_id, data } = req.body;
-    const result = await createMedicalRecord(doctor_id, appointment_id, data);
+    const { appointment_id, diagnosis, treatment, notes } = req.body;
+
+    if (!appointment_id) {
+      throw new BadRequestError("Thiếu mã cuộc hẹn");
+    }
+
+    const result = await createMedicalRecord(doctor_id, appointment_id, {
+      diagnosis,
+      treatment,
+      notes
+    });
+
     res.status(200).json(result);
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.message });
+    console.error('Error in createMedicalRecordController:', error);
+    if (error instanceof BadRequestError || error instanceof NotFoundError) {
+      res.status(400).json({ success: false, message: error.message });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: "Có lỗi xảy ra khi tạo hồ sơ bệnh án",
+        error: error.message 
+      });
+    }
   }
 };
 export const completeAppointmentController = async (req, res) => {
@@ -528,3 +548,8 @@ export const updatePaymentStatusController = async (req, res) => {
     }
   }
 };
+export const getAllMedicinesController = asyncHandler(async (req, res) => {
+  const { search, expiry_before } = req.query;
+  const result = await getAllMedicines({ search, expiry_before });
+  res.status(200).json(result);
+});

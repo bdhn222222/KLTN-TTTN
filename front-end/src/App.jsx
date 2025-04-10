@@ -4,7 +4,7 @@ import Home from "./pages/Patient/Home";
 import NavbarPatient from "./components/Patient/NavbarPatient";
 import Doctors from "./pages/Patient/Doctors";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
+// import Register from "./pages/Register";
 import Contact from "./pages/Patient/Contact";
 import About from "./pages/Patient/About";
 import MyProfile from "./pages/Patient/MyProfile";
@@ -17,7 +17,12 @@ import "react-toastify/dist/ReactToastify.css";
 import "antd/dist/reset.css";
 import DashboardDoctor from './pages/Doctor/DashboardDoctor';
 import NavbarDoctor from "./components/Doctor/NavbarDoctor";
-
+import AppointmentWTCDoctor from "./pages/Doctor/AppointmentWTCDoctor";
+import AppointmentAccDoctor from "./pages/Doctor/AppointmentAccDoctor";
+import CreateMedicalRecordPage from "./pages/Doctor/CreateMedicalRecordPage";
+import AppointmentComDoctor from "./pages/Doctor/AppointmentComDoctor";
+import AppointmentCanDoctor from "./pages/Doctor/AppointmentCanDoctor";
+import AppointmentPaymentPage from "./pages/Doctor/AppointmentPaymentPage";
 // Layout cho Patient Portal
 const PatientLayout = ({ children }) => {
   return (
@@ -59,21 +64,24 @@ const App = () => {
         } />
 
         {/* Doctor Routes */}
-        <Route path="/doctor/*" element={
-          <DoctorLayout>
-            <Routes>
-              <Route path="dashboard" element={<DashboardDoctor />} />
-              {/* Add more doctor routes here */}
-            </Routes>
-          </DoctorLayout>
-        } />
+        <Route path="/doctor">
+          <Route path="dashboard" element={<DashboardDoctor />} />
+          <Route path="appointments">
+            <Route path="waiting-to-confirm" element={<AppointmentWTCDoctor />} />
+            <Route path="accepted" element={<AppointmentAccDoctor />} />
+            <Route path="completed" element={<AppointmentComDoctor />} />
+            <Route path="cancelled" element={<AppointmentCanDoctor />} />
+            <Route path=":appointment_id/payment" element={<AppointmentPaymentPage />} />
+          </Route>
+          <Route path="medical-records/create/:appointment_id" element={<CreateMedicalRecordPage />} />
+        </Route>
 
         {/* Shared Routes */}
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        {/* <Route path="/register" element={<Register />} /> */}
 
-        {/* Redirect unknown routes to home */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Redirect unknown routes to login */}
+        <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
       <ToastContainer />
     </AppContextProvider>

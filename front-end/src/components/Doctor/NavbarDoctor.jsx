@@ -38,7 +38,7 @@ function NavbarDoctor() {
           onClick={() => navigate('/doctor/dashboard')} 
         />
         <div className="flex items-center gap-1 bg-blue-100 px-3 py-1 rounded-full">
-          <UserOutlined className="text-blue-900" />
+          <UserOutlined className="!text-blue-900" />
           <span className="text-blue-900 font-medium">Doctor</span>
         </div>
       </div>

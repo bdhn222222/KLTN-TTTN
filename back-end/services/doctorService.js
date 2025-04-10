@@ -6,11 +6,12 @@ import UnauthorizedError from "../errors/unauthorized.js";
 import NotFoundError from "../errors/not_found.js";
 import ForbiddenError from "../errors/forbidden.js";
 import { Op, Sequelize } from "sequelize";
-const { User, Doctor, DoctorDayOff, Appointment, Patient, CompensationCode } = db;
+const { User, Doctor, DoctorDayOff, Appointment, Patient, CompensationCode, Medicine } = db;
 import dayjs from "dayjs";
 import utc from 'dayjs/plugin/utc.js';  // Sử dụng phần mở rộng .js
 import timezone from 'dayjs/plugin/timezone.js';  // Sử dụng phần mở rộng .js
 import { v4 as uuidv4 } from 'uuid';
+import axios from 'axios';
 
 dayjs.extend(timezone);
 dayjs.extend(utc);
@@ -327,7 +328,7 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
             include: [
               {
                 model: db.Medicine,
-                as: "medicine",
+                as: "Medicine",
                 attributes: ["medicine_id", "name", "price"],
               }
             ]
@@ -378,14 +379,14 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
       } : null,
       prescription: appointment.Prescription ? {
         id: appointment.Prescription.prescription_id,
-        status: appointment.Prescription.dispensed ? "Đã phát thuốc" : "Chưa phát thuốc",
+        status: appointment.Prescription.status,
         medicine_details: appointment.Prescription.medicine_details,
         medicines: appointment.Prescription.prescriptionMedicines.map(pm => ({
-          id: pm.medicine.medicine_id,
-          name: pm.medicine.name,
+          id: pm.Medicine?.medicine_id,
+          name: pm.Medicine?.name,
           quantity: pm.quantity,
-          price: pm.medicine.price,
-          total: pm.quantity * pm.medicine.price,
+          price: pm.Medicine?.price,
+          total: pm.quantity * (pm.Medicine?.price || 0),
           note: pm.note
         })),
         createdAt: appointment.Prescription.createdAt
@@ -769,7 +770,7 @@ export const getDoctorDayOffs = async (doctor_id, start, end, status, date) => {
             as: 'user',
             attributes: ['email']
           }]
-        }]
+        }],
       });
 
       return {
@@ -1325,7 +1326,7 @@ export const acceptAppointment = async (appointment_id, doctor_id) => {
   };
 };
 
-export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
+export const createMedicalRecord = async (doctor_id, appointment_id, { diagnosis, treatment, notes }) => {
   // Lấy thông tin lịch hẹn
   const appointment = await db.Appointment.findOne({
     where: { appointment_id },
@@ -1349,22 +1350,23 @@ export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
     throw new BadRequestError("Chỉ có thể tạo hồ sơ bệnh án sau khi lịch hẹn đã được chấp nhận");
   }
 
-  // Kiểm tra thời gian tạo hồ sơ phải sau thời gian lịch hẹn
-  // if (new Date() < new Date(appointment.appointment_datetime)) {
-  //   throw new BadRequestError("Không thể tạo hồ sơ trước thời gian khám");
-  // }
-
   // Kiểm tra xem đã có hồ sơ bệnh án cho lịch hẹn này chưa
   const existingRecord = await db.MedicalRecord.findOne({
-    where: { appointment_id },
+    where: { 
+      appointment_id,
+      [Op.or]: [
+        { completed_at: { [Op.not]: null } },
+        { completed_by: { [Op.not]: null } }
+      ]
+    },
   });
 
   if (existingRecord) {
     throw new BadRequestError("Đã có hồ sơ bệnh án cho lịch hẹn này");
   }
 
-  // Thiếu validate dữ liệu đầu vào
-  if (!data.diagnosis || !data.treatment) {
+  // Validate dữ liệu đầu vào
+  if (!diagnosis || !treatment) {
     throw new BadRequestError("Thiếu thông tin chẩn đoán hoặc phương pháp điều trị");
   }
 
@@ -1373,19 +1375,24 @@ export const createMedicalRecord = async (doctor_id, appointment_id, data) => {
     appointment_id,
     patient_id: appointment.patient_id,
     doctor_id,
-    diagnosis: data.diagnosis,
-    treatment: data.treatment,
-    notes: data.notes,
+    diagnosis,
+    treatment,
+    notes: notes || null,
     is_visible_to_patient: false,
     completed_at: new Date(),
-    completed_by: doctor_id
+    completed_by: doctor_id,
+    viewed_at: null
   });
 
   return {
     success: true,
     message: "Tạo hồ sơ bệnh án thành công. Bệnh nhân cần thanh toán để xem kết quả.",
     data: {
-      record_id: medicalRecord.record_id
+      record_id: medicalRecord.record_id,
+      diagnosis: medicalRecord.diagnosis,
+      treatment: medicalRecord.treatment,
+      notes: medicalRecord.notes,
+      created_at: medicalRecord.createdAt
     }
   };
 };
@@ -1435,7 +1442,7 @@ const generatePrescriptionPDF = async (prescription_id) => {
       },
       {
         model: db.PrescriptionMedicine,
-        as: "PrescriptionMedicines",
+        as: "prescriptionMedicines",
         include: [
           {
             model: db.Medicine,
@@ -1481,6 +1488,10 @@ export const createPrescriptions = async (
           model: db.Specialization,
           as: "Specialization"
         }
+      },
+      {
+        model: db.Patient, // Ensure the patient is included
+        as: "Patient"
       }
     ]
   });
@@ -1519,9 +1530,10 @@ export const createPrescriptions = async (
   // Tạo đơn thuốc
   const prescription = await db.Prescription.create({
     appointment_id,
+    patient_id: appointment.patient_id, // Ensure the patient_id is passed
     note: note || null,
     created_by: doctor_id,
-    status: "pending_prepare",
+    status: "pending_prepare", // Đơn thuốc bắt đầu ở trạng thái chuẩn bị
     use_hospital_pharmacy,
     createdAt: new Date()
   });
@@ -1560,10 +1572,15 @@ export const createPrescriptions = async (
     });
   }
 
-  // Nếu không sử dụng nhà thuốc bệnh viện, tạo PDF ngay
+  // Nếu không sử dụng nhà thuốc bệnh viện, tạo PDF ngay và cập nhật status thành 'completed'
   if (!use_hospital_pharmacy) {
     const pdfUrl = await generatePrescriptionPDF(prescription.prescription_id);
     await prescription.update({ pdf_url: pdfUrl });
+    await prescription.update({ status: "completed" }); // Đổi trạng thái thành 'completed'
+  } else {
+    // Nếu sử dụng nhà thuốc bệnh viện, xử lý thanh toán ở đây
+    // Ví dụ: Bạn có thể tạo payment ở đây nếu cần, hoặc giữ status là 'pending_prepare' nếu không có payment.
+    // Lưu ý: Nếu có payment, không cập nhật thành 'completed' ở đây.
   }
 
   // Trả về kết quả
@@ -1740,5 +1757,159 @@ export const updatePaymentStatus = async (doctor_id, payment_id, status, note = 
   } catch (error) {
     await t.rollback();
     throw error;
+  }
+};
+
+export const getAllMedicines = async ({ search, expiry_before}) => {
+  const whereClause = {};
+
+  if (search) {
+    whereClause[Op.or] = [
+      { name: { [Op.like]: `%${search}%` } },
+      { supplier: { [Op.like]: `%${search}%` } },
+    ];
+  }
+
+  if (expiry_before) {
+    whereClause.expiry_date = { [Op.lte]: new Date(expiry_before) };
+  }
+
+  const { count, rows } = await Medicine.findAndCountAll({
+    where: whereClause,
+    order: [["name", "ASC"]],
+  });
+
+  const formattedMedicines = rows.map((med) => ({
+    ...med.toJSON(),
+    status_message: med.is_out_of_stock ? "Tạm hết hàng" : "",
+  }));
+
+  return {
+    message:
+      count > 0 ? "Lấy danh sách thuốc thành công" : "Không tìm thấy thuốc nào",
+    medicines: formattedMedicines,
+    totalRecords: count,
+  };
+};
+
+const handlePaymentProcess = async () => {
+  try {
+    setLoading(true);
+    let payment_id = null;
+    
+    // Kiểm tra xem đã có payment trong dữ liệu chưa
+    if (appointmentDetail.payment && (appointmentDetail.payment.id || appointmentDetail.payment.payment_id)) {
+      payment_id = appointmentDetail.payment.id || appointmentDetail.payment.payment_id;
+      console.log("Found existing payment ID:", payment_id);
+    } else {
+      console.log("No payment found, calling completeAppointment to create one");
+      
+      // Nếu chưa có payment, gọi API completeAppointment để tạo
+      try {
+        const completeResponse = await axios.post(`${url1}/doctor/appointments/complete`, {
+          appointment_id: Number(appointment_id)
+        }, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        console.log("completeAppointment response:", completeResponse.data);
+        
+        // Lấy payment_id từ kết quả API
+        if (completeResponse.data && 
+            completeResponse.data.data && 
+            completeResponse.data.data.payment && 
+            completeResponse.data.data.payment.payment_id) {
+          payment_id = completeResponse.data.data.payment.payment_id;
+          console.log("Created new payment with ID:", payment_id);
+        } else {
+          throw new Error("Could not create payment through completeAppointment API");
+        }
+      } catch (error) {
+        console.error("Error calling completeAppointment:", error);
+        
+        // Xử lý lỗi cụ thể từ API
+        if (error.response?.data?.message) {
+          const errorMsg = error.response.data.message;
+          
+          // Nếu lỗi là do đã có payment, thử lấy lại thông tin
+          if (errorMsg.includes("đã hoàn thành") || errorMsg.includes("already completed")) {
+            console.log("Appointment already completed, refreshing data to get payment ID...");
+            await fetchAppointmentDetail(); // Refresh data to get the payment
+            
+            // Check again after refresh
+            if (appointmentDetail?.payment?.id || appointmentDetail?.payment?.payment_id) {
+              payment_id = appointmentDetail.payment.id || appointmentDetail.payment.payment_id;
+              console.log("Retrieved payment ID after refresh:", payment_id);
+            }
+          } else {
+            throw new Error(errorMsg);
+          }
+        } else {
+          throw error;
+        }
+      }
+    }
+    
+    // Đảm bảo đã có payment_id trước khi tiếp tục
+    if (!payment_id) {
+      console.error("Could not find or create payment_id");
+      throw new Error("Payment information not found and could not be created");
+    }
+    
+    // Tiếp tục với việc cập nhật trạng thái payment
+    console.log(`Updating payment status for payment_id: ${payment_id}`);
+    
+    const updateResponse = await axios.patch(`${url1}/doctor/appointments/payments/${payment_id}/status`, {
+      status: 'paid',
+      note: `Payment received via ${paymentMethod}`
+    }, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    
+    console.log("Update payment response:", updateResponse.data);
+
+    showNotification(
+      'success',
+      'Success',
+      'Payment processed successfully'
+    );
+
+    // Refresh appointment details
+    fetchAppointmentDetail();
+    
+  } catch (error) {
+    console.error('Error processing payment:', error);
+    showNotification(
+      'error',
+      'Error',
+      error.response?.data?.message || error.message || 'Failed to process payment'
+    );
+  } finally {
+    setLoading(false);
+  }
+};
+
+const fetchAppointmentDetail = async () => {
+  try {
+    setLoading(true);
+    const response = await axios.get(`${url1}/doctor/appointments/${appointment_id}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    
+    let appointmentData = response.data.data;
+    console.log('API Response - Original Data:', JSON.stringify(appointmentData, null, 2));
+    
+    // Cập nhật state và thực hiện các xử lý khác...
+    setAppointmentDetail(appointmentData);
+  } catch (error) {
+    // Xử lý lỗi...
+  } finally {
+    setLoading(false);
   }
 };

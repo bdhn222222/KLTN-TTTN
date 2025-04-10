@@ -10,7 +10,7 @@ export default (sequelize) => {
       });
       PrescriptionMedicine.belongsTo(models.Medicine, {
         foreignKey: "medicine_id",
-        as: "medicine",
+        as: "Medicine",
       });
     }
   }

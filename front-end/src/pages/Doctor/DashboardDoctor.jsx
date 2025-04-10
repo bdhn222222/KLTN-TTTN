@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Layout, Card, Table, Button, Avatar, Badge, Space, Tag, Statistic, Flex } from 'antd';
+import React, { useState, useEffect, useContext } from 'react';
+import { Layout, Card, Table, Button, Avatar, Badge, Space, Tag, Statistic, Flex, notification } from 'antd';
 import {
   DashboardOutlined,
   CalendarOutlined,
@@ -15,7 +15,9 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import NavbarDoctor from '../../components/Doctor/NavbarDoctor';
-import api from '../../config/axios';
+import MenuDoctor from '../../components/Doctor/MenuDoctor';
+import axios from 'axios';
+import { AppContext } from '../../context/AppContext';
 import dayjs from 'dayjs';
 
 const { Sider, Content } = Layout;
@@ -32,12 +34,79 @@ const DashboardDoctor = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const navigate = useNavigate();
+  const { url1 } = useContext(AppContext);
+  const [formData, setFormData] = useState([]);
+  const [api, contextHolder] = notification.useNotification();
+  
+  const showNotification = (type, message, description) => {
+    api[type]({
+      message: message,
+      description: description,
+      placement: 'topRight',
+      duration: 3,
+    });
+  };
 
-  // Fetch dashboard statistics
+  const fetchFormData = async () => {
+    try {
+      const response = await axios.get(`${url1}/doctor/appointments`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      setFormData(response.data.data);
+    } catch (error) {
+      console.error('Error fetching form data:', error);
+      showNotification(
+        'error',
+        'Tải dữ liệu thất bại',
+        'Không thể tải danh sách cuộc hẹn, vui lòng thử lại sau'
+      );
+    }
+  };
+
+  const acceptAppointment = async (appointmentId) => {
+    try {
+      await axios.patch(`${url1}/doctor/appointments/${appointmentId}/accept`, null, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      showNotification(
+        'success',
+        'Xác nhận thành công',
+        'Cuộc hẹn đã được xác nhận thành công'
+      );
+      
+      // Refresh appointments data
+      fetchAppointments();
+    } catch (error) {
+      console.error('Error accepting appointment:', error);
+      
+      let errorMessage = '';
+      if (error.response?.status === 401) {
+        errorMessage = 'Bạn không có quyền thực hiện thao tác này';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'Không tìm thấy cuộc hẹn';
+      } else if (error.response?.status === 400) {
+        errorMessage = 'Cuộc hẹn đã được xác nhận trước đó';
+      } else {
+        errorMessage = 'Có lỗi xảy ra, vui lòng thử lại sau';
+      }
+
+      showNotification(
+        'error',
+        'Xác nhận thất bại',
+        errorMessage
+      );
+    }
+  };
+  
   const fetchStatistics = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/doctor/summary');
+      const response = await axios.get(`${url1}/doctor/summary`);
       setStatistics(response.data.data);
     } catch (error) {
       console.error('Error fetching statistics:', error);
@@ -50,7 +119,7 @@ const DashboardDoctor = () => {
   const fetchLatestAppointments = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/doctor/appointments', {
+      const response = await axios.get(`${url1}/doctor/appointments`, {
         params: {
           limit: 5,
           sort: 'latest'
@@ -65,35 +134,73 @@ const DashboardDoctor = () => {
   };
 
   useEffect(() => {
-    fetchStatistics();
-    fetchLatestAppointments();
-    fetchAppointments();
+    const fetchData = async () => {
+      try {
+        await fetchFormData();
+        console.log('Form data after fetch:', formData);
+      } catch (error) {
+        console.error('Error fetching form data:', error);
+      }
+    };
+
+    fetchData();
   }, []);
+
+  // Thêm useEffect để theo dõi thay đổi của formData
+  useEffect(() => {
+    console.log('Form data updated:', formData);
+  }, [formData]);
 
   const fetchAppointments = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/doctor/appointments');
-      console.log('API Response:', response.data); // Debug log
+      const response = await axios.get(`${url1}/doctor/appointments`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       
       if (response.data && response.data.data) {
         setAppointments(response.data.data);
+        setFormData(response.data.data);
+        console.log('Appointments loaded:', response.data.data);
       } else {
         console.error('Invalid data format from API:', response.data);
         setAppointments([]);
+        setFormData([]);
+        showNotification(
+          'error',
+          'Tải dữ liệu thất bại',
+          'Không thể tải danh sách cuộc hẹn, vui lòng thử lại sau'
+        );
       }
     } catch (error) {
       console.error('Error fetching appointments:', error);
       setAppointments([]);
+      setFormData([]);
+      showNotification(
+        'error',
+        'Tải dữ liệu thất bại',
+        'Không thể tải danh sách cuộc hẹn, vui lòng thử lại sau'
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchAppointments();
+  }, []);
+
   const handleAcceptAppointment = async (appointmentId) => {
     try {
-      await api.put(`/doctor/appointments/${appointmentId}/accept`);
-      fetchAppointments(); // Refresh the list
+      await axios.put(`${url1}/doctor/appointments/${appointmentId}/accept`, null, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      // Refresh the appointments list after accepting
+      fetchAppointments();
     } catch (error) {
       console.error('Error accepting appointment:', error);
     }
@@ -141,7 +248,7 @@ const DashboardDoctor = () => {
 
   const columns = [
     {
-      title: 'Mã cuộc hẹn',
+      title: 'ID',
       dataIndex: 'appointment_id',
       key: 'appointment_id',
     },
@@ -188,10 +295,9 @@ const DashboardDoctor = () => {
           </Button>
           {record.status === 'waiting_for_confirmation' && (
             <Button
-              type="primary"
+              className="!bg-blue-900 !text-white px-6 py-2 rounded-full font-light hidden md:block hover:!bg-blue-800 hover:!text-white border border-blue-800 transition duration-300"
               icon={<CheckOutlined />}
-              onClick={() => handleAcceptAppointment(record.appointment_id)}
-              className="bg-blue-900 hover:bg-blue-800"
+              onClick={() => acceptAppointment(record.appointment_id)}
             >
               Xác nhận
             </Button>
@@ -230,6 +336,7 @@ const DashboardDoctor = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
+      {contextHolder}
       <NavbarDoctor />
       <Layout>
         <Sider 
@@ -256,18 +363,7 @@ const DashboardDoctor = () => {
               <MenuFoldOutlined className="text-xl" onClick={() => setCollapsed(true)} />
             )}
           </div>
-          <div className="flex flex-col gap-2 p-4">
-            {menuItems.map(item => (
-              <div
-                key={item.key}
-                onClick={item.onClick}
-                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-blue-50"
-              >
-                {item.icon}
-                {!collapsed && <span>{item.label}</span>}
-              </div>
-            ))}
-          </div>
+          <MenuDoctor collapsed={collapsed} />
         </Sider>
 
         <Layout style={{ marginLeft: collapsed ? 80 : 250, marginTop: 64 }}>

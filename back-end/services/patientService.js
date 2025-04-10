@@ -610,7 +610,7 @@ export const getAllPrescriptions = async ({
   const prescriptions = rows.map(prescription => ({
     prescription_id: prescription.prescription_id,
     created_at: dayjs(prescription.createdAt).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
-    status: prescription.dispensed ? 'Đã phát thuốc' : 'Chưa phát thuốc',
+    status: prescription.status,
     appointment: {
       appointment_id: prescription.appointment.appointment_id,
       datetime: dayjs(prescription.appointment.appointment_datetime)

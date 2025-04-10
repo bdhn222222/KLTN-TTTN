@@ -16,7 +16,8 @@ import {
   createMedicalRecordController,
   createPrescriptionsController,
   getAppointmentPaymentsController,
-  updatePaymentStatusController
+  updatePaymentStatusController,
+  getAllMedicinesController
 } from "../controllers/doctorController.js";
 import validate from "../middleware/validate.js";
 import { body, param } from "express-validator";
@@ -104,7 +105,7 @@ router.get(
   authorize(["doctor"]),
   getAppointmentDetailsController
 );
-router.put(
+router.patch(
   "/appointments/:appointment_id/accept",
   authenticateUser,
   authorize(["doctor"]),
@@ -114,13 +115,13 @@ router.put(
   acceptAppointmentController
 );
 
-router.put(
+router.post(
   "/appointments/:id/mark-not-coming",
   authenticateUser,
   authorize(["doctor"]),
   markPatientNotComingController
 );
-router.put(
+router.post(
   "/appointments/:id/complete",
   authenticateUser,
   authorize(["doctor"]),
@@ -132,14 +133,14 @@ router.get(
   authorize(["doctor"]),
   getDoctorDayOffsController
 );
-router.put(
+router.post(
   "/day-offs/:id",
   authenticateUser,
   authorize(["doctor"]),
   cancelDoctorDayOffController
 );
 
-router.put(
+router.post(
   '/appointments/:id/cancel',
   authenticateUser,
   authorize(['doctor']),
@@ -159,7 +160,7 @@ router.put(
   cancelAppointmentController
 );
 router.post('/medical-records', authenticateUser, authorize(['doctor']), createMedicalRecordController);
-router.put('/appointments/complete', authenticateUser, authorize(['doctor']), completeAppointmentController);
+router.post('/appointments/complete', authenticateUser, authorize(['doctor']), completeAppointmentController);
 router.post('/prescriptions', 
   authenticateUser, 
   authorize(['doctor']), 
@@ -177,5 +178,10 @@ router.post('/prescriptions',
   ],
   createPrescriptionsController
 );
-
+router.get(
+  "/medicines",
+  authenticateUser,
+  authorize(["doctor"]),
+  getAllMedicinesController
+);
 export default router;

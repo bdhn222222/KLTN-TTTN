@@ -11,7 +11,7 @@ import Feedback from "./feedbacks.js";
 import Prescription from "./prescriptions.js";
 import Medicine from "./medicines.js";
 import PrescriptionMedicine from "./prescription-medicines.js";
-import PrescriptionPayment from "./prescription-payments.js";
+import PrescriptionPayment from "./prescription_payment.js";
 import Payment from "./payments.js";
 import MedicalRecord from "./medicalRecords.js";
 import Schedule from "./schedules.js";

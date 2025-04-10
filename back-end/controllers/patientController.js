@@ -11,6 +11,7 @@ import UnauthorizedError from "../errors/unauthorized.js";
 import InternalServerError from "../errors/internalServerError.js";
 import asyncHandler from "express-async-handler";
 
+
 export const registerPatientController = async (req, res, next) => {
   try {
     const patient = await registerPatient(req.body);
@@ -31,8 +32,8 @@ export const loginPatientController = async (req, res, next) => {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       next(error);
-    } else if (error instanceof NotFoundError) {
-      next(error);
+    // } else if (error instanceof NotFoundError) {
+    //   next(error);
     } else {
       next(new InternalServerError(error.message));
     }

@@ -31,11 +31,11 @@ export default (sequelize) => {
         allowNull: false,
       },
       payment_method: {
-        type: DataTypes.ENUM("cash", "credit_card", "VNPay", "MoMo", "ZaloPay"),
+        type: DataTypes.ENUM("cash", "ZaloPay"),
         allowNull: false,
       },
       status: {
-        type: DataTypes.ENUM("paid", "pending", "cancel"),
+        type: DataTypes.ENUM("paid", "pending", "cancelled"),
         allowNull: false,
         defaultValue: "pending",
       },
