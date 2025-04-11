@@ -11,7 +11,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import NavbarDoctor from '../../components/Doctor/NavbarDoctor';
 import MenuDoctor from '../../components/Doctor/MenuDoctor';
-import AppointmentDetails from '../../components/Appointment/AppointmentDetails';
+import AppointmentDetails from '../../components/Doctor/AppointmentDetails';
 import axios from 'axios';
 import { AppContext } from '../../context/AppContext';
 import dayjs from 'dayjs';
@@ -46,7 +46,7 @@ const AppointmentCanDoctor = () => {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         params: {
-          status: ['cancelled', 'patient_not_coming']
+          status: ['cancelled', 'patient_not_coming', 'doctor_day_off']
         }
       });
       
@@ -97,8 +97,9 @@ const AppointmentCanDoctor = () => {
         accepted: { color: 'green', text: 'confirmed' },
         completed: { color: 'blue', text: 'completed' },
         cancelled: { color: 'red', text: 'cancelled' },
-        doctor_day_off: { color: 'orange', text: 'doctor_day_off' },
-        patient_not_coming: { color: 'red', text: 'cancelled' } // Đảm bảo text là 'cancelled'
+        doctor_day_off: { color: 'red', text: 'cancelled' },
+        patient_not_coming: { color: 'red', text: 'cancelled' }
+         // Đảm bảo text là 'cancelled'
       };
 
     const config = statusConfig[status] || { color: 'default', text: status };

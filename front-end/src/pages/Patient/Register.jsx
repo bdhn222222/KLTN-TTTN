@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { DatePicker, notification, Form, Input, Select } from 'antd';
+import { DatePicker, notification, Form, Input, Select, Button, Spin } from 'antd';
+import { CheckCircleOutlined, CloseCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import axios from 'axios';
@@ -15,23 +16,34 @@ const dateFormat = 'YYYY-MM-DD';
 const Register = () => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
   const [api, contextHolder] = notification.useNotification();
   const { url1 } = useContext(AppContext);
 
   const showNotification = (type, message, description) => {
+    const icons = {
+      success: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+      error: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+      info: <InfoCircleOutlined style={{ color: '#1890ff' }} />
+    };
+
     api[type]({
       message: message,
       description: description,
       placement: 'topRight',
-      duration: 3,
+      duration: 5,
+      icon: icons[type],
       style: {
-        fontFamily: 'Inter'
-      },
+        fontFamily: 'Inter',
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+      }
     });
   };
 
   const onFinish = async (values) => {
     try {
+      setLoading(true);
       console.log("Sending registration data:", values);
       
       const requestData = {
@@ -42,7 +54,8 @@ const Register = () => {
         gender: values.gender,
         phone_number: values.phone_number,
         insurance_number: values.insurance_number,
-        id_number: values.insurance_number,
+        id_number: values.id_number,
+        address: values.address,
         role: 'patient'
       };
 
@@ -60,9 +73,13 @@ const Register = () => {
         showNotification(
           'success',
           'Đăng ký thành công!',
-          'Chào mừng bạn đến với Prescripto. Vui lòng đăng nhập để tiếp tục.'
+          'Chào mừng bạn đến với Prescripto. Vui lòng kiểm tra email để xác thực tài khoản.'
         );
-        navigate('/login');
+        
+        // Delay navigation to allow user to see the success message
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
       }
     } catch (error) {
       console.error("Registration error:", error);
@@ -73,13 +90,15 @@ const Register = () => {
         'Đăng ký không thành công',
         errorMessage
       );
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-[80vh] flex items-center">
       {contextHolder}
-      <div className="flex flex-col gap-3 m-auto items-start p-8 min-w-[800px] border rounder-xl text-zinc-600 text-sm shadow-lg">
+      <div className="flex flex-col gap-3 m-auto items-start p-8 min-w-[800px] border rounded-xl text-zinc-600 text-sm shadow-lg">
         <p className="text-2xl font-semibold w-full text-center">Create Account</p>
         <p className="w-full text-center">Please sign up to book appointment</p>
 
@@ -96,7 +115,7 @@ const Register = () => {
               <Form.Item
                 label={<span>Full Name <span style={{ color: 'red' }}>(*)</span></span>}
                 name="username"
-                rules={[{ required: true, message: 'Tên đăng nhập không được để trống' }]}
+                rules={[{ required: true, message: 'Tên đầy đủ không được để trống' }]}
               >
                 <Input placeholder="Enter your full name" />
               </Form.Item>
@@ -104,7 +123,10 @@ const Register = () => {
               <Form.Item
                 label={<span>Phone Number <span style={{ color: 'red' }}>(*)</span></span>}
                 name="phone_number"
-                rules={[{ required: true, message: 'Số điện thoại không được để trống' }]}
+                rules={[
+                  { required: true, message: 'Số điện thoại không được để trống' },
+                  { pattern: /^[0-9]{10,11}$/, message: 'Số điện thoại không hợp lệ' }
+                ]}
               >
                 <Input placeholder="Enter your phone number" />
               </Form.Item>
@@ -133,6 +155,17 @@ const Register = () => {
               >
                 <Input placeholder="Enter your email" />
               </Form.Item>
+
+              <Form.Item
+                label={<span>ID Number <span style={{ color: 'red' }}>(*)</span></span>}
+                name="id_number"
+                rules={[
+                  { required: true, message: 'Số CMND/CCCD không được để trống' },
+                  { pattern: /^[0-9]{9,12}$/, message: 'Số CMND/CCCD không hợp lệ' }
+                ]}
+              >
+                <Input placeholder="Enter your ID number" />
+              </Form.Item>
             </div>
 
             {/* Cột phải */}
@@ -152,9 +185,23 @@ const Register = () => {
               <Form.Item
                 label={<span>Insurance Number <span style={{ color: 'red' }}>(*)</span></span>}
                 name="insurance_number"
-                rules={[{ required: true, message: 'Mã số BHYT không được để trống' }]}
+                rules={[
+                  { required: true, message: 'Mã số BHYT không được để trống' },
+                  { pattern: /^[0-9]{10}$/, message: 'Mã số BHYT phải có 10 chữ số' }
+                ]}
               >
                 <Input placeholder="Enter your insurance number" />
+              </Form.Item>
+
+              <Form.Item
+                label={<span>Address <span style={{ color: 'red' }}>(*)</span></span>}
+                name="address"
+                rules={[{ required: true, message: 'Địa chỉ không được để trống' }]}
+              >
+                <Input.TextArea 
+                  placeholder="Enter your address" 
+                  autoSize={{ minRows: 2, maxRows: 3 }}
+                />
               </Form.Item>
 
               <Form.Item
@@ -162,7 +209,11 @@ const Register = () => {
                 name="password"
                 rules={[
                   { required: true, message: 'Mật khẩu không được để trống' },
-                  { min: 8, message: 'Mật khẩu phải có ít nhất 8 ký tự' }
+                  { min: 8, message: 'Mật khẩu phải có ít nhất 8 ký tự' },
+                  {
+                    pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/,
+                    message: 'Mật khẩu phải chứa ít nhất một chữ hoa, một chữ thường, một số và một ký tự đặc biệt'
+                  }
                 ]}
               >
                 <Input.Password placeholder="Enter your password" />
@@ -171,12 +222,15 @@ const Register = () => {
           </div>
 
           <Form.Item>
-            <button
-              type="submit"
-              className="bg-blue-900 !text-white w-full py-2 rounded-md mt-4 hover:bg-white hover:!text-blue-900 border border-blue-900 transition-colors"
+            <Button
+              type="primary"
+              htmlType="submit"
+              className="bg-blue-900 text-white w-full py-2 h-auto rounded-md mt-4 hover:bg-blue-800 border-none"
+              loading={loading}
+              size="large"
             >
-              Create Account
-            </button>
+              {loading ? 'Creating Account...' : 'Create Account'}
+            </Button>
           </Form.Item>
         </Form>
 

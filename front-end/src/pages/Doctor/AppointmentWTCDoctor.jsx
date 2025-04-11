@@ -13,7 +13,7 @@ import MenuDoctor from '../../components/Doctor/MenuDoctor';
 import axios from 'axios';
 import { AppContext } from '../../context/AppContext';
 import dayjs from 'dayjs';
-import AppointmentDetails from '../../components/Appointment/AppointmentDetails';
+import AppointmentDetails from '../../components/Doctor/AppointmentDetails';
 
 const { Sider, Content } = Layout;
 

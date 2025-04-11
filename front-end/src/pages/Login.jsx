@@ -14,7 +14,7 @@ const Login = () => {
     api[type]({
       message: message,
       description: description,
-      placement: 'topRight',
+      placement: 'topRight',  
       duration: 3,
       style: {
         fontFamily: 'Inter'
@@ -63,7 +63,7 @@ const Login = () => {
       const roleRoutes = {
         patient: "/",
         doctor: "/doctor/appointments/waiting-to-confirm",
-        pharmacist: "/pharmacist/dashboard",
+        pharmacist: "/pharmacists/prescription/pending_prepare",
         admin: "/admin/dashboard"
       };
       navigate(roleRoutes[values.role]);

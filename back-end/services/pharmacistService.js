@@ -7,7 +7,7 @@ import { Op } from "sequelize";
 import dayjs from "dayjs";
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
-
+import InternalServerError from "../errors/internalServerError.js";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -82,6 +82,7 @@ export const loginPharmacist = async ({ email, password }) => {
 };
 
 export const getPrescriptionDetails = async (prescription_id) => {
+  try {
   const prescription = await db.Prescription.findByPk(prescription_id, {
     include: [
       {
@@ -100,7 +101,7 @@ export const getPrescriptionDetails = async (prescription_id) => {
         include: [
           {
             model: db.Medicine,
-            as: "medicine",
+            as: "Medicine",
             attributes: [
               "medicine_id",
               "name",
@@ -179,14 +180,14 @@ export const getPrescriptionDetails = async (prescription_id) => {
       medicines: prescription.prescriptionMedicines.map(item => ({
         prescription_medicine_id: item.prescription_medicine_id,
         medicine: {
-          medicine_id: item.medicine.medicine_id,
-          name: item.medicine.name,
-          unit: item.medicine.unit,
-          price: item.medicine.price ? `${item.medicine.price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-          stock_quantity: item.medicine.quantity,
-          expiry_date: item.medicine.expiry_date ? 
-            dayjs(item.medicine.expiry_date).format('YYYY-MM-DD') : null,
-          status: item.medicine.is_out_of_stock ? 'Tạm hết hàng' : 'Còn hàng'
+          medicine_id: item.Medicine.medicine_id,
+          name: item.Medicine.name,
+          unit: item.Medicine.unit,
+          price: item.Medicine.price ? `${item.Medicine.price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
+          stock_quantity: item.Medicine.quantity,
+          expiry_date: item.Medicine.expiry_date ? 
+            dayjs(item.Medicine.expiry_date).format('YYYY-MM-DD') : null,
+          status: item.Medicine.is_out_of_stock ? 'Tạm hết hàng' : 'Còn hàng'
         },
         prescribed: {
           quantity: item.quantity || 0,
@@ -208,6 +209,10 @@ export const getPrescriptionDetails = async (prescription_id) => {
       } : null
     }
   };
+} catch (error) {
+  console.error('Error fetching prescription details:', error);
+  throw new InternalServerError('Lỗi khi lấy thông tin đơn thuốc');
+}
 };
 
 export const updatePrescriptionItem = async (
@@ -1078,7 +1083,7 @@ export const getAllPrescriptions = async ({
         include: [
           {
             model: db.Medicine,
-            as: "medicine",
+            as: "Medicine",
             attributes: [
               "medicine_id",
               "name",
@@ -1100,6 +1105,7 @@ export const getAllPrescriptions = async ({
             model: db.Patient,
             as: "Patient",
             required: false,
+            attributes: ["patient_id", "phone_number"],
             include: [
               {
                 model: db.User,
@@ -1182,7 +1188,8 @@ export const getAllPrescriptions = async ({
       status: prescription.Appointment.status,
       patient: prescription.Appointment.Patient?.user ? {
         name: prescription.Appointment.Patient.user.username,
-        email: prescription.Appointment.Patient.user.email
+        email: prescription.Appointment.Patient.user.email,
+        phone_number: prescription.Appointment.Patient.phone_number || null
       } : null,
       doctor: prescription.Appointment.Doctor?.user ? {
         name: prescription.Appointment.Doctor.user.username,
@@ -1191,12 +1198,12 @@ export const getAllPrescriptions = async ({
     } : null,
     medicines: prescription.prescriptionMedicines?.map(item => ({
       prescription_medicine_id: item.prescription_medicine_id,
-      medicine: item.medicine ? {
-        medicine_id: item.medicine.medicine_id,
-        name: item.medicine.name,
-        unit: item.medicine.unit,
-        price: item.medicine.price ? `${item.medicine.price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-        status: item.medicine.is_out_of_stock ? 'Tạm hết hàng' : 'Còn hàng'
+      medicine: item.Medicine ? {
+        medicine_id: item.Medicine.medicine_id,
+        name: item.Medicine.name,
+        unit: item.Medicine.unit,
+        price: item.Medicine.price ? `${item.Medicine.price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
+        status: item.Medicine.is_out_of_stock ? 'Tạm hết hàng' : 'Còn hàng'
       } : null,
       prescribed: {
         quantity: item.quantity || 0,

@@ -27,6 +27,7 @@ import AppointmentCanDoctor from "./pages/Doctor/AppointmentCanDoctor";
 import AppointmentPaymentPage from "./pages/Doctor/AppointmentPaymentPage";
 import PatientDoctor from "./pages/Doctor/PatientDoctor";
 import ProfileDoctor from "./pages/Doctor/ProfileDoctor";
+import PrescriptionPrepare from "./pages/Pharmacists/PrescriptionPrepare";
 
 // Layout cho Patient Portal
 const PatientLayout = () => {
@@ -41,6 +42,14 @@ const PatientLayout = () => {
 
 // Layout cho Doctor Portal
 const DoctorLayout = () => {
+  return (
+    <div>
+      <Outlet />
+    </div>
+  );
+};
+
+const PharmacistLayout = () => {
   return (
     <div>
       <Outlet />
@@ -82,12 +91,20 @@ const App = () => {
           <Route path="profile" element={<ProfileDoctor />} />
         </Route>
 
-        <Route path="/pharmacists" element={<DoctorLayout />}>
-          <Route path="prescription"> 
-            
+        {/* Pharmacist Routes */}
+        <Route path="/pharmacists" element={<PharmacistLayout />}>
+          {/* Default route for pharmacists - redirects to pending_prepare */}
+          <Route index element={<Navigate to="/pharmacists/prescription/pending_prepare" replace />} />
+          <Route path="prescription">
+            <Route path="pending_prepare" element={<PrescriptionPrepare />} />
+            {/* Uncomment these routes when the components are ready */}
+            {/* <Route path="waiting_payment" element={<PrescriptionWaitingPayment />} /> */}
+            {/* <Route path="completed" element={<PrescriptionCompleted />} /> */}
+            {/* <Route path="cancelled" element={<PrescriptionCancelled />} /> */}
+            {/* You can use the line below temporarily until you create the other components */}
+            <Route path="*" element={<PrescriptionPrepare />} />
           </Route>
-
-          
+          <Route path="*" element={<Navigate to="/pharmacists/prescription/pending_prepare" replace />} />
         </Route>
 
         {/* Shared Routes */}
@@ -101,5 +118,5 @@ const App = () => {
     </AppContextProvider>
   );
 };
-
 export default App;
+

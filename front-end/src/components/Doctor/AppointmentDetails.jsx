@@ -28,7 +28,7 @@ const AppointmentDetails = ({
     accepted: { color: 'green', text: 'confirmed' },
     completed: { color: 'blue', text: 'completed' },
     cancelled: { color: 'red', text: 'cancelled' },
-    doctor_day_off: { color: 'orange', text: 'doctor_day_off' },
+    doctor_day_off: { color: 'red', text: 'cancelled' },
     patient_not_coming: { color: 'red', text: 'cancelled' } // Đảm bảo text là 'cancelled'
   };
 
@@ -295,6 +295,11 @@ const AppointmentDetails = ({
               {selectedAppointment.appointment_info.status === 'patient_not_coming' && (
                 <Descriptions.Item label="Lý do hủy">
                   Patient not coming
+                </Descriptions.Item>
+              )}
+              {selectedAppointment.appointment_info.status === 'doctor_day_off' && (
+                <Descriptions.Item label="Lý do hủy">
+                  Bác sĩ có lịch nghỉ.
                 </Descriptions.Item>
               )}
             </Descriptions>

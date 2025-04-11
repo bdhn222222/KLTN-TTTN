@@ -1,0 +1,26 @@
+
+
+  VITE v6.1.0  ready in 629 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+  ➜  press h + enter to show help
+11:54:17 PM [vite] (client) hmr update /src/components/Pharmacist/Prescripti
+11:54:17 PM [vite] (client) hmr update /src/components/Pharmacist/PrescriptionDetails.jsx
+11:56:40 PM [vite] (client) hmr update /src/components/Pharmacist/Prescripti
+11:56:40 PM [vite] (client) hmr update /src/components/Pharmacist/PrescriptionDetails.jsx (x2)
+12:00:03 AM [vite] (client) hmr update /src/components/Pharmacist/Prescripti
+12:00:03 AM [vite] (client) hmr update /src/components/Pharmacist/PrescriptionDetails.jsx (x3)
+12:00:35 AM [vite] (client) hmr update /src/components/Pharmacist/Prescripti
+12:00:35 AM [vite] (client) hmr update /src/components/Pharmacist/PrescriptionDetails.jsx (x4)
+12:01:18 AM [vite] (client) hmr update /src/components/Pharmacist/Prescripti
+12:01:18 AM [vite] (client) hmr update /src/components/Pharmacist/PrescriptionDetails.jsx (x5)
+12:01:50 AM [vite] (client) hmr update /src/components/Pharmacist/Prescripti
+12:01:50 AM [vite] (client) hmr update /src/components/Pharmacist/PrescriptionDetails.jsx (x6)
+12:02:26 AM [vite] (client) hmr update /src/components/Pharmacist/Prescripti
+12:02:26 AM [vite] (client) hmr update /src/components/Pharmacist/PrescriptionDetails.jsx (x7)
+12:02:52 AM [vite] (client) hmr update /src/components/Pharmacist/Prescripti
+12:02:52 AM [vite] (client) hmr update /src/components/Pharmacist/PrescriptionDetails.jsx (x8)
+12:03:16 AM [vite] (client) hmr update /src/components/Pharmacist/Prescripti
+12:03:16 AM [vite] (client) hmr update /src/components/Pharmacist/PrescriptionDetails.jsx (x9)
+^C
