@@ -9,6 +9,7 @@ import { Op } from "sequelize";
 import sequelize from "sequelize";
 import utc from 'dayjs/plugin/utc.js';  // Sử dụng phần mở rộng .js
 import timezone from 'dayjs/plugin/timezone.js';  // Sử dụng phần mở rộng .js
+import { sendVerifyLink } from '../utils/gmail.js';
 import CompensationCode from '../models/compensationCode.js';
 import { Model, DataTypes } from "sequelize";
 import ForbiddenError from "../errors/forbidden.js";
@@ -32,66 +33,217 @@ export const registerPatient = async ({
   phone_number,
   insurance_number,
   id_number,
+  address
 }) => {
-  const existingPatient = await User.findOne({ where: { email } });
-  if (existingPatient) throw new BadRequestError("Email đã được đăng ký");
-  const hashedPassword = bcrypt.hashSync(password, 10);
-  const newUser = await User.create({
-    username,
-    email,
-    password: hashedPassword,
-    role: "patient",
-  });
-  const newPatient = await Patient.create({
-    user_id: newUser.user_id,
-    date_of_birth,
-    gender,
-    phone_number,
-    insurance_number,
-    id_number,
-    is_verified: false,
-  });
-  return {
-    message: "Đăng ký account bệnh nhân thành công",
-    patient: newPatient,
-  };
+  const transaction = await db.sequelize.transaction();
+
+  try {
+    const existingPatient = await User.findOne({ 
+      where: { email },
+      transaction 
+    });
+    
+    if (existingPatient) {
+      throw new BadRequestError("Email đã được đăng ký");
+    }
+
+    // Hash password với bcrypt
+    // const salt = await bcrypt.genSalt(10);
+    // const hashedPassword = await bcrypt.hash(password, salt);
+    
+    const newUser = await User.create({
+      username,
+      email,
+      password,
+      role: "patient",
+    }, { transaction });
+
+    const otp_code = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp_expiry = new Date(Date.now() + 5 * 60 * 1000);
+
+    const patientData = {
+      user_id: newUser.user_id,
+      date_of_birth,
+      gender,
+      phone_number,
+      insurance_number,
+      id_number,
+      address,
+      is_verified: false,
+      otp_code,
+      otp_expiry,
+    };
+
+    const newPatient = await Patient.create(patientData, { transaction });
+
+    const link = `${process.env.URL}/patient/verify?email=${email}&otp_code=${otp_code}`;
+    await sendVerifyLink(email, link);
+
+    await transaction.commit();
+
+    return {
+      message: "Đăng ký account bệnh nhân thành công",
+      patient: newPatient,
+    };
+  } catch (error) {
+    await transaction.rollback();
+    
+    if (error instanceof BadRequestError) {
+      throw error;
+    }
+    
+    if (error.name === 'SequelizeValidationError') {
+      throw new BadRequestError(error.message);
+    }
+
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      throw new BadRequestError('Email hoặc số điện thoại đã được sử dụng');
+    }
+
+    throw new Error(`Lỗi trong quá trình đăng ký: ${error.message}`);
+  }
+};
+
+export const verifyEmail = async (email, otp_code) => {
+  try {
+    const user = await User.findOne({
+      where: { email },
+      include: [{ model: Patient, as: "Patient" }],
+    });
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
+
+    const patient = user.Patient;
+    if (!patient) throw new NotFoundError("Patient not found");
+
+    if (patient.is_verified)
+      throw new BadRequestError("Email already verified");
+    if (patient.otp_code !== otp_code)
+      throw new BadRequestError("Invalid OTP code");
+    if (patient.otp_expiry < new Date())
+      throw new BadRequestError("OTP code has expired");
+
+    patient.is_verified = true;
+    patient.otp_code = null;
+    patient.otp_expiry = null;
+    
+    await patient.save();
+
+    return { 
+      message: "Xác thực email thành công" 
+    };
+  } catch (error) {
+    if (error instanceof BadRequestError || error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new Error("Lỗi trong quá trình xác thực email: " + error.message);
+  }
+};
+
+export const changePassword = async (user_id, oldPassword, newPassword) => {
+  const transaction = await db.sequelize.transaction();
+  try {
+    const user = await db.User.findByPk(user_id, {
+      include: [{ model: db.Patient, as: "Patient" }],
+      transaction,
+    });
+
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
+
+    const patient = user.Patient;
+    if (!patient) {
+      throw new NotFoundError("Patient not found");
+    }
+
+    if (!patient.is_verified) {
+      const otp_code = Math.floor(100000 + Math.random() * 900000).toString();
+      const otp_expiry = new Date(Date.now() + 5 * 60 * 1000);
+
+      patient.otp_code = otp_code;
+      patient.otp_expiry = otp_expiry;
+
+      await patient.save({ transaction });
+
+      const link = `${process.env.URL}/patient/verify?email=${user.email}&otp_code=${otp_code}`;
+      await sendVerifyLink(user.email, link); // Gửi email xác thực mới
+
+      await transaction.commit();
+      return {
+        message: "Email not verified. Verification link has been resent.",
+      };
+    }
+
+    // So sánh mật khẩu cũ
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      throw new BadRequestError("Incorrect password");
+    }
+    user.password = newPassword;
+    await user.save({ transaction });
+
+    await transaction.commit();
+    return { message: "Success" };
+  } catch (error) {
+    await transaction.rollback();
+    throw new Error(error.message);
+  }
 };
 
 export const loginPatient = async ({ email, password }) => {
-  const user = await User.findOne({
-    where: { email, role: "patient" },
-    include: { model: Patient, as: "Patient" },
-  });
-  if (!user) {
-    throw new NotFoundError("Bệnh nhân không tồn tại hoặc email không đúng");
-  }
-  const isPasswordValid = await bcrypt.compare(password, user.password);
-  if (!isPasswordValid) {
-    throw new UnauthorizedError("Mật khẩu không chính xác");
-  }
-  const token = jwt.sign(
-    { user_id: user.user_id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN }
-  );
+  try {
+    const user = await db.User.findOne({
+      where: { email, role: "patient" },
+      include: [{ model: db.Patient, as: "Patient" }],
+    });
 
-  return {
-    message: "Đăng nhập thành công",
-    token,
-    patient: {
-      user_id: user.user_id,
-      email: user.email,
-      username: user.username,
-      role: user.role,
-      date_of_birth: user.Patient.date_of_birth,
-      gender: user.Patient.gender,
-      address: user.Patient.address,
-      phone_number: user.Patient.phone_number,
-      insurance_number: user.Patient.insurance_number,
-      id_number: user.Patient.id_number,
-      is_verified: user.Patient.is_verified,
-    },
-  };
+    if (!user) {
+      throw new NotFoundError("Bệnh nhân không tồn tại hoặc email không đúng");
+    }
+    
+    const patient = user.Patient;
+    if (!patient) {
+      throw new NotFoundError("Thông tin bệnh nhân không tồn tại");
+    }
+
+    // Kiểm tra mật khẩu
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    
+    if (!isPasswordValid) {
+      throw new UnauthorizedError("Mật khẩu không chính xác");
+    }
+
+    const token = jwt.sign(
+      { user_id: user.user_id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+
+    return {
+      message: "Đăng nhập thành công",
+      token,
+      patient: {
+        user_id: user.user_id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        date_of_birth: patient.date_of_birth,
+        gender: patient.gender,
+        address: patient.address,
+        phone_number: patient.phone_number,
+        insurance_number: patient.insurance_number,
+        id_number: patient.id_number,
+        is_verified: patient.is_verified,
+      },
+    };
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof UnauthorizedError) {
+      throw error;
+    }
+    throw new Error(`Lỗi trong quá trình đăng nhập: ${error.message}`);
+  }
 };
 
 export const getAllSpecializations = async () => {
@@ -746,3 +898,4 @@ export const updatePatientProfile = async (user_id, updateData) => {
     throw new Error(error.message);
   }
 };
+

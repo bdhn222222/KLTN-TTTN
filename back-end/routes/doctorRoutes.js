@@ -1,4 +1,5 @@
 import express from "express";
+import multer from "multer";
 import {
   registerDoctorController,
   loginDoctorController,
@@ -20,7 +21,8 @@ import {
   getAllMedicinesController,
   getAllPatientsController,
   getPatientAppointmentsController,
-  getDoctorProfileController
+  getDoctorProfileController,
+  updateDoctorProfileController
 } from "../controllers/doctorController.js";
 import validate from "../middleware/validate.js";
 import { body, param } from "express-validator";
@@ -33,6 +35,8 @@ import {
 } from "../middleware/rateLimiter.js";
 
 const router = express.Router();
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 const app = express();
 app.use(express.json());
 router.post(
@@ -209,6 +213,13 @@ router.get(
   authenticateUser,
   authorize(["doctor"]),
   getDoctorProfileController
+);
+router.patch(
+  "/profile",
+  authenticateUser,
+  authorize(["doctor"]),
+  upload.single('avatar'),
+  updateDoctorProfileController
 );
 
 export default router;

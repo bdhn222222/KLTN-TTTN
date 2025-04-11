@@ -7,7 +7,9 @@ import NotFoundError from "../errors/not_found.js";
 import ForbiddenError from "../errors/forbidden.js";
 import InternalServerError from "../errors/internalServerError.js";
 import { Op, Sequelize } from "sequelize";
-const { User, Doctor, DoctorDayOff, Appointment, Patient, CompensationCode, Medicine } = db;
+import cloudinary from "../config/cloudinary.js";
+
+const { User, Doctor, DoctorDayOff, Appointment, Patient, CompensationCode, Medicine, Specialization, Schedule } = db;
 import dayjs from "dayjs";
 import utc from 'dayjs/plugin/utc.js';  // Sử dụng phần mở rộng .js
 import timezone from 'dayjs/plugin/timezone.js';  // Sử dụng phần mở rộng .js
@@ -1999,8 +2001,8 @@ export const getDoctorProfile = async (user_id) => {
           model: Doctor,
           as: "doctor",
           include: [
-            { model: Specialization, as: "specialization" },
-            { model: Schedule, as: "schedule" },
+            { model: Specialization, as: "Specialization" },
+            { model: Schedule, as: "Schedule" },
           ],
         },
       ],

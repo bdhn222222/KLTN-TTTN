@@ -130,24 +130,10 @@ export const getDoctorDayOffsController = async (req, res) => {
     const result = await getDoctorDayOffs(doctor_id, start, end, status, date);
     res.status(200).json(result);
   } catch (error) {
-    console.error('Error in getDoctorDayOffsController:', error);
-    
-    if (error.name === 'BadRequestError') {
-      return res.status(400).json({
-        success: false,
-        message: error.message || "Yêu cầu không hợp lệ"
-      });
-    } else if (error.name === 'NotFoundError') {
-      return res.status(404).json({
-        success: false,
-        message: error.message || "Không tìm thấy dữ liệu"
-      });
+    if (error instanceof BadRequestError) {
+      next(error);
     } else {
-      return res.status(500).json({
-        success: false,
-        message: "Có lỗi xảy ra khi lấy danh sách ngày nghỉ",
-        error: error.message
-      });
+      next(new InternalServerError(error.message));
     }
   }
 };
@@ -172,22 +158,19 @@ export const createDoctorDayOffController = async (req, res) => {
 };
 export const cancelDoctorDayOffController = async (req, res) => {
   try {
-    const doctor_id = req.user.user_id; // Lấy từ token
-    const day_off_id = req.params.id;
-    const { time_off } = req.body;
+  const doctor_id = req.user.user_id; // Lấy từ token
+  const day_off_id = req.params.id;
+  const { time_off } = req.body;
 
-    if (!time_off) {
-      return res.status(400).json({
-        success: false,
-        message: "Thiếu thông tin buổi nghỉ cần hủy"
-      });
-    }
+  if (!time_off) {
+    throw new BadRequestError("Thiếu thông tin buổi nghỉ cần hủy");
+  }
 
-    // Gọi service cancelDoctorDayOff để xử lý
-    const result = await cancelDoctorDayOff(doctor_id, day_off_id, time_off);
+  // Gọi service cancelDoctorDayOff để xử lý
+  const result = await cancelDoctorDayOff(doctor_id, day_off_id, time_off);
 
-    // Trả về kết quả cho người dùng
-    res.status(200).json(result);
+  // Trả về kết quả cho người dùng
+  res.status(200).json(result);
   } catch (error) {
     console.error('Error canceling doctor day off:', error);
     
@@ -659,6 +642,50 @@ export const getDoctorProfileController = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Có lỗi xảy ra khi lấy thông tin bác sĩ",
+      error: error.message
+    });
+  }
+};
+
+export const updateDoctorProfileController = async (req, res) => {
+  try {
+    const user_id = req.user.user_id;
+    const updateData = req.body;
+    if (!updateData && !req.file) {
+      throw new BadRequestError("At least one field must be provided.");
+    }
+
+    if (req.file) {
+      const imageBuffer = req.file.buffer.toString("base64");
+      updateData.avatar = `data:image/png;base64,${imageBuffer}`;
+    }
+    const result = await updateDoctorProfile(user_id, updateData);
+
+    res.status(200).json({
+      success: true,
+      message: "Cập nhật thông tin thành công",
+      data: result
+    });
+  } catch (error) {
+    console.error('Error in updateDoctorProfileController:', error);
+    
+    if (error instanceof BadRequestError) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: "Có lỗi xảy ra khi cập nhật thông tin",
       error: error.message
     });
   }

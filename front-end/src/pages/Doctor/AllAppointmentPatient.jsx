@@ -158,7 +158,7 @@ const AllAppointmentPatient = () => {
       accepted: { color: 'green', text: 'confirmed' },
       completed: { color: 'blue', text: 'completed' },
       cancelled: { color: 'red', text: 'cancelled' },
-      doctor_day_off: { color: 'red', text: 'cancelled' },
+      doctor_day_off: { color: 'red', text: 'can' },
       patient_not_coming: { color: 'gray', text: 'patient_not_coming' }
     };
 

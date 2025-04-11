@@ -93,10 +93,8 @@ const PatientDoctor = () => {
     fetchPatients(1, pagination.pageSize, value);
   };
 
-  const handleViewDetails = (patientId, patientData) => {
-    navigate(`/doctor/patients/${patientId}`, {
-      state: { patientInfo: patientData }
-    });
+  const handleViewDetails = (patientId) => {
+    navigate(`/doctor/patients/${patientId}`);
   };
 
   const columns = [
@@ -148,10 +146,10 @@ const PatientDoctor = () => {
       width: '10%',
       render: (_, record) => (
         <Button
-          type="primary"
+        //   type="primary"
           icon={<EyeOutlined />}
-          onClick={() => handleViewDetails(record.patient_id, record)}
-          className="!bg-blue-900 !text-white px-4 py-1 rounded-full hover:!bg-blue-800"
+          onClick={() => handleViewDetails(record.patient_id)}
+          className="!text-blue-900 hover:text-blue-800 hover:border-blue-900 px-6 py-2 rounded-full font-light hidden md:block hover:opacity-90 transition duration-300"
         >
           Details
         </Button>

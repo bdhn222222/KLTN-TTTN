@@ -5,7 +5,9 @@ import {
   getAllSpecializationsController,
   getAllDoctorsController,
   getDoctorProfileController,
-  bookAppointmentController
+  verifyEmailController,
+  bookAppointmentController,
+  changePasswordController
 } from "../controllers/patientController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
@@ -16,24 +18,11 @@ const router = express.Router();
 import { loginLimiter, registerLimiter } from "../middleware/rateLimiter.js";
 router.post(
   "/register",
-  validate([
-    body("username")
-      .notEmpty()
-      .withMessage("Tên đăng nhập không được để trống"),
-    body("email").isEmail().withMessage("Email không hợp lệ"),
-    body("password")
-      .isLength({ min: 8 })
-      .withMessage("Mật khẩu phải có ít nhất 8 ký tự"),
-    body("date_of_birth")
-      .notEmpty()
-      .withMessage("Ngày sinh không được để trống"),
-    body("gender")
-      .isIn(["male", "female", "other"])
-      .withMessage("Giới tính không hợp lệ"),
-  ]),
-  registerLimiter,
+  // registerLimiter,
   registerPatientController
 );
+
+router.get("/verify", verifyEmailController);
 
 router.post(
   "/login",
@@ -41,7 +30,7 @@ router.post(
     body("email").isEmail().withMessage("Email không hợp lệ"),
     body("password").notEmpty().withMessage("Mật khẩu không được để trống"),
   ]),
-  loginLimiter,
+  // loginLimiter,
   loginPatientController
 );
 router.get("/specializations", getAllSpecializationsController);
@@ -66,6 +55,8 @@ router.post(
   ]),
   bookAppointmentController
 );
+
+router.post("/change-password", authenticateUser, authorize(["patient"]), changePasswordController);
 
 export default router;
 

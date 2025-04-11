@@ -1,7 +1,9 @@
 import db from "../models/index.js";
 import bcrypt from "bcryptjs";
 import BadRequestError from "../errors/bad_request.js";
+import cloudinary from "../config/cloudinary.js";
 import jwt from "jsonwebtoken";
+import axios from "axios";
 const { User, Admin } = db;
 export const registerAdmin = async ({ username, email, password }) => {
   const existingUser = await User.findOne({ where: { email } });
@@ -388,6 +390,21 @@ export const deleteSpecialization = async (specialization_id) => {
     return { message: "Success" };
   } catch (error) {
     await transaction.rollback();
+    throw new Error(error.message);
+  }
+};
+
+export const updateDoctorProfileWithAxios = async (user_id, updateData) => {
+  try {
+    const response = await axios.post(`${url1}/doctor/profile`, updateData, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return { message: "Success" };
+  } catch (error) {
     throw new Error(error.message);
   }
 };

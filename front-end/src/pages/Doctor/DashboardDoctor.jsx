@@ -368,8 +368,8 @@ const DashboardDoctor = () => {
 
         <Layout style={{ marginLeft: collapsed ? 80 : 250, marginTop: 64 }}>
           <Content style={{ margin: '24px 16px', overflow: 'initial' }}>
-            {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <Card loading={loading} className="shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <Card loading={loading} className="w-full bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden border border-gray-100">
                 <Statistic
                   title="Tổng số bệnh nhân"
                   value={statistics.totalPatients || 0}
@@ -377,7 +377,7 @@ const DashboardDoctor = () => {
                   className="text-center"
                 />
               </Card>
-              <Card loading={loading} className="shadow-sm">
+              <Card loading={loading} className="w-full bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden border border-gray-100">
                 <Statistic
                   title="Cuộc hẹn hôm nay"
                   value={statistics.totalAppointments || 0}
@@ -385,7 +385,7 @@ const DashboardDoctor = () => {
                   className="text-center"
                 />
               </Card>
-              <Card loading={loading} className="shadow-sm">
+              <Card loading={loading} className="w-full bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden border border-gray-100">
                 <Statistic
                   title="Chờ xác nhận"
                   value={statistics.pendingAppointments || 0}
@@ -393,8 +393,7 @@ const DashboardDoctor = () => {
                   className="text-center"
                 />
               </Card>
-            </div> */}
-
+            </div>
 
             <Card title="Danh sách cuộc hẹn" className="shadow-sm">
               <Flex gap="middle" vertical>

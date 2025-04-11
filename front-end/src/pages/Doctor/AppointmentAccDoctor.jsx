@@ -104,9 +104,7 @@ const AppointmentAccDoctor = () => {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         params: {
-          status: 'accepted',
-          sort: 'appointment_datetime',
-          order: 'desc'
+          status: 'accepted'
         }
       });
       
@@ -372,8 +370,6 @@ const AppointmentAccDoctor = () => {
       dataIndex: 'appointment_datetime',
       key: 'appointment_datetime',
       render: (datetime) => dayjs(datetime).format('DD/MM/YYYY HH:mm'),
-      sorter: (a, b) => new Date(a.appointment_datetime) - new Date(b.appointment_datetime),
-      defaultSortOrder: 'descend',
     },
     {
       title: 'Status',
@@ -454,8 +450,6 @@ const AppointmentAccDoctor = () => {
                     showSizeChanger: true,
                     showTotal: (total) => `Tổng số ${total} cuộc hẹn chờ xác nhận`,
                   }}
-                  defaultSortOrder="descend"
-                  sortDirections={["descend", "ascend"]}
                 />
               </Flex>
             </Card>

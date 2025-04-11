@@ -310,7 +310,8 @@ const AppointmentPaymentPage = () => {
 
   const totalPrescriptionAmount = calculatePrescriptionTotal();
   const appointmentFee = appointmentDetail?.appointment_info?.fees || 0;
-  const totalAmount = appointmentFee + totalPrescriptionAmount;
+  // const totalAmount = appointmentFee + totalPrescriptionAmount;
+  const totalAmount = appointmentFee
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -391,7 +392,7 @@ const AppointmentPaymentPage = () => {
                 {/* Payment Summary Card */}
                 <Card className="shadow-sm mb-4">
                   <div className="flex justify-between items-center mb-4">
-                    <Title level={4} className="!mb-0">Payment Summary</Title>
+                    <Title level={4} className="!mb-0">Payment Appointment</Title>
                     <Tag color={getStatusColor(appointmentDetail.payment?.status || 'pending').color}>
                       {getStatusColor(appointmentDetail.payment?.status || 'pending').text}
                     </Tag>
@@ -401,9 +402,9 @@ const AppointmentPaymentPage = () => {
                     <Descriptions.Item label="Total Appointment Fee">
                       {appointmentFee.toLocaleString('vi-VN')} VNĐ
                     </Descriptions.Item>
-                    <Descriptions.Item label="Prescription Charges">
+                    {/* <Descriptions.Item label="Prescription Charges">
                       {totalPrescriptionAmount.toLocaleString('vi-VN')} VNĐ
-                    </Descriptions.Item>
+                    </Descriptions.Item> */}
                     <Descriptions.Item label="Total Amount" className="font-semibold">
                       <Text strong>{totalAmount.toLocaleString('vi-VN')} VNĐ</Text>
                     </Descriptions.Item>
@@ -532,7 +533,7 @@ const AppointmentPaymentPage = () => {
         <Radio.Group onChange={handlePaymentMethodChange} value={paymentMethod}>
           <Space direction="vertical">
             <Radio value="cash">Cash Payment</Radio>
-            <Radio value="zalopay">ZaloPay</Radio>
+            {/* <Radio value="zalopay">ZaloPay</Radio> */}
           </Space>
         </Radio.Group>
       </Modal>

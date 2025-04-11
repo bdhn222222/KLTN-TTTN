@@ -26,14 +26,14 @@ export const sendVerifyLink = async (email, link) => {
     port: 587,
     secure: false,
     auth: {
-      user: process.env.EMAIL,
-      pass: process.env.PASSWORD,
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASSWORD,
     },
   });
 
   try {
     const mailOptions = {
-      from: process.env.EMAIL,
+      from: process.env.MAIL_USER,
       to: email,
       subject: "Verification OTP",
       html: `

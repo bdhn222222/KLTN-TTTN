@@ -79,13 +79,13 @@ export default (sequelize) => {
 
   User.beforeSave(async (user) => {
     if (user.changed("password")) {
-      const value = String(user.password);
+      const value = user.password;
 
-      if (value.length < 8 || value.length > 32) {
-        throw new BadRequestError(
-          "Password must be between 8 and 32 characters."
-        );
-      }
+      // if (value.length < 8 || value.length > 32) {
+      //   throw new BadRequestError(
+      //     "Password must be between 8 and 32 characters."
+      //   );
+      // }
 
       const hasUppercase = /[A-Z]/.test(value);
       const hasLowercase = /[a-z]/.test(value);

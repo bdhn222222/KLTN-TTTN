@@ -24,24 +24,28 @@ const Login = () => {
 
   const onFinish = async (values) => {
     try {
+      console.log("Login values:", values);
+
       const response = await axios.post(`${url1}/${values.role}/login`, {
         email: values.email,
         password: values.password
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       console.log("Login response:", response);
 
-      // Lưu token
+      // Lưu token và thông tin user
       localStorage.setItem("token", response.data.token);
-
-      // Lưu thông tin user dựa trên role
       const userData = {
         ...response.data[values.role],
         role: values.role
       };
       localStorage.setItem("user", JSON.stringify(userData));
 
-      // Hiển thị thông báo và chuyển hướng dựa trên role
+      // Hiển thị thông báo thành công
       const roleMessages = {
         patient: 'Chào mừng bạn quay trở lại Prescripto',
         doctor: 'Chào mừng bác sĩ quay trở lại Prescripto',
@@ -67,20 +71,43 @@ const Login = () => {
     } catch (error) {
       console.error("Login error:", error);
       
-      let errorMessage = '';
-      if (error.response?.status === 401) {
-        errorMessage = 'Email hoặc mật khẩu không chính xác';
-      } else if (error.response?.status === 404) {
-        errorMessage = 'Tài khoản không tồn tại';
-      } else if (error.response?.status === 503) {
-        errorMessage = 'Không thể kết nối đến server. Vui lòng thử lại sau';
-      } else {
-        errorMessage = error.message || 'Có lỗi xảy ra. Vui lòng thử lại';
+      let errorMessage = 'Đã có lỗi xảy ra';
+      
+      if (error.response) {
+        // Lỗi từ server
+        const status = error.response.status;
+        const data = error.response.data;
+        
+        console.log("Server error details:", {
+          status,
+          data,
+          error: data.error || data.message
+        });
+        
+        switch (status) {
+          case 400:
+            errorMessage = data.error || data.message || 'Thông tin đăng nhập không hợp lệ';
+            break;
+          case 401:
+            errorMessage = 'Email hoặc mật khẩu không chính xác';
+            break;
+          case 404:
+            errorMessage = 'Không tìm thấy tài khoản với email này';
+            break;
+          case 500:
+            errorMessage = 'Lỗi server, vui lòng thử lại sau';
+            break;
+          default:
+            errorMessage = data.error || data.message || 'Đã có lỗi xảy ra khi đăng nhập';
+        }
+      } else if (error.request) {
+        // Lỗi không nhận được response
+        errorMessage = 'Không thể kết nối đến server';
       }
 
       showNotification(
         'error',
-        'Đăng nhập không thành công',
+        'Đăng nhập thất bại',
         errorMessage
       );
     }
@@ -146,6 +173,16 @@ const Login = () => {
             </button>
           </Form.Item>
         </Form>
+
+        <p className="w-full text-center">
+          Don't have an account?{" "}
+          <span
+            onClick={() => navigate("/register")}
+            className="text-blue-900 underline cursor-pointer hover:text-blue-700 transition-colors"
+          >
+            Register here
+          </span>
+        </p>
       </div>
     </div>
   );

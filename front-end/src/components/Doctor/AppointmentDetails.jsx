@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { Drawer, Button, Space, Tag, Divider, Descriptions, Modal, Flex, Input, Form, notification, Spin } from 'antd';
+import { Drawer, Button, Space, Tag, Divider, Descriptions, Modal, Flex, Input, Form, notification } from 'antd';
 import { ArrowLeftOutlined, CloseCircleOutlined, CheckOutlined, FileAddOutlined, CheckCircleOutlined, WalletOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import axios from 'axios';
@@ -13,8 +13,7 @@ const AppointmentDetails = ({
   selectedAppointment, 
   onRefresh,
   onNavigateToCreateRecord,
-  onNavigateToPayment,
-  loading = false
+  onNavigateToPayment 
 }) => {
   const { url1 } = useContext(AppContext);
   const [isConfirmCancelVisible, setIsConfirmCancelVisible] = useState(false);
@@ -257,7 +256,7 @@ const AppointmentDetails = ({
       <Drawer
         open={isDrawerVisible}
         onClose={() => setIsDrawerVisible(false)}
-        width="30%"
+        width="50%"
         extra={
           <Space>
             {/* <Button 
@@ -272,20 +271,16 @@ const AppointmentDetails = ({
         }
         title={
           <Flex justify="space-between" align="center">
-            <span>Appointment Details</span>
-            {selectedAppointment && !loading && (
-              <Tag color={getStatusTag(selectedAppointment.appointment_info.status).props.color}>
-                {getStatusTag(selectedAppointment.appointment_info.status).props.children}
-              </Tag>
-            )}
-          </Flex>
+  <span>Appointment Details</span>
+  {selectedAppointment && (
+    <Tag color={getStatusTag(selectedAppointment.appointment_info.status).props.color}>
+      {getStatusTag(selectedAppointment.appointment_info.status).props.children}
+    </Tag>
+  )}
+</Flex>
         }
       >
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <Spin size="large" />
-          </div>
-        ) : selectedAppointment && (
+        {selectedAppointment && (
           <>
             <Descriptions title="Appointment Information" column={1}>
               <Descriptions.Item label="Mã cuộc hẹn">
@@ -447,6 +442,15 @@ const AppointmentDetails = ({
               onChange={(e) => setCancelReason(e.target.value)}
             />
           </Form.Item>
+          
+          <div className="text-sm text-red-600">
+            <p>Lưu ý: Việc hủy cuộc hẹn có thể dẫn đến các quy định đền bù</p>
+            <ul className="list-disc pl-5 mt-1">
+              {/* <li>Hủy trước 24 giờ: Không yêu cầu đền bù</li>
+              <li>Hủy từ 3-24 giờ: Bệnh nhân được giảm giá 5% cho lần khám tiếp theo</li>
+              <li>Hủy dưới 3 giờ: Bệnh nhân được giảm giá 20% cho lần khám tiếp theo</li> */}
+            </ul>
+          </div>
         </Form>
       </Modal>
 
