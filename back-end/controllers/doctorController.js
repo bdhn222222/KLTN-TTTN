@@ -17,7 +17,10 @@ import {
   getDoctorDayOffs,
   createMedicalRecord,
   getAppointmentPayments,
-  updatePaymentStatus
+  updatePaymentStatus,
+  getAllPatient,
+  getPatientAppointment,
+  getDoctorProfile
 } from "../services/doctorService.js";
 import BadRequestError from "../errors/bad_request.js";
 import InternalServerError from "../errors/internalServerError.js";
@@ -119,7 +122,7 @@ export const markPatientNotComingController = asyncHandler(async (req, res) => {
   const result = await markPatientNotComing(appointment_id, doctor_id);
   res.status(200).json(result);
 });
-export const getDoctorDayOffsController = asyncHandler(async (req, res, next) => {
+export const getDoctorDayOffsController = async (req, res) => {
   try {
     const doctor_id = req.user.user_id;
     const { start, end, status, date } = req.query;
@@ -127,89 +130,37 @@ export const getDoctorDayOffsController = asyncHandler(async (req, res, next) =>
     const result = await getDoctorDayOffs(doctor_id, start, end, status, date);
     res.status(200).json(result);
   } catch (error) {
-    if (error instanceof BadRequestError) {
-      next(error);
+    console.error('Error in getDoctorDayOffsController:', error);
+    
+    if (error.name === 'BadRequestError') {
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Yêu cầu không hợp lệ"
+      });
+    } else if (error.name === 'NotFoundError') {
+      return res.status(404).json({
+        success: false,
+        message: error.message || "Không tìm thấy dữ liệu"
+      });
     } else {
-      next(new InternalServerError(error.message));
+      return res.status(500).json({
+        success: false,
+        message: "Có lỗi xảy ra khi lấy danh sách ngày nghỉ",
+        error: error.message
+      });
     }
   }
-});
+};
 export const createDoctorDayOffController = async (req, res) => {
   try {
-    const { off_date, off_morning, off_afternoon, reason, is_emergency } = req.body;
-    const doctor_id = req.user.doctor.doctor_id;
+    const { off_date, time_off, reason, is_emergency } = req.body;
+    const doctor_id = req.user.user_id;
 
-    // Tạo ngày nghỉ
-    const dayOff = await DoctorDayOff.create({
-      doctor_id,
-      off_date,
-      off_morning,
-      off_afternoon,
-      reason,
-      is_emergency,
-      status: 'active'
-    });
-
-    // Tìm các lịch hẹn bị ảnh hưởng
-    const affectedAppointments = await Appointment.findAll({
-      where: {
-        doctor_id,
-        appointment_datetime: {
-          [Op.between]: [
-            new Date(off_date + ' 00:00:00'),
-            new Date(off_date + ' 23:59:59')
-          ]
-        },
-        status: {
-          [Op.in]: ['waiting_for_confirmation', 'accepted']
-        }
-      }
-    });
-
-    // Lưu các lịch hẹn bị ảnh hưởng
-    for (const appointment of affectedAppointments) {
-      await DayOffAppointment.create({
-        day_off_id: dayOff.day_off_id,
-        appointment_id: appointment.appointment_id
-      });
-
-      // Nếu là nghỉ khẩn cấp (ít hơn 3 giờ trước lịch hẹn)
-      if (is_emergency) {
-        const appointmentTime = new Date(appointment.appointment_datetime);
-        const now = new Date();
-        const hoursDiff = (appointmentTime - now) / (1000 * 60 * 60);
-
-        if (hoursDiff < 3) {
-          // Tạo mã bồi thường
-          const compensationCode = await CompensationCode.create({
-            appointment_id: appointment.appointment_id,
-            patient_id: appointment.patient_id,
-            doctor_id,
-            code: generateCompensationCode(), // Hàm tạo mã ngẫu nhiên
-            amount: appointment.Doctor.Specialization.fees * 0.1, // 10% phí khám
-            discount_percentage: 10,
-            expiry_date: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000) // 6 tháng
-          });
-
-          // Cập nhật trạng thái lịch hẹn
-          await appointment.update({
-            status: 'doctor_day_off',
-            cancelled_at: new Date(),
-            cancelled_by: 'doctor',
-            cancel_reason: reason
-          });
-        }
-      }
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Tạo ngày nghỉ thành công',
-      data: {
-        dayOff,
-        affectedAppointments: affectedAppointments.length
-      }
-    });
+    // Gọi service với doctor_id đã lấy đúng
+    const result = await createDoctorDayOff(doctor_id, off_date, time_off, reason);
+    
+    res.status(201).json(result);
+    
   } catch (error) {
     console.error('Error creating doctor day off:', error);
     res.status(500).json({
@@ -219,26 +170,51 @@ export const createDoctorDayOffController = async (req, res) => {
     });
   }
 };
-export const cancelDoctorDayOffController = asyncHandler(async (req, res) => {
-  const doctor_id = req.user.user_id; // Lấy từ token
-  const day_off_id = req.params.id;
-  const { time_off } = req.body;
+export const cancelDoctorDayOffController = async (req, res) => {
+  try {
+    const doctor_id = req.user.user_id; // Lấy từ token
+    const day_off_id = req.params.id;
+    const { time_off } = req.body;
 
-  if (!time_off) {
-    throw new BadRequestError("Thiếu thông tin buổi nghỉ cần hủy");
+    if (!time_off) {
+      return res.status(400).json({
+        success: false,
+        message: "Thiếu thông tin buổi nghỉ cần hủy"
+      });
+    }
+
+    // Gọi service cancelDoctorDayOff để xử lý
+    const result = await cancelDoctorDayOff(doctor_id, day_off_id, time_off);
+
+    // Trả về kết quả cho người dùng
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error canceling doctor day off:', error);
+    
+    if (error.name === 'NotFoundError') {
+      return res.status(404).json({
+        success: false,
+        message: error.message || "Không tìm thấy ngày nghỉ"
+      });
+    } else if (error.name === 'BadRequestError') {
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Yêu cầu không hợp lệ"
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        message: "Có lỗi xảy ra khi hủy ngày nghỉ",
+        error: error.message
+      });
+    }
   }
-
-  // Gọi service cancelDoctorDayOff để xử lý
-  const result = await cancelDoctorDayOff(doctor_id, day_off_id, time_off);
-
-  // Trả về kết quả cho người dùng
-  res.status(200).json(result);
-});
+};
 export const cancelAppointmentController = async (req, res) => {
   try {
     const doctor_id = req.user.user_id;
     const appointment_id = parseInt(req.params.id);
-    const { reason, is_emergency = false } = req.body;
+    const { reason } = req.body;
 
     // Kiểm tra appointment_id
     if (!appointment_id || isNaN(appointment_id)) {
@@ -264,20 +240,11 @@ export const cancelAppointmentController = async (req, res) => {
       });
     }
 
-    // Nếu là hủy cấp bách, kiểm tra thêm lý do cấp bách
-    if (is_emergency && (!reason.includes('cấp bách') && !reason.includes('khẩn cấp'))) {
-      return res.status(400).json({
-        success: false,
-        error: "Vui lòng nêu rõ lý do cấp bách/khẩn cấp trong nội dung"
-      });
-    }
-
     const result = await cancelAppointment(
       appointment_id, 
       doctor_id, 
       reason.trim(), 
-      'doctor', 
-      is_emergency
+      'doctor'
     );
     
     return res.status(200).json(result);
@@ -553,3 +520,146 @@ export const getAllMedicinesController = asyncHandler(async (req, res) => {
   const result = await getAllMedicines({ search, expiry_before });
   res.status(200).json(result);
 });
+
+/**
+ * Lấy danh sách tất cả bệnh nhân
+ */
+export const getAllPatientsController = async (req, res) => {
+  try {
+    const doctor_id = req.user.user_id;
+    const { search, page = 1, limit = 10 } = req.query;
+
+    // Validate parameters
+    if (page && (isNaN(page) || parseInt(page) < 1)) {
+      return res.status(400).json({
+        success: false,
+        message: "Số trang không hợp lệ"
+      });
+    }
+
+    if (limit && (isNaN(limit) || parseInt(limit) < 1)) {
+      return res.status(400).json({
+        success: false,
+        message: "Số lượng mỗi trang không hợp lệ"
+      });
+    }
+
+    const result = await getAllPatient(doctor_id, {
+      search,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error in getAllPatientsController:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Có lỗi xảy ra khi lấy danh sách bệnh nhân"
+    });
+  }
+};
+
+/**
+ * Lấy danh sách lịch hẹn của một bệnh nhân cụ thể
+ */
+export const getPatientAppointmentsController = async (req, res) => {
+  try {
+    const doctor_id = req.user.user_id;
+    const { patient_id } = req.params;
+    const { status, start_date, end_date, page = 1, limit = 10 } = req.query;
+
+    // Validate patient_id
+    if (!patient_id || isNaN(patient_id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Mã bệnh nhân không hợp lệ"
+      });
+    }
+
+    // Validate pagination parameters
+    if (page && (isNaN(page) || parseInt(page) < 1)) {
+      return res.status(400).json({
+        success: false,
+        message: "Số trang không hợp lệ"
+      });
+    }
+
+    if (limit && (isNaN(limit) || parseInt(limit) < 1)) {
+      return res.status(400).json({
+        success: false,
+        message: "Số lượng mỗi trang không hợp lệ"
+      });
+    }
+
+    // Validate date parameters
+    if (start_date && !dayjs(start_date).isValid()) {
+      return res.status(400).json({
+        success: false,
+        message: "Ngày bắt đầu không hợp lệ"
+      });
+    }
+
+    if (end_date && !dayjs(end_date).isValid()) {
+      return res.status(400).json({
+        success: false,
+        message: "Ngày kết thúc không hợp lệ"
+      });
+    }
+
+    if (start_date && end_date && dayjs(end_date).isBefore(dayjs(start_date))) {
+      return res.status(400).json({
+        success: false,
+        message: "Ngày kết thúc phải sau ngày bắt đầu"
+      });
+    }
+
+    const result = await getPatientAppointment(
+      doctor_id,
+      patient_id,
+      {
+        status,
+        start_date,
+        end_date,
+        page: parseInt(page),
+        limit: parseInt(limit)
+      }
+    );
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error in getPatientAppointmentsController:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Có lỗi xảy ra khi lấy danh sách cuộc hẹn của bệnh nhân"
+    });
+  }
+};
+
+export const getDoctorProfileController = async (req, res) => {
+  try {
+    const user_id = req.user.user_id;
+    const result = await getDoctorProfile(user_id);
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result.user
+    });
+  } catch (error) {
+    console.error('Error in getDoctorProfileController:', error);
+    
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: "Có lỗi xảy ra khi lấy thông tin bác sĩ",
+      error: error.message
+    });
+  }
+};

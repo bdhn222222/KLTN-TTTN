@@ -17,7 +17,10 @@ import {
   createPrescriptionsController,
   getAppointmentPaymentsController,
   updatePaymentStatusController,
-  getAllMedicinesController
+  getAllMedicinesController,
+  getAllPatientsController,
+  getPatientAppointmentsController,
+  getDoctorProfileController
 } from "../controllers/doctorController.js";
 import validate from "../middleware/validate.js";
 import { body, param } from "express-validator";
@@ -184,4 +187,28 @@ router.get(
   authorize(["doctor"]),
   getAllMedicinesController
 );
+
+// Patient routes for doctor
+router.get(
+  "/patients", 
+  authenticateUser, 
+  authorize(["doctor"]), 
+  getAllPatientsController
+);
+
+router.get(
+  "/patients/:patient_id/appointments", 
+  authenticateUser, 
+  authorize(["doctor"]), 
+  getPatientAppointmentsController
+);
+
+// Thêm route cho getDoctorProfile
+router.get(
+  "/profile",
+  authenticateUser,
+  authorize(["doctor"]),
+  getDoctorProfileController
+);
+
 export default router;

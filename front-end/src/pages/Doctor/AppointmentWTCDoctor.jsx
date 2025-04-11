@@ -231,7 +231,7 @@ const AppointmentWTCDoctor = () => {
 
         <Layout style={{ marginLeft: collapsed ? 80 : 250, marginTop: 64 }}>
           <Content style={{ margin: '24px 16px', overflow: 'initial' }}>
-            <Card title="Missed Appointments by Patients" className="shadow-sm">
+            <Card title="Waiting for Confirmation Appointments " className="shadow-sm">
               <Flex gap="middle" vertical>
                 <Table
                   columns={columns}

@@ -1,9 +1,11 @@
-import React, { useContext } from 'react';
-import { Drawer, Button, Space, Tag, Divider, Descriptions, Modal, Flex } from 'antd';
-import { ArrowLeftOutlined, CloseCircleOutlined, CheckOutlined, FileAddOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import React, { useContext, useState } from 'react';
+import { Drawer, Button, Space, Tag, Divider, Descriptions, Modal, Flex, Input, Form, notification, Spin } from 'antd';
+import { ArrowLeftOutlined, CloseCircleOutlined, CheckOutlined, FileAddOutlined, CheckCircleOutlined, WalletOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import { AppContext } from '../../context/AppContext';
+
+const { TextArea } = Input;
 
 const AppointmentDetails = ({ 
   isDrawerVisible, 
@@ -11,11 +13,16 @@ const AppointmentDetails = ({
   selectedAppointment, 
   onRefresh,
   onNavigateToCreateRecord,
-  onNavigateToPayment 
+  onNavigateToPayment,
+  loading = false
 }) => {
   const { url1 } = useContext(AppContext);
-  const [isConfirmCancelVisible, setIsConfirmCancelVisible] = React.useState(false);
-  const [isConfirmCompleteVisible, setIsConfirmCompleteVisible] = React.useState(false);
+  const [isConfirmCancelVisible, setIsConfirmCancelVisible] = useState(false);
+  const [isConfirmCompleteVisible, setIsConfirmCompleteVisible] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [form] = Form.useForm();
+  const [api, contextHolder] = notification.useNotification();
 
   const statusConfig = {
     waiting_for_confirmation: { color: 'gold', text: 'unconfirmed' },
@@ -31,21 +38,89 @@ const AppointmentDetails = ({
     return <Tag color={config.color} style={{ fontWeight: 'normal' }}>{config.text}</Tag>;
   };
 
-  const handleCancelAppointment = async (appointmentId) => {
+  const showNotification = (type, message, description) => {
+    api[type]({
+      message: message,
+      description: description,
+      placement: 'topRight',
+      duration: 5,
+    });
+  };
+
+  const handleCancelAppointment = async () => {
+    if (!cancelReason || cancelReason.trim() === '') {
+      showNotification(
+        'error', 
+        'Lỗi', 
+        'Vui lòng nhập lý do hủy cuộc hẹn'
+      );
+      return;
+    }
+
+    if (!selectedAppointment) {
+      showNotification(
+        'error',
+        'Lỗi',
+        'Không tìm thấy thông tin cuộc hẹn'
+      );
+      return;
+    }
+
+    const appointmentId = selectedAppointment.appointment_info?.id || selectedAppointment.appointment_id;
+
+    if (!appointmentId) {
+      showNotification(
+        'error',
+        'Lỗi',
+        'Mã cuộc hẹn không hợp lệ'
+      );
+      return;
+    }
+
+    console.log(`Cancelling appointment with ID: ${appointmentId}`);
+
     try {
+      setIsCancelling(true);
       await axios.post(`${url1}/doctor/appointments/${appointmentId}/cancel`, {
-        reason: "Bác sĩ hủy lịch hẹn"
+        reason: cancelReason.trim()
       }, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       
+      showNotification(
+        'success',
+        'Hủy thành công',
+        'Đã hủy cuộc hẹn thành công'
+      );
+      
       setIsConfirmCancelVisible(false);
+      setCancelReason('');
+      form.resetFields();
       setIsDrawerVisible(false);
       onRefresh();
     } catch (error) {
       console.error('Error cancelling appointment:', error);
+      
+      let errorMessage = '';
+      if (error.response?.status === 401) {
+        errorMessage = 'Bạn không có quyền thực hiện thao tác này';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'Không tìm thấy cuộc hẹn';
+      } else if (error.response?.status === 400) {
+        errorMessage = error.response?.data?.message || error.response?.data?.error || 'Cuộc hẹn không thể hủy';
+      } else {
+        errorMessage = 'Có lỗi xảy ra, vui lòng thử lại sau';
+      }
+
+      showNotification(
+        'error',
+        'Hủy thất bại',
+        errorMessage
+      );
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -89,7 +164,7 @@ const AppointmentDetails = ({
               danger
               icon={<CloseCircleOutlined />}
               onClick={() => setIsConfirmCancelVisible(true)}
-              className="px-6 py-2 h-auto rounded-full"
+              className="!bg-red-700 !text-white px-6 py-2 h-auto rounded-full hover:!bg-red-600"
             >
               Cancel
             </Button>
@@ -124,7 +199,7 @@ const AppointmentDetails = ({
               danger
               icon={<CloseCircleOutlined />}
               onClick={() => setIsConfirmCancelVisible(true)}
-              className="px-6 py-2 h-auto rounded-full"
+              className="!bg-red-700 !text-white px-6 py-2 h-auto rounded-full hover:!bg-red-600"
             >
               Cancel
             </Button>
@@ -133,14 +208,14 @@ const AppointmentDetails = ({
               // Nếu đã có medical record và prescription -> hiển thị nút "Hoàn thành"
               <Button
                 type="primary"
-                icon={<CheckCircleOutlined />}
+                icon={<WalletOutlined />}
                 onClick={() => {
                   console.log(`Navigating to payment page for appointment ID: ${appointmentId}`);
                   onNavigateToPayment(appointmentId);
                 }}
                 className="!bg-blue-900 !text-white px-6 py-2 h-auto rounded-full hover:!bg-blue-800"
               >
-                Hoàn thành
+                Payment
               </Button>
             ) : (
               // Nếu chưa có medical record và prescription -> hiển thị nút "Tạo hồ sơ"
@@ -153,7 +228,7 @@ const AppointmentDetails = ({
                 }}
                 className="!bg-blue-900 !text-white px-6 py-2 h-auto rounded-full hover:!bg-blue-800"
               >
-                Tạo hồ sơ
+                Create Medical Record
               </Button>
             )}
           </Flex>
@@ -178,6 +253,7 @@ const AppointmentDetails = ({
 
   return (
     <>
+      {contextHolder}
       <Drawer
         open={isDrawerVisible}
         onClose={() => setIsDrawerVisible(false)}
@@ -196,16 +272,20 @@ const AppointmentDetails = ({
         }
         title={
           <Flex justify="space-between" align="center">
-  <span>Appointment Details</span>
-  {selectedAppointment && (
-    <Tag color={getStatusTag(selectedAppointment.appointment_info.status).props.color}>
-      {getStatusTag(selectedAppointment.appointment_info.status).props.children}
-    </Tag>
-  )}
-</Flex>
+            <span>Appointment Details</span>
+            {selectedAppointment && !loading && (
+              <Tag color={getStatusTag(selectedAppointment.appointment_info.status).props.color}>
+                {getStatusTag(selectedAppointment.appointment_info.status).props.children}
+              </Tag>
+            )}
+          </Flex>
         }
       >
-        {selectedAppointment && (
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <Spin size="large" />
+          </div>
+        ) : selectedAppointment && (
           <>
             <Descriptions title="Appointment Information" column={1}>
               <Descriptions.Item label="Mã cuộc hẹn">
@@ -317,15 +397,57 @@ const AppointmentDetails = ({
       <Modal
         title="Xác nhận hủy lịch hẹn"
         open={isConfirmCancelVisible}
-        onOk={() => handleCancelAppointment(selectedAppointment?.appointment_info.id)}
-        onCancel={() => setIsConfirmCancelVisible(false)}
-        okText="Xác nhận"
-        cancelText="Hủy"
-        okButtonProps={{
-          className: '!bg-blue-900 !text-white hover:!bg-blue-800'
+        onOk={handleCancelAppointment}
+        onCancel={() => {
+          setIsConfirmCancelVisible(false);
+          setCancelReason('');
+          form.resetFields();
         }}
+        footer={[
+          <Button key="back" onClick={() => {
+            setIsConfirmCancelVisible(false);
+            setCancelReason('');
+            form.resetFields();
+          }}
+          className="!bg-white !text-gray-700 px-6 py-2 h-auto rounded-full border !border-gray-700 hover:!bg-gray-100 hover:!text-gray-700">
+            Hủy bỏ
+          </Button>,
+          <Button 
+            key="submit" 
+            type="primary" 
+            danger 
+            loading={isCancelling}
+            onClick={handleCancelAppointment}
+            className="!bg-red-700 !text-white px-6 py-2 h-auto rounded-full hover:!bg-white hover:!text-red-700 border !border-red-700"
+          >
+            Xác nhận hủy
+          </Button>,
+        ]}
       >
-        <p>Bạn có chắc chắn muốn hủy lịch hẹn này?</p>
+        <Form form={form} layout="vertical">
+          <p>Bạn có chắc chắn muốn hủy cuộc hẹn này không?</p>
+          {selectedAppointment && (
+            <p className="text-sm text-gray-500 mb-4">
+              Thông tin cuộc hẹn: {dayjs(
+                (selectedAppointment.appointment_info && selectedAppointment.appointment_info.datetime) || 
+                selectedAppointment.appointment_datetime
+              ).format('DD/MM/YYYY HH:mm')} - {selectedAppointment.patient?.name || 'Không có thông tin'}
+            </p>
+          )}
+          
+          <Form.Item 
+            name="reason" 
+            label="Lý do hủy cuộc hẹn"
+            rules={[{ required: true, message: 'Vui lòng nhập lý do hủy cuộc hẹn' }]}
+          >
+            <TextArea 
+              rows={4} 
+              placeholder="Nhập lý do hủy cuộc hẹn..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+          </Form.Item>
+        </Form>
       </Modal>
 
       <Modal

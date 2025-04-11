@@ -667,3 +667,82 @@ export const getAllPrescriptions = async ({
     }
   };
 };
+
+
+export const updatePatientProfile = async (user_id, updateData) => {
+  const transaction = await db.sequelize.transaction();
+  try {
+    const user = await User.findByPk(user_id, {
+      attributes: { exclude: ["password"] },
+      include: [{ model: Patient, as: "patient" }],
+      transaction,
+    });
+
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
+
+    const { patient } = user;
+    if (!patient) {
+      throw new NotFoundError("Patient not found");
+    }
+
+    const userFields = ["username", "email"];
+    let emailChanged = false;
+    userFields.forEach((field) => {
+      if (updateData[field] !== undefined) {
+        if (field === "email" && updateData.email !== user.email) {
+          emailChanged = true;
+        }
+        user[field] = updateData[field];
+      }
+    });
+
+    if (updateData.avatar) {
+      const uploadResult = await cloudinary.uploader.upload(updateData.avatar, {
+        folder: "avatars",
+        use_filename: true,
+        unique_filename: false,
+      });
+      user.avatar = uploadResult.secure_url;
+    }
+
+    const patientFields = [
+      "date_of_birth",
+      "gender",
+      "address",
+      "phone_number",
+      "insurance_number",
+      "id_number",
+    ];
+
+    patientFields.forEach((field) => {
+      if (updateData[field] !== undefined) {
+        patient[field] = updateData[field];
+      }
+    });
+
+    if (emailChanged) {
+      const otp_code = Math.floor(100000 + Math.random() * 900000).toString();
+      const otp_expiry = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
+
+      patient.is_verified = false;
+      patient.otp_code = otp_code;
+      patient.otp_expiry = otp_expiry;
+    }
+
+    await user.save({ transaction });
+    await patient.save({ transaction });
+
+    if (emailChanged) {
+      const link = `${process.env.URL}/patient/verify?email=${updateData.email}&otp_code=${patient.otp_code}`;
+      await sendVerifyLink(updateData.email, link); // Gửi email xác thực mới
+    }
+
+    await transaction.commit();
+    return { message: "Success" };
+  } catch (error) {
+    await transaction.rollback();
+    throw new Error(error.message);
+  }
+};

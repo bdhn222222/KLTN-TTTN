@@ -377,7 +377,7 @@ const AppointmentPaymentPage = () => {
                   type="primary"
                   icon={<CheckCircleOutlined />}
                   disabled
-                  className="!bg-green-700 !text-white px-8 py-2 h-auto rounded-full font-light border transition duration-300"
+                  className="!bg-green-100 !text-green-700 px-8 py-2 h-auto rounded-full font-light border transition duration-300"
                 >
                   Payment Completed
                 </Button>

@@ -104,7 +104,9 @@ const AppointmentAccDoctor = () => {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         params: {
-          status: 'accepted'
+          status: 'accepted',
+          sort: 'appointment_datetime',
+          order: 'desc'
         }
       });
       
@@ -328,7 +330,7 @@ const AppointmentAccDoctor = () => {
           type="primary"
           icon={<CheckCircleOutlined />}
           onClick={() => handleCompleteAppointment(record.appointment_id)}
-          className="!bg-blue-900 !text-white px-6 py-2 h-auto rounded-full hover:!bg-blue-800"
+          className="!bg-blue-900 !text-white px-6 w-34 py-2 h-auto rounded-full hover:!bg-blue-800"
         >
           Hoàn thành
         </Button>
@@ -341,7 +343,7 @@ const AppointmentAccDoctor = () => {
         type="primary"
         icon={<FileAddOutlined />}
         onClick={() => createMedicalRecord(record.appointment_id)}
-        className="!bg-blue-900 !text-white px-6 py-2 h-auto rounded-full hover:!bg-blue-800"
+        className="!bg-blue-900 !text-white px-6 w-34 py-2 h-auto rounded-full hover:!bg-blue-800"
       >
         Tạo hồ sơ
       </Button>
@@ -370,6 +372,8 @@ const AppointmentAccDoctor = () => {
       dataIndex: 'appointment_datetime',
       key: 'appointment_datetime',
       render: (datetime) => dayjs(datetime).format('DD/MM/YYYY HH:mm'),
+      sorter: (a, b) => new Date(a.appointment_datetime) - new Date(b.appointment_datetime),
+      defaultSortOrder: 'descend',
     },
     {
       title: 'Status',
@@ -392,7 +396,7 @@ const AppointmentAccDoctor = () => {
             <Button
               icon={<EyeOutlined />}
               onClick={() => getAppointmentDetails(record.appointment_id)}
-              className="!text-blue-900 hover:text-blue-800 px-6 py-2 rounded-full font-light hidden md:block hover:opacity-90 transition duration-300"
+              className="!text-blue-900 hover:text-blue-800 hover:border-blue-900 px-6 py-2 rounded-full font-light hidden md:block hover:opacity-90 transition duration-300"
             >
               Details
             </Button>
@@ -450,6 +454,8 @@ const AppointmentAccDoctor = () => {
                     showSizeChanger: true,
                     showTotal: (total) => `Tổng số ${total} cuộc hẹn chờ xác nhận`,
                   }}
+                  defaultSortOrder="descend"
+                  sortDirections={["descend", "ascend"]}
                 />
               </Flex>
             </Card>

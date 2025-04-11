@@ -524,11 +524,11 @@ const CreateMedicalRecordPage = () => {
               // Call the completeAppointment endpoint to finish the appointment
               const completeResponse = await axios.post(`${url1}/doctor/appointments/complete`, {
                 appointment_id: Number(appointment_id)
-              }, {
-                headers: {
-                  'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-              });
+      }, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
 
               console.log('Appointment completed successfully:', completeResponse.data);
               
@@ -547,8 +547,8 @@ const CreateMedicalRecordPage = () => {
               );
             }
           } else {
-            showNotification(
-              'success',
+      showNotification(
+        'success',
               'Success',
               'Medical record and prescription updated successfully'
             );

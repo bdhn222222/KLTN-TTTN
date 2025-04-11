@@ -23,6 +23,10 @@ import CreateMedicalRecordPage from "./pages/Doctor/CreateMedicalRecordPage";
 import AppointmentComDoctor from "./pages/Doctor/AppointmentComDoctor";
 import AppointmentCanDoctor from "./pages/Doctor/AppointmentCanDoctor";
 import AppointmentPaymentPage from "./pages/Doctor/AppointmentPaymentPage";
+import PatientDoctor from "./pages/Doctor/PatientDoctor";
+import AllAppointmentPatient from "./pages/Doctor/AllAppointmentPatient";
+import ScheduleDoctor from "./pages/Doctor/ScheduleDoctor";
+
 // Layout cho Patient Portal
 const PatientLayout = ({ children }) => {
   return (
@@ -74,6 +78,9 @@ const App = () => {
             <Route path=":appointment_id/payment" element={<AppointmentPaymentPage />} />
           </Route>
           <Route path="medical-records/create/:appointment_id" element={<CreateMedicalRecordPage />} />
+          <Route path="patients" element={<PatientDoctor />} />
+          <Route path="patients/:patient_id" element={<AllAppointmentPatient />} />
+          <Route path="schedule" element={<ScheduleDoctor />} />
         </Route>
 
         {/* Shared Routes */}
