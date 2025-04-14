@@ -8,7 +8,7 @@ const AppContextProvider = (props) => {
   const value = {
     doctors,
     currencySymbol,
-    url1
+    url1,
   };
 
   return (

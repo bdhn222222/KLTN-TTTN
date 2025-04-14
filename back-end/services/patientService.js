@@ -1227,7 +1227,7 @@ export const getAllAppointments = async (user_id, family_member_id = null) => {
       include: [
         {
           model: db.Doctor,
-          as: "doctor",
+          as: "Doctor",
           include: [
             {
               model: db.Specialization,
@@ -1243,8 +1243,8 @@ export const getAllAppointments = async (user_id, family_member_id = null) => {
         },
         {
           model: db.FamilyMember,
-          as: "familyMember",
-          attributes: ["name", "relationship"],
+          as: "FamilyMember",
+          attributes: ["username", "relationship"],
         },
       ],
       order: [["appointment_datetime", "DESC"]],
@@ -1259,11 +1259,17 @@ export const getAllAppointments = async (user_id, family_member_id = null) => {
       ),
       status: appointment.status,
       fees: appointment.fees,
-      doctor: {
-        doctor_id: appointment.doctor.doctor_id,
-        name: appointment.doctor.user.username,
-        specialization: appointment.doctor.Specialization.name,
-      },
+      doctor: appointment.doctor
+        ? {
+            doctor_id: appointment.doctor.doctor_id,
+            name: appointment.doctor.user
+              ? appointment.doctor.user.username
+              : "Unknown",
+            specialization: appointment.doctor.Specialization
+              ? appointment.doctor.Specialization.name
+              : "Unknown",
+          }
+        : null,
       family_member: appointment.familyMember
         ? {
             family_member_id: appointment.familyMember.family_member_id,
@@ -1826,4 +1832,42 @@ const prepareSuccessResponse = (
       },
     },
   };
+};
+
+export const getFamilyMemberById = async (user_id, family_member_id) => {
+  const t = await db.sequelize.transaction();
+
+  try {
+    // Lấy patient_id từ user_id
+    const patient = await Patient.findOne({
+      where: { user_id },
+      transaction: t,
+    });
+
+    if (!patient) {
+      throw new BadRequestError("Không tìm thấy thông tin bệnh nhân");
+    }
+
+    // Tìm thông tin chi tiết của family member
+    const familyMember = await FamilyMember.findOne({
+      where: {
+        family_member_id,
+        patient_id: patient.patient_id,
+      },
+      transaction: t,
+    });
+
+    if (!familyMember) {
+      throw new NotFoundError("Không tìm thấy thành viên gia đình");
+    }
+
+    // Commit transaction nếu thành công
+    await t.commit();
+
+    return familyMember;
+  } catch (error) {
+    // Rollback transaction nếu có lỗi
+    await t.rollback();
+    throw error;
+  }
 };

@@ -13,6 +13,7 @@ import {
   updateFamilyMemberController,
   getAllAppointmentsController,
   bookSymptomsAppointmentController,
+  getFamilyMemberByIdController,
 } from "../controllers/patientController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
@@ -77,6 +78,13 @@ router.get(
   authenticateUser,
   authorize(["patient"]),
   getFamilyMembersController
+);
+
+router.get(
+  "/family-members/:family_member_id",
+  authenticateUser,
+  authorize(["patient"]),
+  getFamilyMemberByIdController
 );
 
 router.post(

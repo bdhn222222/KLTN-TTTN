@@ -9,6 +9,7 @@ import {
   changePassword,
   addFamilyMember,
   getFamilyMembers,
+  getFamilyMemberById,
   updateFamilyMember,
   deleteFamilyMember,
   getAllAppointments,
@@ -358,5 +359,23 @@ export const bookSymptomsAppointmentController = async (req, res) => {
         message: error.message || "Có lỗi xảy ra khi đặt lịch hẹn",
       });
     }
+  }
+};
+
+export const getFamilyMemberByIdController = async (req, res, next) => {
+  const { user_id } = req.user; // Lấy user_id từ token
+  const { family_member_id } = req.params;
+
+  try {
+    // Gọi service để lấy thông tin chi tiết của family member
+    const familyMember = await getFamilyMemberById(user_id, family_member_id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Lấy thông tin chi tiết thành viên gia đình thành công",
+      data: familyMember,
+    });
+  } catch (error) {
+    next(error);
   }
 };
