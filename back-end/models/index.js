@@ -16,11 +16,13 @@ import Payment from "./payments.js";
 import MedicalRecord from "./medicalRecords.js";
 import Schedule from "./schedules.js";
 import DoctorDayOff from "./doctor-day-offs.js";
-import DayOffAppointment from "./day-off-appointments.js";
 import CompensationCode from "./compensationCode.js";
-import RetailPrescription from './retailPrescriptions.js';
-import RetailPrescriptionMedicine from './retailPrescriptionMedicines.js';
-import RetailPrescriptionPayment from './retailPrescriptionPayments.js';
+import RetailPrescription from "./retailPrescriptions.js";
+import RetailPrescriptionMedicine from "./retailPrescriptionMedicines.js";
+import RetailPrescriptionPayment from "./retailPrescriptionPayments.js";
+import FamilyMember from "./familyMember.js";
+import Symptom from "./symptom.js";
+import SymptomSpecializationMapping from "./symptomSpecializationMapping.js";
 
 const sequelize = new Sequelize(dbConfig.development);
 
@@ -31,7 +33,6 @@ const db = {
   Patient: Patient(sequelize, Sequelize.DataTypes),
   Doctor: Doctor(sequelize, Sequelize.DataTypes),
   DoctorDayOff: DoctorDayOff(sequelize, Sequelize.DataTypes),
-  DayOffAppointment: DayOffAppointment(sequelize, Sequelize.DataTypes),
   Pharmacist: Pharmacist(sequelize, Sequelize.DataTypes),
   Admin: Admin(sequelize, Sequelize.DataTypes),
   Specialization: Specialization(sequelize, Sequelize.DataTypes),
@@ -46,8 +47,21 @@ const db = {
   Schedule: Schedule(sequelize, Sequelize.DataTypes),
   CompensationCode: CompensationCode(sequelize, Sequelize.DataTypes),
   RetailPrescription: RetailPrescription(sequelize, Sequelize.DataTypes),
-  RetailPrescriptionMedicine: RetailPrescriptionMedicine(sequelize, Sequelize.DataTypes),
-  RetailPrescriptionPayment: RetailPrescriptionPayment(sequelize, Sequelize.DataTypes),
+
+  RetailPrescriptionMedicine: RetailPrescriptionMedicine(
+    sequelize,
+    Sequelize.DataTypes
+  ),
+  RetailPrescriptionPayment: RetailPrescriptionPayment(
+    sequelize,
+    Sequelize.DataTypes
+  ),
+  FamilyMember: FamilyMember(sequelize, Sequelize.DataTypes),
+  Symptom: Symptom(sequelize, Sequelize.DataTypes),
+  SymptomSpecializationMapping: SymptomSpecializationMapping(
+    sequelize,
+    Sequelize.DataTypes
+  ),
 };
 
 // Thiết lập các quan hệ giữa các bảng (nếu có)
@@ -56,6 +70,5 @@ Object.keys(db).forEach((modelName) => {
     db[modelName].associate(db);
   }
 });
-
 
 export default db;

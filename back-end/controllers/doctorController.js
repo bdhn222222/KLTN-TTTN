@@ -4,7 +4,7 @@ import {
   updateDoctorProfile,
   getAllMedicines,
   createDoctorDayOff,
-  createPrescriptions,  
+  createPrescriptions,
   cancelDoctorDayOff,
   getDoctorAppointments,
   getDoctorSummary,
@@ -20,7 +20,7 @@ import {
   updatePaymentStatus,
   getAllPatient,
   getPatientAppointment,
-  getDoctorProfile
+  getDoctorProfile,
 } from "../services/doctorService.js";
 import BadRequestError from "../errors/bad_request.js";
 import InternalServerError from "../errors/internalServerError.js";
@@ -28,6 +28,7 @@ import asyncHandler from "express-async-handler";
 import NotFoundError from "../errors/not_found.js";
 import { Op } from "sequelize";
 import dayjs from "dayjs";
+import db from "../models/index.js";
 
 export const registerDoctorController = async (req, res, next) => {
   try {
@@ -54,54 +55,58 @@ export const loginDoctorController = async (req, res, next) => {
   }
 };
 
-export const getDoctorAppointmentsController = asyncHandler(async (req, res) => {
-  const doctor_id = req.user.user_id;
-  const { filter_date, status, start_date, end_date } = req.query;
+export const getDoctorAppointmentsController = asyncHandler(
+  async (req, res) => {
+    const doctor_id = req.user.user_id;
+    const { filter_date, status, start_date, end_date } = req.query;
 
-  // Gọi service với các tham số đã được xử lý
-  const result = await getDoctorAppointments({
-    doctor_id,
-    filter_date,
-    status,
-    start_date,
-    end_date
-  });
+    // Gọi service với các tham số đã được xử lý
+    const result = await getDoctorAppointments({
+      doctor_id,
+      filter_date,
+      status,
+      start_date,
+      end_date,
+    });
 
-  res.status(200).json(result);
-});
+    res.status(200).json(result);
+  }
+);
 export const getDoctorSummaryController = asyncHandler(async (req, res) => {
   const doctor_id = req.user.user_id;
   const result = await getDoctorSummary(doctor_id);
   res.status(200).json(result);
 });
-export const getDoctorAppointmentStatsController = asyncHandler(async (req, res) => {
-  const doctor_id = req.user.user_id;
-  const { start, end } = req.query;
+export const getDoctorAppointmentStatsController = asyncHandler(
+  async (req, res) => {
+    const doctor_id = req.user.user_id;
+    const { start, end } = req.query;
 
-  const result = await getDoctorAppointmentStats(doctor_id, start, end);
-  res.status(200).json(result);
-});
+    const result = await getDoctorAppointmentStats(doctor_id, start, end);
+    res.status(200).json(result);
+  }
+);
 export const getAppointmentDetailsController = async (req, res, next) => {
-    try {
-        const { appointment_id } = req.params;
-        const doctor_id = req.user.user_id;
-        
-        console.log('Params:', { appointment_id, doctor_id });
-        
-        if (!appointment_id) {
-            throw new BadRequestError("Thiếu mã cuộc hẹn");
-        }
+  try {
+    const { appointment_id } = req.params;
+    const doctor_id = req.user.user_id;
 
-        const result = await getAppointmentDetails(appointment_id, doctor_id);
-        res.status(200).json(result);
-    } catch (error) {
-        console.error('Error in getAppointmentDetailsController:', error);
-        if (error instanceof BadRequestError || error instanceof NotFoundError) {
-            next(error);
-        } else {
-            next(new InternalServerError(error.message));
-        }
+    console.log("Params:", { appointment_id, doctor_id });
+
+    if (!appointment_id) {
+      throw new BadRequestError("Thiếu mã cuộc hẹn");
     }
+
+    const result = await getAppointmentDetails(appointment_id, doctor_id);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error in getAppointmentDetailsController:", error);
+    if (error instanceof BadRequestError || error instanceof NotFoundError) {
+      next(error);
+    } else {
+      next(new InternalServerError(error.message));
+    }
+  }
 };
 export const acceptAppointmentController = asyncHandler(async (req, res) => {
   const doctor_id = req.user.user_id;
@@ -124,9 +129,13 @@ export const markPatientNotComingController = asyncHandler(async (req, res) => {
 });
 export const getDoctorDayOffsController = async (req, res) => {
   try {
-    const doctor_id = req.user.user_id;
+    const user_id = req.user.user_id;
     const { start, end, status, date } = req.query;
-
+    const doctor = await db.Doctor.findOne({
+      where: { user_id },
+      attributes: ["doctor_id"],
+    });
+    const doctor_id = doctor.doctor_id;
     const result = await getDoctorDayOffs(doctor_id, start, end, status, date);
     res.status(200).json(result);
   } catch (error) {
@@ -140,55 +149,81 @@ export const getDoctorDayOffsController = async (req, res) => {
 export const createDoctorDayOffController = async (req, res) => {
   try {
     const { off_date, time_off, reason, is_emergency } = req.body;
-    const doctor_id = req.user.user_id;
+    const user_id = req.user.user_id;
+
+    // Lấy doctor_id từ user_id
+    const doctor = await db.Doctor.findOne({
+      where: { user_id },
+      attributes: ["doctor_id"],
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy thông tin bác sĩ");
+    }
 
     // Gọi service với doctor_id đã lấy đúng
-    const result = await createDoctorDayOff(doctor_id, off_date, time_off, reason);
-    
+    const result = await createDoctorDayOff(
+      doctor.doctor_id,
+      off_date,
+      time_off,
+      reason
+    );
+
     res.status(201).json(result);
-    
   } catch (error) {
-    console.error('Error creating doctor day off:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Có lỗi xảy ra khi tạo ngày nghỉ',
-      error: error.message
-    });
+    console.error("Error creating doctor day off:", error);
+    if (error instanceof NotFoundError) {
+      res.status(404).json({
+        success: false,
+        message: error.message,
+      });
+    } else if (error instanceof BadRequestError) {
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: "Có lỗi xảy ra khi tạo ngày nghỉ",
+        error: error.message,
+      });
+    }
   }
 };
 export const cancelDoctorDayOffController = async (req, res) => {
   try {
-  const doctor_id = req.user.user_id; // Lấy từ token
-  const day_off_id = req.params.id;
-  const { time_off } = req.body;
+    const doctor_id = req.user.user_id; // Lấy từ token
+    const day_off_id = req.params.id;
+    const { time_off } = req.body;
 
-  if (!time_off) {
-    throw new BadRequestError("Thiếu thông tin buổi nghỉ cần hủy");
-  }
+    if (!time_off) {
+      throw new BadRequestError("Thiếu thông tin buổi nghỉ cần hủy");
+    }
 
-  // Gọi service cancelDoctorDayOff để xử lý
-  const result = await cancelDoctorDayOff(doctor_id, day_off_id, time_off);
+    // Gọi service cancelDoctorDayOff để xử lý
+    const result = await cancelDoctorDayOff(doctor_id, day_off_id, time_off);
 
-  // Trả về kết quả cho người dùng
-  res.status(200).json(result);
+    // Trả về kết quả cho người dùng
+    res.status(200).json(result);
   } catch (error) {
-    console.error('Error canceling doctor day off:', error);
-    
-    if (error.name === 'NotFoundError') {
+    console.error("Error canceling doctor day off:", error);
+
+    if (error.name === "NotFoundError") {
       return res.status(404).json({
         success: false,
-        message: error.message || "Không tìm thấy ngày nghỉ"
+        message: error.message || "Không tìm thấy ngày nghỉ",
       });
-    } else if (error.name === 'BadRequestError') {
+    } else if (error.name === "BadRequestError") {
       return res.status(400).json({
         success: false,
-        message: error.message || "Yêu cầu không hợp lệ"
+        message: error.message || "Yêu cầu không hợp lệ",
       });
     } else {
       return res.status(500).json({
         success: false,
         message: "Có lỗi xảy ra khi hủy ngày nghỉ",
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -203,7 +238,7 @@ export const cancelAppointmentController = async (req, res) => {
     if (!appointment_id || isNaN(appointment_id)) {
       return res.status(400).json({
         success: false,
-        error: "Mã cuộc hẹn không hợp lệ"
+        error: "Mã cuộc hẹn không hợp lệ",
       });
     }
 
@@ -211,7 +246,7 @@ export const cancelAppointmentController = async (req, res) => {
     if (!reason || reason.trim().length === 0) {
       return res.status(400).json({
         success: false,
-        error: "Vui lòng nhập lý do"
+        error: "Vui lòng nhập lý do",
       });
     }
 
@@ -219,30 +254,29 @@ export const cancelAppointmentController = async (req, res) => {
     if (reason.trim().length < 3 || reason.trim().length > 200) {
       return res.status(400).json({
         success: false,
-        error: "Lý do phải từ 3 đến 200 ký tự"
+        error: "Lý do phải từ 3 đến 200 ký tự",
       });
     }
 
     const result = await cancelAppointment(
-      appointment_id, 
-      doctor_id, 
-      reason.trim(), 
-      'doctor'
+      appointment_id,
+      doctor_id,
+      reason.trim(),
+      "doctor"
     );
-    
-    return res.status(200).json(result);
 
+    return res.status(200).json(result);
   } catch (error) {
     if (error instanceof BadRequestError || error instanceof NotFoundError) {
       return res.status(400).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
     console.error("Error in cancelAppointmentController:", error);
     return res.status(500).json({
       success: false,
-      error: "Có lỗi xảy ra khi hủy lịch hẹn"
+      error: "Có lỗi xảy ra khi hủy lịch hẹn",
     });
   }
 };
@@ -254,13 +288,13 @@ export const getAffectedAppointmentsController = async (req, res) => {
 
     // Kiểm tra quyền truy cập
     const dayOff = await DoctorDayOff.findOne({
-      where: { day_off_id, doctor_id }
+      where: { day_off_id, doctor_id },
     });
 
     if (!dayOff) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy ngày nghỉ'
+        message: "Không tìm thấy ngày nghỉ",
       });
     }
 
@@ -270,49 +304,49 @@ export const getAffectedAppointmentsController = async (req, res) => {
         {
           model: DoctorDayOff,
           through: { where: { day_off_id } },
-          as: 'DoctorDayOffs'
+          as: "DoctorDayOffs",
         },
         {
           model: Patient,
-          as: 'Patient',
+          as: "Patient",
           include: [
             {
               model: User,
-              as: 'User',
-              attributes: ['username', 'email', 'phone_number']
-            }
-          ]
+              as: "User",
+              attributes: ["username", "email", "phone_number"],
+            },
+          ],
         },
         {
           model: CompensationCode,
-          as: 'CompensationCode',
-          required: false
-        }
+          as: "CompensationCode",
+          required: false,
+        },
       ],
       where: {
         doctor_id,
-        status: 'doctor_day_off'
-      }
+        status: "doctor_day_off",
+      },
     });
 
     res.status(200).json({
       success: true,
-      data: affectedAppointments
+      data: affectedAppointments,
     });
   } catch (error) {
-    console.error('Error getting affected appointments:', error);
+    console.error("Error getting affected appointments:", error);
     res.status(500).json({
       success: false,
-      message: 'Có lỗi xảy ra khi lấy danh sách lịch hẹn bị ảnh hưởng',
-      error: error.message
+      message: "Có lỗi xảy ra khi lấy danh sách lịch hẹn bị ảnh hưởng",
+      error: error.message,
     });
   }
 };
 
 // Hàm tạo mã bồi thường ngẫu nhiên
 function generateCompensationCode() {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = '';
+  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let code = "";
   for (let i = 0; i < 8; i++) {
     code += characters.charAt(Math.floor(Math.random() * characters.length));
   }
@@ -331,19 +365,19 @@ export const createMedicalRecordController = async (req, res) => {
     const result = await createMedicalRecord(doctor_id, appointment_id, {
       diagnosis,
       treatment,
-      notes
+      notes,
     });
 
     res.status(200).json(result);
   } catch (error) {
-    console.error('Error in createMedicalRecordController:', error);
+    console.error("Error in createMedicalRecordController:", error);
     if (error instanceof BadRequestError || error instanceof NotFoundError) {
       res.status(400).json({ success: false, message: error.message });
     } else {
-      res.status(500).json({ 
-        success: false, 
+      res.status(500).json({
+        success: false,
         message: "Có lỗi xảy ra khi tạo hồ sơ bệnh án",
-        error: error.message 
+        error: error.message,
       });
     }
   }
@@ -352,7 +386,7 @@ export const completeAppointmentController = async (req, res) => {
   try {
     const { appointment_id } = req.body;
     const doctor_id = req.user.user_id;
-    
+
     if (!appointment_id) {
       throw new BadRequestError("Thiếu mã cuộc hẹn");
     }
@@ -360,17 +394,17 @@ export const completeAppointmentController = async (req, res) => {
     const result = await completeAppointment(appointment_id, doctor_id);
     res.status(200).json(result);
   } catch (error) {
-    console.error('Error in completeAppointmentController:', error);
-    
+    console.error("Error in completeAppointmentController:", error);
+
     if (error instanceof BadRequestError) {
       res.status(400).json({ success: false, message: error.message });
     } else if (error instanceof NotFoundError) {
       res.status(404).json({ success: false, message: error.message });
     } else {
-      res.status(500).json({ 
-        success: false, 
+      res.status(500).json({
+        success: false,
         message: "Có lỗi xảy ra khi hoàn thành cuộc hẹn",
-        error: error.message 
+        error: error.message,
       });
     }
   }
@@ -381,7 +415,9 @@ export const createPrescriptionsController = asyncHandler(async (req, res) => {
   const doctor_id = req.user.user_id;
 
   if (use_hospital_pharmacy === undefined) {
-    throw new BadRequestError("Vui lòng chỉ định có sử dụng nhà thuốc bệnh viện hay không");
+    throw new BadRequestError(
+      "Vui lòng chỉ định có sử dụng nhà thuốc bệnh viện hay không"
+    );
   }
 
   const result = await createPrescriptions(
@@ -401,13 +437,13 @@ export const createPrescriptionsController = asyncHandler(async (req, res) => {
 export const getAppointmentPaymentsController = async (req, res) => {
   try {
     const doctor_id = req.user.user_id;
-    const { 
-      page = 1, 
-      limit = 10, 
-      payment_status, 
-      start_date, 
-      end_date, 
-      date 
+    const {
+      page = 1,
+      limit = 10,
+      payment_status,
+      start_date,
+      end_date,
+      date,
     } = req.query;
 
     // Validate input
@@ -436,29 +472,29 @@ export const getAppointmentPaymentsController = async (req, res) => {
     }
 
     const result = await getAppointmentPayments(
-      doctor_id, 
+      doctor_id,
       {
         payment_status,
         start_date,
         end_date,
-        date
-      }, 
-      parseInt(page), 
+        date,
+      },
+      parseInt(page),
       parseInt(limit)
     );
 
     res.status(200).json(result);
   } catch (error) {
-    console.error('Error in getAppointmentPaymentsController:', error);
+    console.error("Error in getAppointmentPaymentsController:", error);
     if (error instanceof BadRequestError) {
       res.status(400).json({ success: false, message: error.message });
     } else if (error instanceof NotFoundError) {
       res.status(404).json({ success: false, message: error.message });
     } else {
-      res.status(500).json({ 
-        success: false, 
+      res.status(500).json({
+        success: false,
         message: "Có lỗi xảy ra khi lấy danh sách thanh toán",
-        error: error.message 
+        error: error.message,
       });
     }
   }
@@ -481,19 +517,24 @@ export const updatePaymentStatusController = async (req, res) => {
       throw new BadRequestError("Thiếu trạng thái thanh toán");
     }
 
-    const result = await updatePaymentStatus(doctor_id, payment_id, status, note);
+    const result = await updatePaymentStatus(
+      doctor_id,
+      payment_id,
+      status,
+      note
+    );
     res.status(200).json(result);
   } catch (error) {
-    console.error('Error in updatePaymentStatusController:', error);
+    console.error("Error in updatePaymentStatusController:", error);
     if (error instanceof BadRequestError) {
       res.status(400).json({ success: false, message: error.message });
     } else if (error instanceof NotFoundError) {
       res.status(404).json({ success: false, message: error.message });
     } else {
-      res.status(500).json({ 
-        success: false, 
+      res.status(500).json({
+        success: false,
         message: "Có lỗi xảy ra khi cập nhật trạng thái thanh toán",
-        error: error.message 
+        error: error.message,
       });
     }
   }
@@ -516,29 +557,29 @@ export const getAllPatientsController = async (req, res) => {
     if (page && (isNaN(page) || parseInt(page) < 1)) {
       return res.status(400).json({
         success: false,
-        message: "Số trang không hợp lệ"
+        message: "Số trang không hợp lệ",
       });
     }
 
     if (limit && (isNaN(limit) || parseInt(limit) < 1)) {
       return res.status(400).json({
         success: false,
-        message: "Số lượng mỗi trang không hợp lệ"
+        message: "Số lượng mỗi trang không hợp lệ",
       });
     }
 
     const result = await getAllPatient(doctor_id, {
       search,
       page: parseInt(page),
-      limit: parseInt(limit)
+      limit: parseInt(limit),
     });
 
     res.status(200).json(result);
   } catch (error) {
-    console.error('Error in getAllPatientsController:', error);
+    console.error("Error in getAllPatientsController:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Có lỗi xảy ra khi lấy danh sách bệnh nhân"
+      message: error.message || "Có lỗi xảy ra khi lấy danh sách bệnh nhân",
     });
   }
 };
@@ -556,7 +597,7 @@ export const getPatientAppointmentsController = async (req, res) => {
     if (!patient_id || isNaN(patient_id)) {
       return res.status(400).json({
         success: false,
-        message: "Mã bệnh nhân không hợp lệ"
+        message: "Mã bệnh nhân không hợp lệ",
       });
     }
 
@@ -564,14 +605,14 @@ export const getPatientAppointmentsController = async (req, res) => {
     if (page && (isNaN(page) || parseInt(page) < 1)) {
       return res.status(400).json({
         success: false,
-        message: "Số trang không hợp lệ"
+        message: "Số trang không hợp lệ",
       });
     }
 
     if (limit && (isNaN(limit) || parseInt(limit) < 1)) {
       return res.status(400).json({
         success: false,
-        message: "Số lượng mỗi trang không hợp lệ"
+        message: "Số lượng mỗi trang không hợp lệ",
       });
     }
 
@@ -579,42 +620,40 @@ export const getPatientAppointmentsController = async (req, res) => {
     if (start_date && !dayjs(start_date).isValid()) {
       return res.status(400).json({
         success: false,
-        message: "Ngày bắt đầu không hợp lệ"
+        message: "Ngày bắt đầu không hợp lệ",
       });
     }
 
     if (end_date && !dayjs(end_date).isValid()) {
       return res.status(400).json({
         success: false,
-        message: "Ngày kết thúc không hợp lệ"
+        message: "Ngày kết thúc không hợp lệ",
       });
     }
 
     if (start_date && end_date && dayjs(end_date).isBefore(dayjs(start_date))) {
       return res.status(400).json({
         success: false,
-        message: "Ngày kết thúc phải sau ngày bắt đầu"
+        message: "Ngày kết thúc phải sau ngày bắt đầu",
       });
     }
 
-    const result = await getPatientAppointment(
-      doctor_id,
-      patient_id,
-      {
-        status,
-        start_date,
-        end_date,
-        page: parseInt(page),
-        limit: parseInt(limit)
-      }
-    );
+    const result = await getPatientAppointment(doctor_id, patient_id, {
+      status,
+      start_date,
+      end_date,
+      page: parseInt(page),
+      limit: parseInt(limit),
+    });
 
     res.status(200).json(result);
   } catch (error) {
-    console.error('Error in getPatientAppointmentsController:', error);
+    console.error("Error in getPatientAppointmentsController:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Có lỗi xảy ra khi lấy danh sách cuộc hẹn của bệnh nhân"
+      message:
+        error.message ||
+        "Có lỗi xảy ra khi lấy danh sách cuộc hẹn của bệnh nhân",
     });
   }
 };
@@ -627,22 +666,22 @@ export const getDoctorProfileController = async (req, res) => {
     res.status(200).json({
       success: true,
       message: result.message,
-      data: result.user
+      data: result.user,
     });
   } catch (error) {
-    console.error('Error in getDoctorProfileController:', error);
-    
+    console.error("Error in getDoctorProfileController:", error);
+
     if (error instanceof NotFoundError) {
       return res.status(404).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: "Có lỗi xảy ra khi lấy thông tin bác sĩ",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -664,29 +703,29 @@ export const updateDoctorProfileController = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Cập nhật thông tin thành công",
-      data: result
+      data: result,
     });
   } catch (error) {
-    console.error('Error in updateDoctorProfileController:', error);
-    
+    console.error("Error in updateDoctorProfileController:", error);
+
     if (error instanceof BadRequestError) {
       return res.status(400).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
-    
+
     if (error instanceof NotFoundError) {
       return res.status(404).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: "Có lỗi xảy ra khi cập nhật thông tin",
-      error: error.message
+      error: error.message,
     });
   }
 };

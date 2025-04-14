@@ -9,11 +9,21 @@ import InternalServerError from "../errors/internalServerError.js";
 import { Op, Sequelize } from "sequelize";
 import cloudinary from "../config/cloudinary.js";
 
-const { User, Doctor, DoctorDayOff, Appointment, Patient, CompensationCode, Medicine, Specialization, Schedule } = db;
+const {
+  User,
+  Doctor,
+  DoctorDayOff,
+  Appointment,
+  Patient,
+  CompensationCode,
+  Medicine,
+  Specialization,
+  Schedule,
+} = db;
 import dayjs from "dayjs";
-import utc from 'dayjs/plugin/utc.js';  // Sử dụng phần mở rộng .js
-import timezone from 'dayjs/plugin/timezone.js';  // Sử dụng phần mở rộng .js
-import { v4 as uuidv4 } from 'uuid';
+import utc from "dayjs/plugin/utc.js"; // Sử dụng phần mở rộng .js
+import timezone from "dayjs/plugin/timezone.js"; // Sử dụng phần mở rộng .js
+import { v4 as uuidv4 } from "uuid";
 
 dayjs.extend(timezone);
 dayjs.extend(utc);
@@ -51,14 +61,16 @@ export const registerDoctor = async ({
 export const loginDoctor = async ({ email, password }) => {
   const user = await User.findOne({
     where: { email, role: "doctor" },
-    include: { 
-      model: Doctor, 
+    include: {
+      model: Doctor,
       as: "doctor",
-      include: [{
-        model: db.Specialization,
-        as: "Specialization",
-        attributes: ["fees"]
-      }]
+      include: [
+        {
+          model: db.Specialization,
+          as: "Specialization",
+          attributes: ["fees"],
+        },
+      ],
     },
   });
   if (!user) {
@@ -144,7 +156,13 @@ export const updateDoctorProfile = async (user_id, updateData) => {
   }
 };
 
-export const getDoctorAppointments = async ({ doctor_id, filter_date, status, start_date, end_date }) => {
+export const getDoctorAppointments = async ({
+  doctor_id,
+  filter_date,
+  status,
+  start_date,
+  end_date,
+}) => {
   // Xây dựng điều kiện where cho query
   const whereClause = {
     doctor_id,
@@ -157,19 +175,25 @@ export const getDoctorAppointments = async ({ doctor_id, filter_date, status, st
 
   // Xử lý điều kiện lọc theo ngày với múi giờ Việt Nam
   if (filter_date) {
-    const filterDay = dayjs.tz(filter_date, 'Asia/Ho_Chi_Minh').startOf('day');
+    const filterDay = dayjs.tz(filter_date, "Asia/Ho_Chi_Minh").startOf("day");
     whereClause.appointment_datetime = {
       [Op.between]: [
-        filterDay.format('YYYY-MM-DD HH:mm:ss'),
-        filterDay.endOf('day').format('YYYY-MM-DD HH:mm:ss')
-      ]
+        filterDay.format("YYYY-MM-DD HH:mm:ss"),
+        filterDay.endOf("day").format("YYYY-MM-DD HH:mm:ss"),
+      ],
     };
   } else if (start_date && end_date) {
     whereClause.appointment_datetime = {
       [Op.between]: [
-        dayjs.tz(start_date, 'Asia/Ho_Chi_Minh').startOf('day').format('YYYY-MM-DD HH:mm:ss'),
-        dayjs.tz(end_date, 'Asia/Ho_Chi_Minh').endOf('day').format('YYYY-MM-DD HH:mm:ss')
-      ]
+        dayjs
+          .tz(start_date, "Asia/Ho_Chi_Minh")
+          .startOf("day")
+          .format("YYYY-MM-DD HH:mm:ss"),
+        dayjs
+          .tz(end_date, "Asia/Ho_Chi_Minh")
+          .endOf("day")
+          .format("YYYY-MM-DD HH:mm:ss"),
+      ],
     };
   }
 
@@ -194,17 +218,17 @@ export const getDoctorAppointments = async ({ doctor_id, filter_date, status, st
   return {
     success: true,
     message: "Lấy danh sách lịch hẹn thành công",
-    data: appointments.map(appointment => ({
+    data: appointments.map((appointment) => ({
       appointment_id: appointment.appointment_id,
       patient_name: appointment.Patient.user.username,
       patient_email: appointment.Patient.user.email,
       appointment_datetime: dayjs(appointment.appointment_datetime)
-        .tz('Asia/Ho_Chi_Minh')
-        .format('YYYY-MM-DDTHH:mm:ss'),
+        .tz("Asia/Ho_Chi_Minh")
+        .format("YYYY-MM-DDTHH:mm:ss"),
       status: appointment.status,
       fees: appointment.fees,
-      doctor_id: appointment.doctor_id
-    }))
+      doctor_id: appointment.doctor_id,
+    })),
   };
 };
 
@@ -233,7 +257,7 @@ export const getDoctorSummary = async (doctor_id) => {
       appointmentsByStatus,
     },
   };
-}
+};
 
 export const getDoctorAppointmentStats = async (doctor_id, start, end) => {
   // Validate dates
@@ -250,7 +274,7 @@ export const getDoctorAppointmentStats = async (doctor_id, start, end) => {
   const whereClause = { doctor_id };
   if (start && end) {
     whereClause.appointment_datetime = {
-      [Op.between]: [new Date(start), new Date(end)]
+      [Op.between]: [new Date(start), new Date(end)],
     };
   }
 
@@ -270,17 +294,20 @@ export const getDoctorAppointmentStats = async (doctor_id, start, end) => {
   });
 
   const totalAppointments = appointments.length;
-  const uniquePatients = new Set(appointments.map(a => a.patient.patient_id)).size;
+  const uniquePatients = new Set(appointments.map((a) => a.patient.patient_id))
+    .size;
 
   const statusMap = {};
-  appointments.forEach(appointment => {
+  appointments.forEach((appointment) => {
     statusMap[appointment.status] = (statusMap[appointment.status] || 0) + 1;
   });
 
-  const appointmentsByStatus = Object.entries(statusMap).map(([status, count]) => ({
-    status,
-    count,
-  }));
+  const appointmentsByStatus = Object.entries(statusMap).map(
+    ([status, count]) => ({
+      status,
+      count,
+    })
+  );
 
   return {
     success: true,
@@ -289,19 +316,19 @@ export const getDoctorAppointmentStats = async (doctor_id, start, end) => {
       totalAppointments,
       uniquePatients,
       appointmentsByStatus,
-      appointments: appointments.map(apt => ({
+      appointments: appointments.map((apt) => ({
         id: apt.appointment_id,
         datetime: apt.appointment_datetime,
         status: apt.status,
         patient: {
           id: apt.patient.patient_id,
           name: apt.patient.user.username,
-          email: apt.patient.user.email
-        }
-      }))
+          email: apt.patient.user.email,
+        },
+      })),
     },
   };
-}
+};
 
 export const getAppointmentDetails = async (appointment_id, doctor_id) => {
   const appointment = await db.Appointment.findOne({
@@ -314,8 +341,8 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
           model: db.User,
           as: "user",
           attributes: ["user_id", "username", "email"],
-        }
-      }, 
+        },
+      },
       {
         model: db.MedicalRecord,
         as: "MedicalRecord",
@@ -332,22 +359,28 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
                 model: db.Medicine,
                 as: "Medicine",
                 attributes: ["medicine_id", "name", "price"],
-              }
-            ]
-          }
-        ]
+              },
+            ],
+          },
+        ],
       },
       {
         model: db.Payment,
         as: "Payments",
-        attributes: ["payment_id", "amount", "payment_method", "status", "createdAt"],
+        attributes: [
+          "payment_id",
+          "amount",
+          "payment_method",
+          "status",
+          "createdAt",
+        ],
       },
       {
         model: db.Feedback,
         as: "Feedback",
         attributes: ["rating", "comment", "createdAt"],
-      }
-    ]
+      },
+    ],
   });
 
   if (!appointment) {
@@ -364,52 +397,67 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
         status: appointment.status,
         fees: appointment.fees,
         createdAt: appointment.createdAt,
-        updatedAt: appointment.updatedAt
+        updatedAt: appointment.updatedAt,
       },
       patient: {
         id: appointment.Patient.patient_id,
         user_id: appointment.Patient.user.user_id,
         name: appointment.Patient.user.username,
-        email: appointment.Patient.user.email
+        email: appointment.Patient.user.email,
       },
-      medical_record: appointment.MedicalRecord ? {
-        id: appointment.MedicalRecord.record_id,
-        diagnosis: appointment.MedicalRecord.diagnosis,
-        treatment: appointment.MedicalRecord.treatment,
-        notes: appointment.MedicalRecord.notes,
-        createdAt: appointment.MedicalRecord.createdAt
-      } : null,
-      prescription: appointment.Prescription ? {
-        id: appointment.Prescription.prescription_id,
-        status: appointment.Prescription.status,
-        medicine_details: appointment.Prescription.medicine_details,
-        medicines: appointment.Prescription.prescriptionMedicines.map(pm => ({
-          id: pm.Medicine?.medicine_id,
-          name: pm.Medicine?.name,
-          quantity: pm.quantity,
-          price: pm.Medicine?.price,
-          total: pm.quantity * (pm.Medicine?.price || 0),
-          note: pm.note
-        })),
-        createdAt: appointment.Prescription.createdAt
-      } : null,
-      payment: appointment.Payments ? {
-        id: appointment.Payments.payment_id,
-        amount: appointment.Payments.amount,
-        status: appointment.Payments.status,
-        payment_method: appointment.Payments.payment_method,
-        payment_date: appointment.Payments.createdAt
-      } : null,
-      feedback: appointment.Feedback ? {
-        rating: appointment.Feedback.rating,
-        comment: appointment.Feedback.comment,
-        createdAt: appointment.Feedback.createdAt
-      } : null
-    }
+      medical_record: appointment.MedicalRecord
+        ? {
+            id: appointment.MedicalRecord.record_id,
+            diagnosis: appointment.MedicalRecord.diagnosis,
+            treatment: appointment.MedicalRecord.treatment,
+            notes: appointment.MedicalRecord.notes,
+            createdAt: appointment.MedicalRecord.createdAt,
+          }
+        : null,
+      prescription: appointment.Prescription
+        ? {
+            id: appointment.Prescription.prescription_id,
+            status: appointment.Prescription.status,
+            medicine_details: appointment.Prescription.medicine_details,
+            medicines: appointment.Prescription.prescriptionMedicines.map(
+              (pm) => ({
+                id: pm.Medicine?.medicine_id,
+                name: pm.Medicine?.name,
+                quantity: pm.quantity,
+                price: pm.Medicine?.price,
+                total: pm.quantity * (pm.Medicine?.price || 0),
+                note: pm.note,
+              })
+            ),
+            createdAt: appointment.Prescription.createdAt,
+          }
+        : null,
+      payment: appointment.Payments
+        ? {
+            id: appointment.Payments.payment_id,
+            amount: appointment.Payments.amount,
+            status: appointment.Payments.status,
+            payment_method: appointment.Payments.payment_method,
+            payment_date: appointment.Payments.createdAt,
+          }
+        : null,
+      feedback: appointment.Feedback
+        ? {
+            rating: appointment.Feedback.rating,
+            comment: appointment.Feedback.comment,
+            createdAt: appointment.Feedback.createdAt,
+          }
+        : null,
+    },
   };
-}
+};
 
-export const cancelAppointment = async (appointment_id, doctor_id, reason, cancelled_by = 'doctor') => {
+export const cancelAppointment = async (
+  appointment_id,
+  doctor_id,
+  reason,
+  cancelled_by = "doctor"
+) => {
   const t = await db.sequelize.transaction();
 
   try {
@@ -418,45 +466,62 @@ export const cancelAppointment = async (appointment_id, doctor_id, reason, cance
       include: [
         {
           model: db.Patient,
-          as: 'Patient',
-          include: [{
-            model: db.User,
-            as: 'user',
-            attributes: ['email', 'username'],
-          }],
+          as: "Patient",
+          include: [
+            {
+              model: db.User,
+              as: "user",
+              attributes: ["email", "username"],
+            },
+          ],
         },
         {
           model: db.Doctor,
-          as: 'Doctor',
-          include: [{
-            model: db.User,
-            as: 'user',
-            attributes: ['email', 'username'],
-          }],
+          as: "Doctor",
+          include: [
+            {
+              model: db.User,
+              as: "user",
+              attributes: ["email", "username"],
+            },
+          ],
         },
       ],
       transaction: t,
     });
 
     if (!appointment) {
-      throw new NotFoundError('Lịch hẹn không tồn tại');
+      throw new NotFoundError("Lịch hẹn không tồn tại");
     }
 
-    const invalidStatuses = ['cancelled', 'completed', 'doctor_day_off', 'patient_not_coming'];
+    const invalidStatuses = [
+      "cancelled",
+      "completed",
+      "doctor_day_off",
+      "patient_not_coming",
+    ];
     if (invalidStatuses.includes(appointment.status)) {
-      throw new BadRequestError(`Không thể hủy lịch hẹn đã ${
-        appointment.status === 'cancelled' ? 'bị hủy' :
-        appointment.status === 'completed' ? 'hoàn thành' : 
-        appointment.status === 'doctor_day_off' ? 'bị nghỉ' : 'được đánh dấu bệnh nhân không đến'
-      }`);
+      throw new BadRequestError(
+        `Không thể hủy lịch hẹn đã ${
+          appointment.status === "cancelled"
+            ? "bị hủy"
+            : appointment.status === "completed"
+            ? "hoàn thành"
+            : appointment.status === "doctor_day_off"
+            ? "bị nghỉ"
+            : "được đánh dấu bệnh nhân không đến"
+        }`
+      );
     }
 
     // Đơn giản hóa: Không kiểm tra thời gian và không tạo mã đền bù
-    const now = dayjs().tz('Asia/Ho_Chi_Minh');
-    const appointmentTime = dayjs(appointment.appointment_datetime).tz('Asia/Ho_Chi_Minh');
+    const now = dayjs().tz("Asia/Ho_Chi_Minh");
+    const appointmentTime = dayjs(appointment.appointment_datetime).tz(
+      "Asia/Ho_Chi_Minh"
+    );
 
     // Cập nhật trạng thái cuộc hẹn thành cancelled
-    appointment.status = 'cancelled';
+    appointment.status = "cancelled";
     appointment.cancelled_at = now.toDate();
     appointment.cancelled_by = cancelled_by;
     appointment.cancel_reason = reason;
@@ -466,7 +531,7 @@ export const cancelAppointment = async (appointment_id, doctor_id, reason, cance
 
     return {
       success: true,
-      message: 'Huỷ lịch hẹn thành công',
+      message: "Huỷ lịch hẹn thành công",
       data: {
         appointment_id: appointment.appointment_id,
         status: appointment.status,
@@ -478,10 +543,15 @@ export const cancelAppointment = async (appointment_id, doctor_id, reason, cance
           name: appointment.Doctor.user.username,
           email: appointment.Doctor.user.email,
         },
-        datetime: appointmentTime.format('YYYY-MM-DDTHH:mm:ssZ'),
-        cancelled_at: dayjs(appointment.cancelled_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DDTHH:mm:ssZ'),
-        cancelled_by: cancelled_by === 'doctor' ? appointment.Doctor.user.username : appointment.Patient.user.username,
-        cancel_reason: appointment.cancel_reason
+        datetime: appointmentTime.format("YYYY-MM-DDTHH:mm:ssZ"),
+        cancelled_at: dayjs(appointment.cancelled_at)
+          .tz("Asia/Ho_Chi_Minh")
+          .format("YYYY-MM-DDTHH:mm:ssZ"),
+        cancelled_by:
+          cancelled_by === "doctor"
+            ? appointment.Doctor.user.username
+            : appointment.Patient.user.username,
+        cancel_reason: appointment.cancel_reason,
       },
     };
   } catch (error) {
@@ -497,13 +567,19 @@ export const markPatientNotComing = async (appointment_id, doctor_id) => {
   if (!appointment) {
     throw new NotFoundError("Lịch hẹn không tồn tại");
   }
-  if(["completed", "cancelled", "patient_not_coming"].includes(appointment.status)){
+  if (
+    ["completed", "cancelled", "patient_not_coming"].includes(
+      appointment.status
+    )
+  ) {
     throw new BadRequestError("Không thể cập nhật trạng thái lịch hẹn này");
   }
   const now = dayjs();
   const appointmentTime = dayjs(appointment.appointment_datetime);
-  if(appointmentTime.isBefore(now)){
-    throw new BadRequestError("Không thể cập nhật trạng thái lịch hẹn đã diễn ra");
+  if (appointmentTime.isBefore(now)) {
+    throw new BadRequestError(
+      "Không thể cập nhật trạng thái lịch hẹn đã diễn ra"
+    );
   }
   appointment.status = "patient_not_coming";
   await appointment.save();
@@ -517,19 +593,27 @@ export const markPatientNotComing = async (appointment_id, doctor_id) => {
   };
 };
 
-export const completeAppointment = async (appointment_id, doctor_id, medical_data = null) => {
+export const completeAppointment = async (
+  appointment_id,
+  doctor_id,
+  medical_data = null
+) => {
   // Kiểm tra cuộc hẹn
   const appointment = await db.Appointment.findOne({
     where: { appointment_id, doctor_id },
-    include: [{
-      model: db.Doctor,
-      as: "Doctor",
-      include: [{
-        model: db.Specialization,
-        as: "Specialization",
-        attributes: ["fees"]
-      }]
-    }]
+    include: [
+      {
+        model: db.Doctor,
+        as: "Doctor",
+        include: [
+          {
+            model: db.Specialization,
+            as: "Specialization",
+            attributes: ["fees"],
+          },
+        ],
+      },
+    ],
   });
 
   if (!appointment) {
@@ -542,7 +626,7 @@ export const completeAppointment = async (appointment_id, doctor_id, medical_dat
 
   // Kiểm tra và tạo hồ sơ bệnh án nếu chưa có
   let medicalRecord = await db.MedicalRecord.findOne({
-    where: { appointment_id }
+    where: { appointment_id },
   });
 
   if (!medicalRecord && medical_data) {
@@ -551,7 +635,7 @@ export const completeAppointment = async (appointment_id, doctor_id, medical_dat
       ...medical_data,
       created_by: doctor_id,
       completed_at: new Date(),
-      completed_by: doctor_id
+      completed_by: doctor_id,
     });
   } else if (!medicalRecord) {
     throw new BadRequestError("Vui lòng cung cấp thông tin hồ sơ bệnh án");
@@ -559,20 +643,22 @@ export const completeAppointment = async (appointment_id, doctor_id, medical_dat
 
   // Kiểm tra đơn thuốc
   const prescription = await db.Prescription.findOne({
-    where: { appointment_id }
+    where: { appointment_id },
   });
 
   if (!prescription) {
-    throw new BadRequestError("Vui lòng tạo đơn thuốc trước khi hoàn thành cuộc hẹn");
+    throw new BadRequestError(
+      "Vui lòng tạo đơn thuốc trước khi hoàn thành cuộc hẹn"
+    );
   }
 
   // Tạo bản ghi thanh toán phí khám
   const payment = await db.Payment.create({
     appointment_id,
     amount: appointment.Doctor.Specialization.fees || 0,
-    status: 'pending',
-    payment_method: 'cash',
-    created_by: doctor_id
+    status: "pending",
+    payment_method: "cash",
+    created_by: doctor_id,
   });
 
   // Cập nhật trạng thái cuộc hẹn
@@ -594,16 +680,16 @@ export const completeAppointment = async (appointment_id, doctor_id, medical_dat
       status: appointment.status,
       medical_record: {
         record_id: medicalRecord.record_id,
-        completed_at: medicalRecord.completed_at
+        completed_at: medicalRecord.completed_at,
       },
       prescription: {
-        prescription_id: prescription.prescription_id
+        prescription_id: prescription.prescription_id,
       },
       payment: {
         payment_id: payment.payment_id,
         amount: payment.amount,
-        status: payment.status
-      }
+        status: payment.status,
+      },
     },
   };
 };
@@ -611,7 +697,7 @@ export const completeAppointment = async (appointment_id, doctor_id, medical_dat
 export const getDoctorDayOffs = async (doctor_id, start, end, status, date) => {
   try {
     let whereClause = {
-      doctor_id
+      doctor_id,
     };
 
     // Thêm điều kiện lọc theo trạng thái nếu có
@@ -625,88 +711,121 @@ export const getDoctorDayOffs = async (doctor_id, start, end, status, date) => {
     // Xử lý điều kiện lọc theo ngày với múi giờ Việt Nam
     if (date) {
       // Nếu có date, lấy ngày nghỉ của ngày cụ thể
-      const targetDate = dayjs.tz(date, 'Asia/Ho_Chi_Minh').format('YYYY-MM-DD');
+      const targetDate = dayjs
+        .tz(date, "Asia/Ho_Chi_Minh")
+        .format("YYYY-MM-DD");
       whereClause.off_date = targetDate;
     } else if (start && end) {
       whereClause.off_date = {
         [Op.between]: [
-          dayjs.tz(start, 'Asia/Ho_Chi_Minh').startOf('day').format('YYYY-MM-DD'),
-          dayjs.tz(end, 'Asia/Ho_Chi_Minh').endOf('day').format('YYYY-MM-DD')
-        ]
+          dayjs
+            .tz(start, "Asia/Ho_Chi_Minh")
+            .startOf("day")
+            .format("YYYY-MM-DD"),
+          dayjs.tz(end, "Asia/Ho_Chi_Minh").endOf("day").format("YYYY-MM-DD"),
+        ],
       };
     } else if (start) {
       // Nếu chỉ có ngày bắt đầu, lấy từ ngày đó đến hiện tại
       whereClause.off_date = {
-        [Op.gte]: dayjs.tz(start, 'Asia/Ho_Chi_Minh').startOf('day').format('YYYY-MM-DD')
+        [Op.gte]: dayjs
+          .tz(start, "Asia/Ho_Chi_Minh")
+          .startOf("day")
+          .format("YYYY-MM-DD"),
       };
     } else if (end) {
       // Nếu chỉ có ngày kết thúc, lấy từ quá khứ đến ngày đó
       whereClause.off_date = {
-        [Op.lte]: dayjs.tz(end, 'Asia/Ho_Chi_Minh').endOf('day').format('YYYY-MM-DD')
+        [Op.lte]: dayjs
+          .tz(end, "Asia/Ho_Chi_Minh")
+          .endOf("day")
+          .format("YYYY-MM-DD"),
       };
     }
 
     const dayOffs = await DoctorDayOff.findAll({
       where: whereClause,
-      order: [['off_date', 'ASC']]
+      order: [["off_date", "ASC"]],
     });
 
     // Format response với múi giờ Việt Nam và lấy thông tin các cuộc hẹn bị ảnh hưởng
-    const formattedDayOffs = await Promise.all(dayOffs.map(async dayOff => {
-      // Tìm các cuộc hẹn bị ảnh hưởng
-      const affectedAppointments = await Appointment.findAll({
-        where: {
-          doctor_id,
-          status: "doctor_day_off",
-          appointment_datetime: {
-            [Op.between]: [
-              dayjs.tz(dayOff.off_date, 'Asia/Ho_Chi_Minh').startOf('day').format('YYYY-MM-DD HH:mm:ss'),
-              dayjs.tz(dayOff.off_date, 'Asia/Ho_Chi_Minh').endOf('day').format('YYYY-MM-DD HH:mm:ss')
-            ]
-          }
-        },
-        include: [{
-          model: Patient,
-          as: 'Patient',
-          attributes: ['phone_number'],
-          include: [{
-            model: User,
-            as: 'user',
-            attributes: ['email', 'username']
-          }]
-        }],
-      });
+    const formattedDayOffs = await Promise.all(
+      dayOffs.map(async (dayOff) => {
+        // Tìm các cuộc hẹn bị ảnh hưởng
+        const affectedAppointments = await Appointment.findAll({
+          where: {
+            doctor_id,
+            status: "doctor_day_off",
+            appointment_datetime: {
+              [Op.between]: [
+                dayjs
+                  .tz(dayOff.off_date, "Asia/Ho_Chi_Minh")
+                  .startOf("day")
+                  .format("YYYY-MM-DD HH:mm:ss"),
+                dayjs
+                  .tz(dayOff.off_date, "Asia/Ho_Chi_Minh")
+                  .endOf("day")
+                  .format("YYYY-MM-DD HH:mm:ss"),
+              ],
+            },
+          },
+          include: [
+            {
+              model: db.FamilyMember,
+              as: "FamilyMember",
+              attributes: ["phone_number", "username", "email"],
+              include: [
+                // {
+                //   model: User,
+                //   as: "user",
+                //   attributes: ["email", "username"],
+                // },
+              ],
+            },
+          ],
+        });
 
-      return {
-        id: dayOff.day_off_id,
-        date: dayjs(dayOff.off_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD'),
-        morning: dayOff.off_morning,
-        afternoon: dayOff.off_afternoon,
-        reason: dayOff.reason,
-        status: dayOff.status,
-        createdAt: dayjs(dayOff.createdAt).tz('Asia/Ho_Chi_Minh').format(),
-        affected_appointments: affectedAppointments.map(apt => ({
-          id: apt.appointment_id,
-          datetime: dayjs(apt.appointment_datetime).tz('Asia/Ho_Chi_Minh').format(),
-          patient_name: apt.Patient?.user?.username || 'Không có thông tin',
-          patient_phone: apt.Patient?.phone_number || 'Không có số điện thoại',
-          patient_email: apt.Patient?.user?.email || 'Không có email'
-        }))
-      };
-    }));
+        return {
+          id: dayOff.day_off_id,
+          date: dayjs(dayOff.off_date)
+            .tz("Asia/Ho_Chi_Minh")
+            .format("YYYY-MM-DD"),
+          morning: dayOff.off_morning,
+          afternoon: dayOff.off_afternoon,
+          reason: dayOff.reason,
+          status: dayOff.status,
+          createdAt: dayjs(dayOff.createdAt).tz("Asia/Ho_Chi_Minh").format(),
+          affected_appointments: affectedAppointments.map((apt) => ({
+            id: apt.appointment_id,
+            datetime: dayjs(apt.appointment_datetime)
+              .tz("Asia/Ho_Chi_Minh")
+              .format(),
+            patient_name: apt.FamilyMember?.username || "Không có thông tin",
+            patient_phone:
+              apt.FamilyMember?.phone_number || "Không có số điện thoại",
+            patient_email: apt.FamilyMember?.email || "Không có email",
+          })),
+        };
+      })
+    );
 
     return {
       success: true,
       message: "Lấy danh sách ngày nghỉ thành công",
-      data: formattedDayOffs
+      data: formattedDayOffs,
     };
   } catch (error) {
-    console.error('Error in getDoctorDayOffs:', error);
+    console.error("Error in getDoctorDayOffs:", error);
     throw new InternalServerError("Có lỗi xảy ra khi lấy danh sách ngày nghỉ");
   }
 };
 
-export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) => {
+export const createDoctorDayOff = async (
+  doctor_id,
+  off_date,
+  time_off,
+  reason
+) => {
   // Bắt đầu transaction
   const t = await db.sequelize.transaction();
 
@@ -716,12 +835,12 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
       throw new BadRequestError("Thiếu thông tin ngày nghỉ hoặc buổi nghỉ");
     }
 
-    if (!['morning', 'afternoon', 'full'].includes(time_off)) {
+    if (!["morning", "afternoon", "full"].includes(time_off)) {
       throw new BadRequestError("Buổi nghỉ không hợp lệ");
     }
 
     // Chuyển đổi ngày nghỉ sang múi giờ Việt Nam và lấy đầu ngày
-    const dayOffDate = dayjs.tz(off_date, 'Asia/Ho_Chi_Minh').startOf('day');
+    const dayOffDate = dayjs.tz(off_date, "Asia/Ho_Chi_Minh").startOf("day");
     if (!dayOffDate.isValid()) {
       throw new BadRequestError("Ngày nghỉ không hợp lệ");
     }
@@ -729,29 +848,47 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
     // Kiểm tra có phải cuối tuần không
     const dayOfWeek = dayOffDate.day(); // 0 là Chủ nhật, 6 là thứ 7
     if (dayOfWeek === 0 || dayOfWeek === 6) {
-      throw new BadRequestError("Không thể đăng ký nghỉ vào thứ 7 hoặc chủ nhật");
+      throw new BadRequestError(
+        "Không thể đăng ký nghỉ vào thứ 7 hoặc chủ nhật"
+      );
     }
 
     // So sánh với thời gian hiện tại ở múi giờ Việt Nam (đầu ngày)
-    const today = dayjs().tz('Asia/Ho_Chi_Minh').startOf('day');
+    const today = dayjs().tz("Asia/Ho_Chi_Minh").startOf("day");
     if (dayOffDate.isBefore(today)) {
       throw new BadRequestError("Không thể đăng ký ngày nghỉ trong quá khứ");
     }
 
     // Hàm trợ giúp để lấy điều kiện thời gian dựa trên time_off
     const getTimeCondition = (timeOffType) => {
-      if (timeOffType === 'morning') {
+      if (timeOffType === "morning") {
         return Sequelize.where(
-          Sequelize.fn('TIME', Sequelize.fn('CONVERT_TZ', Sequelize.col('appointment_datetime'), '+00:00', '+07:00')),
+          Sequelize.fn(
+            "TIME",
+            Sequelize.fn(
+              "CONVERT_TZ",
+              Sequelize.col("appointment_datetime"),
+              "+00:00",
+              "+07:00"
+            )
+          ),
           {
-            [Op.between]: ['08:00:00', '11:30:00']
+            [Op.between]: ["08:00:00", "11:30:00"],
           }
         );
-      } else if (timeOffType === 'afternoon') {
+      } else if (timeOffType === "afternoon") {
         return Sequelize.where(
-          Sequelize.fn('TIME', Sequelize.fn('CONVERT_TZ', Sequelize.col('appointment_datetime'), '+00:00', '+07:00')),
+          Sequelize.fn(
+            "TIME",
+            Sequelize.fn(
+              "CONVERT_TZ",
+              Sequelize.col("appointment_datetime"),
+              "+00:00",
+              "+07:00"
+            )
+          ),
           {
-            [Op.between]: ['13:30:00', '17:00:00']
+            [Op.between]: ["13:30:00", "17:00:00"],
           }
         );
       } else {
@@ -763,10 +900,10 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
     const existingDayOff = await db.DoctorDayOff.findOne({
       where: {
         doctor_id,
-        off_date: dayOffDate.format('YYYY-MM-DD'),
-        status: "active"
+        off_date: dayOffDate.format("YYYY-MM-DD"),
+        status: "active",
       },
-      transaction: t
+      transaction: t,
     });
 
     let affectedAppointments = [];
@@ -775,29 +912,31 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
 
     // Nếu đã có ngày nghỉ, kiểm tra xem có thể đăng ký thêm không
     if (existingDayOff) {
-      if (time_off === 'full') {
+      if (time_off === "full") {
         // Nếu đã đăng ký cả hai buổi, báo lỗi
         if (existingDayOff.off_morning && existingDayOff.off_afternoon) {
           throw new BadRequestError("Bạn đã đăng ký nghỉ cả ngày này");
         }
         // Nếu đã đăng ký một buổi, cho phép đăng ký thêm buổi còn lại
         message = "Cập nhật ngày nghỉ thành công";
-      } else if (time_off === 'morning' && existingDayOff.off_morning) {
+      } else if (time_off === "morning" && existingDayOff.off_morning) {
         throw new BadRequestError("Bạn đã đăng ký nghỉ buổi sáng của ngày này");
-      } else if (time_off === 'afternoon' && existingDayOff.off_afternoon) {
-        throw new BadRequestError("Bạn đã đăng ký nghỉ buổi chiều của ngày này");
+      } else if (time_off === "afternoon" && existingDayOff.off_afternoon) {
+        throw new BadRequestError(
+          "Bạn đã đăng ký nghỉ buổi chiều của ngày này"
+        );
       }
 
       const updateData = {};
       let reasonUpdate = existingDayOff.reason || "";
 
-      if (time_off === 'morning' && !existingDayOff.off_morning) {
+      if (time_off === "morning" && !existingDayOff.off_morning) {
         updateData.off_morning = true;
         reasonUpdate = reasonUpdate ? `${reasonUpdate}; ${reason}` : reason;
-      } else if (time_off === 'afternoon' && !existingDayOff.off_afternoon) {
+      } else if (time_off === "afternoon" && !existingDayOff.off_afternoon) {
         updateData.off_afternoon = true;
         reasonUpdate = reasonUpdate ? `${reasonUpdate}; ${reason}` : reason;
-      } else if (time_off === 'full') {
+      } else if (time_off === "full") {
         // Nếu đăng ký full, cập nhật buổi còn lại
         if (!existingDayOff.off_morning) {
           updateData.off_morning = true;
@@ -811,7 +950,10 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
       if (Object.keys(updateData).length > 0) {
         updateData.reason = reasonUpdate;
         await existingDayOff.update(updateData, { transaction: t });
-        updatedDayOff = await db.DoctorDayOff.findByPk(existingDayOff.day_off_id, { transaction: t });
+        updatedDayOff = await db.DoctorDayOff.findByPk(
+          existingDayOff.day_off_id,
+          { transaction: t }
+        );
         message = "Cập nhật ngày nghỉ thành công";
 
         // Tìm và cập nhật các lịch hẹn bị ảnh hưởng
@@ -821,27 +963,24 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
           where: {
             doctor_id,
             status: {
-              [Op.in]: ["accepted", "waiting_for_confirmation"]
+              [Op.in]: ["accepted", "waiting_for_confirmation"],
             },
             [Op.and]: [
               Sequelize.where(
-                Sequelize.fn('DATE', Sequelize.col('appointment_datetime')),
-                dayOffDate.format('YYYY-MM-DD')
+                Sequelize.fn("DATE", Sequelize.col("appointment_datetime")),
+                dayOffDate.format("YYYY-MM-DD")
               ),
-              timeCondition
-            ]
+              timeCondition,
+            ],
           },
-          include: [{
-            model: db.Patient,
-            as: 'Patient',
-            attributes: ['phone_number'],
-            include: [{
-              model: db.User,
-              as: 'user',
-              attributes: ['email', 'username']
-            }]
-          }],
-          transaction: t
+          include: [
+            {
+              model: db.FamilyMember,
+              as: "FamilyMember",
+              attributes: ["name", "phone_number", "email"],
+            },
+          ],
+          transaction: t,
         });
 
         // Cập nhật trạng thái các lịch hẹn bị ảnh hưởng
@@ -850,9 +989,11 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
             { status: "doctor_day_off" },
             {
               where: {
-                appointment_id: foundAppointments.map(apt => apt.appointment_id)
+                appointment_id: foundAppointments.map(
+                  (apt) => apt.appointment_id
+                ),
               },
-              transaction: t
+              transaction: t,
             }
           );
           affectedAppointments = foundAppointments;
@@ -863,25 +1004,32 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
           message: "Ngày nghỉ này đã được đăng ký cho buổi này",
           data: {
             id: existingDayOff.day_off_id,
-            date: dayjs(existingDayOff.off_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD'),
+            date: dayjs(existingDayOff.off_date)
+              .tz("Asia/Ho_Chi_Minh")
+              .format("YYYY-MM-DD"),
             morning: existingDayOff.off_morning,
             afternoon: existingDayOff.off_afternoon,
             reason: existingDayOff.reason,
-            createdAt: dayjs(existingDayOff.createdAt).tz('Asia/Ho_Chi_Minh').format(),
-            affected_appointments: []
-          }
+            createdAt: dayjs(existingDayOff.createdAt)
+              .tz("Asia/Ho_Chi_Minh")
+              .format(),
+            affected_appointments: [],
+          },
         };
       }
     } else {
       // 3. Tạo ngày nghỉ mới
-      const newDayOff = await db.DoctorDayOff.create({
-        doctor_id,
-        off_date: dayOffDate.format('YYYY-MM-DD'),
-        off_morning: time_off === 'morning' || time_off === 'full',
-        off_afternoon: time_off === 'afternoon' || time_off === 'full',
-        reason,
-        status: "active"
-      }, { transaction: t });
+      const newDayOff = await db.DoctorDayOff.create(
+        {
+          doctor_id,
+          off_date: dayOffDate.format("YYYY-MM-DD"),
+          off_morning: time_off === "morning" || time_off === "full",
+          off_afternoon: time_off === "afternoon" || time_off === "full",
+          reason,
+          status: "active",
+        },
+        { transaction: t }
+      );
       updatedDayOff = newDayOff;
 
       // 4. Tìm các lịch hẹn bị ảnh hưởng
@@ -891,27 +1039,24 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
         where: {
           doctor_id,
           status: {
-            [Op.in]: ["accepted", "waiting_for_confirmation"]
+            [Op.in]: ["accepted", "waiting_for_confirmation"],
           },
           [Op.and]: [
             Sequelize.where(
-              Sequelize.fn('DATE', Sequelize.col('appointment_datetime')),
-              dayOffDate.format('YYYY-MM-DD')
+              Sequelize.fn("DATE", Sequelize.col("appointment_datetime")),
+              dayOffDate.format("YYYY-MM-DD")
             ),
-            timeCondition
-          ]
+            timeCondition,
+          ],
         },
-        include: [{
-          model: db.Patient,
-          as: 'Patient',
-          attributes: ['phone_number'],
-          include: [{
-            model: db.User,
-            as: 'user',
-            attributes: ['email', 'username']
-          }]
-        }],
-        transaction: t
+        include: [
+          {
+            model: db.FamilyMember,
+            as: "FamilyMember",
+            attributes: ["username", "phone_number", "email"],
+          },
+        ],
+        transaction: t,
       });
 
       // Cập nhật trạng thái của các lịch hẹn bị ảnh hưởng
@@ -920,9 +1065,11 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
           { status: "doctor_day_off" },
           {
             where: {
-              appointment_id: foundAppointments.map(apt => apt.appointment_id)
+              appointment_id: foundAppointments.map(
+                (apt) => apt.appointment_id
+              ),
             },
-            transaction: t
+            transaction: t,
           }
         );
         affectedAppointments = foundAppointments;
@@ -936,22 +1083,30 @@ export const createDoctorDayOff = async (doctor_id, off_date, time_off, reason) 
       message,
       data: {
         id: updatedDayOff.day_off_id,
-        date: dayjs(updatedDayOff.off_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD'),
+        date: dayjs(updatedDayOff.off_date)
+          .tz("Asia/Ho_Chi_Minh")
+          .format("YYYY-MM-DD"),
         morning: updatedDayOff.off_morning,
         afternoon: updatedDayOff.off_afternoon,
         reason: updatedDayOff.reason,
         status: updatedDayOff.status,
-        createdAt: dayjs(updatedDayOff.createdAt).tz('Asia/Ho_Chi_Minh').format(),
-        affected_appointments: affectedAppointments.length > 0 
-          ? affectedAppointments.map(apt => ({
-              id: apt.appointment_id,
-              datetime: dayjs(apt.appointment_datetime).tz('Asia/Ho_Chi_Minh').format(),
-              patient_name: apt.Patient?.user?.username || 'Không có thông tin',
-              patient_phone: apt.Patient?.phone_number || 'Không có số điện thoại',
-              patient_email: apt.Patient?.user?.email || 'Không có email'
-            }))
-          : []
-      }
+        createdAt: dayjs(updatedDayOff.createdAt)
+          .tz("Asia/Ho_Chi_Minh")
+          .format(),
+        affected_appointments:
+          affectedAppointments.length > 0
+            ? affectedAppointments.map((apt) => ({
+                id: apt.appointment_id,
+                datetime: dayjs(apt.appointment_datetime)
+                  .tz("Asia/Ho_Chi_Minh")
+                  .format(),
+                patient_name: apt.FamilyMember?.name || "Không có thông tin",
+                patient_phone:
+                  apt.FamilyMember?.phone_number || "Không có số điện thoại",
+                patient_email: apt.FamilyMember?.email || "Không có email",
+              }))
+            : [],
+      },
     };
   } catch (error) {
     await t.rollback();
@@ -979,10 +1134,12 @@ export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
     }
 
     // 2. Kiểm tra thời gian hủy
-    const now = dayjs().tz('Asia/Ho_Chi_Minh');
-    const today = now.startOf('day');
+    const now = dayjs().tz("Asia/Ho_Chi_Minh");
+    const today = now.startOf("day");
     const currentHour = now.hour();
-    const offDate = dayjs(dayOff.off_date).tz('Asia/Ho_Chi_Minh').startOf('day');
+    const offDate = dayjs(dayOff.off_date)
+      .tz("Asia/Ho_Chi_Minh")
+      .startOf("day");
 
     // Nếu ngày nghỉ trong quá khứ
     if (offDate.isBefore(today)) {
@@ -990,33 +1147,33 @@ export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
     }
 
     // Nếu là ngày hiện tại
-    if (offDate.isSame(today, 'day')) {
+    if (offDate.isSame(today, "day")) {
       // Nếu hủy cả ngày -> không cho phép
-      if (time_off === 'full') {
+      if (time_off === "full") {
         throw new BadRequestError("Không thể hủy cả ngày vào ngày hiện tại");
       }
 
       // Nếu là buổi sáng và đã quá 8h sáng
-      if (time_off === 'morning' && currentHour >= 8) {
+      if (time_off === "morning" && currentHour >= 8) {
         throw new BadRequestError("Không thể hủy ca sáng sau 8h sáng");
       }
 
       // Nếu là buổi chiều và đã quá 13h30
-      if (time_off === 'afternoon' && currentHour >= 13) {
+      if (time_off === "afternoon" && currentHour >= 13) {
         throw new BadRequestError("Không thể hủy ca chiều sau 13h");
       }
     }
 
     // 3. Kiểm tra time_off hợp lệ
-    if (!['morning', 'afternoon', 'full'].includes(time_off)) {
+    if (!["morning", "afternoon", "full"].includes(time_off)) {
       throw new BadRequestError("Buổi nghỉ không hợp lệ");
     }
 
     // 4. Kiểm tra xem có đăng ký nghỉ buổi đó không
-    if (time_off === 'morning' && !dayOff.off_morning) {
+    if (time_off === "morning" && !dayOff.off_morning) {
       throw new BadRequestError("Bạn chưa đăng ký nghỉ buổi sáng");
     }
-    if (time_off === 'afternoon' && !dayOff.off_afternoon) {
+    if (time_off === "afternoon" && !dayOff.off_afternoon) {
       throw new BadRequestError("Bạn chưa đăng ký nghỉ buổi chiều");
     }
 
@@ -1026,28 +1183,44 @@ export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
       status: "doctor_day_off",
       [Op.and]: [
         Sequelize.where(
-          Sequelize.fn('DATE', Sequelize.col('appointment_datetime')),
+          Sequelize.fn("DATE", Sequelize.col("appointment_datetime")),
           dayOff.off_date
-        )
-      ]
+        ),
+      ],
     };
 
     // Thêm điều kiện lọc theo thời gian
-    if (time_off === 'morning') {
+    if (time_off === "morning") {
       whereClause[Op.and].push(
         Sequelize.where(
-          Sequelize.fn('TIME', Sequelize.fn('CONVERT_TZ', Sequelize.col('appointment_datetime'), '+00:00', '+07:00')),
+          Sequelize.fn(
+            "TIME",
+            Sequelize.fn(
+              "CONVERT_TZ",
+              Sequelize.col("appointment_datetime"),
+              "+00:00",
+              "+07:00"
+            )
+          ),
           {
-            [Op.between]: ['08:00:00', '11:30:00']
+            [Op.between]: ["08:00:00", "11:30:00"],
           }
         )
       );
-    } else if (time_off === 'afternoon') {
+    } else if (time_off === "afternoon") {
       whereClause[Op.and].push(
         Sequelize.where(
-          Sequelize.fn('TIME', Sequelize.fn('CONVERT_TZ', Sequelize.col('appointment_datetime'), '+00:00', '+07:00')),
+          Sequelize.fn(
+            "TIME",
+            Sequelize.fn(
+              "CONVERT_TZ",
+              Sequelize.col("appointment_datetime"),
+              "+00:00",
+              "+07:00"
+            )
+          ),
           {
-            [Op.between]: ['13:30:00', '17:00:00']
+            [Op.between]: ["13:30:00", "17:00:00"],
           }
         )
       );
@@ -1055,33 +1228,39 @@ export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
 
     const affectedAppointments = await db.Appointment.findAll({
       where: whereClause,
-      include: [{
-        model: db.Patient,
-        as: 'Patient',
-        attributes: ['phone_number'],
-        include: [{
-          model: db.User,
-          as: 'user',
-          attributes: ['email', 'username']
-        }]
-      }],
+      include: [
+        {
+          model: db.Patient,
+          as: "Patient",
+          attributes: ["phone_number"],
+          include: [
+            {
+              model: db.User,
+              as: "user",
+              attributes: ["email", "username"],
+            },
+          ],
+        },
+      ],
       transaction: t,
     });
 
     // 6. Cập nhật trạng thái ngày nghỉ
     const updateData = {};
-    if (time_off === 'morning') {
+    if (time_off === "morning") {
       updateData.off_morning = false;
-    } else if (time_off === 'afternoon') {
+    } else if (time_off === "afternoon") {
       updateData.off_afternoon = false;
     } else {
       updateData.status = "cancelled";
     }
 
     // Nếu cả hai buổi đều false thì đánh dấu là đã hủy
-    if (time_off !== 'full' && 
-        ((time_off === 'morning' && !dayOff.off_afternoon) || 
-         (time_off === 'afternoon' && !dayOff.off_morning))) {
+    if (
+      time_off !== "full" &&
+      ((time_off === "morning" && !dayOff.off_afternoon) ||
+        (time_off === "afternoon" && !dayOff.off_morning))
+    ) {
       updateData.status = "cancelled";
     }
 
@@ -1093,7 +1272,9 @@ export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
         { status: "waiting_for_confirmation" },
         {
           where: {
-            appointment_id: affectedAppointments.map(apt => apt.appointment_id),
+            appointment_id: affectedAppointments.map(
+              (apt) => apt.appointment_id
+            ),
           },
           transaction: t,
         }
@@ -1107,17 +1288,20 @@ export const cancelDoctorDayOff = async (doctor_id, day_off_id, time_off) => {
       message: "Hủy ngày nghỉ thành công",
       data: {
         day_off: dayOff,
-        affected_appointments: affectedAppointments.length > 0
-          ? affectedAppointments.map(apt => ({
-              id: apt.appointment_id,
-              datetime: dayjs(apt.appointment_datetime)
-                .tz('Asia/Ho_Chi_Minh')
-                .format('YYYY-MM-DDTHH:mm:ssZ'),
-              patient_name: apt.Patient?.user?.username || 'Không có thông tin',
-              patient_phone: apt.Patient?.phone_number || 'Không có số điện thoại',
-              patient_email: apt.Patient?.user?.email || 'Không có email'
-            }))
-          : [],
+        affected_appointments:
+          affectedAppointments.length > 0
+            ? affectedAppointments.map((apt) => ({
+                id: apt.appointment_id,
+                datetime: dayjs(apt.appointment_datetime)
+                  .tz("Asia/Ho_Chi_Minh")
+                  .format("YYYY-MM-DDTHH:mm:ssZ"),
+                patient_name:
+                  apt.Patient?.user?.username || "Không có thông tin",
+                patient_phone:
+                  apt.Patient?.phone_number || "Không có số điện thoại",
+                patient_email: apt.Patient?.user?.email || "Không có email",
+              }))
+            : [],
       },
     };
   } catch (error) {
@@ -1137,41 +1321,62 @@ export const acceptAppointment = async (appointment_id, doctor_id) => {
   const appointment = await db.Appointment.findOne({
     where: {
       appointment_id,
-      doctor_id
+      doctor_id,
     },
-    include: [{
-      model: db.Patient,
-      as: 'Patient',
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['email', 'username']
-      }]
-    }]
+    include: [
+      {
+        model: db.Patient,
+        as: "Patient",
+        include: [
+          {
+            model: db.User,
+            as: "user",
+            attributes: ["email", "username"],
+          },
+        ],
+      },
+    ],
   });
 
   if (!appointment) {
-    throw new NotFoundError('Không tìm thấy lịch hẹn hoặc lịch hẹn không thuộc về bác sĩ này');
+    throw new NotFoundError(
+      "Không tìm thấy lịch hẹn hoặc lịch hẹn không thuộc về bác sĩ này"
+    );
   }
 
   // Kiểm tra trạng thái lịch hẹn
-  const invalidStatuses = ['accepted', 'completed', 'cancelled', 'doctor_day_off', 'patient_not_coming'];
+  const invalidStatuses = [
+    "accepted",
+    "completed",
+    "cancelled",
+    "doctor_day_off",
+    "patient_not_coming",
+  ];
   if (invalidStatuses.includes(appointment.status)) {
-    throw new BadRequestError(`Không thể chấp nhận lịch hẹn đã ${
-      appointment.status === 'accepted' ? 'được chấp nhận' :
-      appointment.status === 'completed' ? 'hoàn thành' :
-      appointment.status === 'cancelled' ? 'bị hủy' :
-      appointment.status === 'doctor_day_off' ? 'bị nghỉ' : 'được đánh dấu bệnh nhân không đến'
-    }`);
+    throw new BadRequestError(
+      `Không thể chấp nhận lịch hẹn đã ${
+        appointment.status === "accepted"
+          ? "được chấp nhận"
+          : appointment.status === "completed"
+          ? "hoàn thành"
+          : appointment.status === "cancelled"
+          ? "bị hủy"
+          : appointment.status === "doctor_day_off"
+          ? "bị nghỉ"
+          : "được đánh dấu bệnh nhân không đến"
+      }`
+    );
   }
 
   // Chuyển đổi thời gian về múi giờ Việt Nam
-  const appointmentTime = dayjs(appointment.appointment_datetime).tz('Asia/Ho_Chi_Minh');
-  const now = dayjs().tz('Asia/Ho_Chi_Minh');
+  const appointmentTime = dayjs(appointment.appointment_datetime).tz(
+    "Asia/Ho_Chi_Minh"
+  );
+  const now = dayjs().tz("Asia/Ho_Chi_Minh");
 
   // Kiểm tra xem thời gian hẹn đã qua chưa
   if (appointmentTime.isBefore(now)) {
-    throw new BadRequestError('Không thể chấp nhận lịch hẹn đã qua');
+    throw new BadRequestError("Không thể chấp nhận lịch hẹn đã qua");
   }
 
   // Kiểm tra xem đã có lịch hẹn nào được chấp nhận trong cùng khung giờ chưa
@@ -1179,15 +1384,17 @@ export const acceptAppointment = async (appointment_id, doctor_id) => {
     where: {
       doctor_id,
       appointment_datetime: appointment.appointment_datetime,
-      status: 'accepted',
+      status: "accepted",
       appointment_id: {
-        [Op.ne]: appointment_id
-      }
-    }
+        [Op.ne]: appointment_id,
+      },
+    },
   });
 
   if (existingAcceptedAppointment) {
-    throw new BadRequestError('Đã có lịch hẹn khác được chấp nhận trong khung giờ này');
+    throw new BadRequestError(
+      "Đã có lịch hẹn khác được chấp nhận trong khung giờ này"
+    );
   }
 
   // Tìm tất cả các lịch hẹn khác trong cùng khung giờ đang ở trạng thái waiting_for_confirmation
@@ -1195,78 +1402,89 @@ export const acceptAppointment = async (appointment_id, doctor_id) => {
     where: {
       doctor_id,
       appointment_datetime: appointment.appointment_datetime,
-      status: 'waiting_for_confirmation',
+      status: "waiting_for_confirmation",
       appointment_id: {
-        [Op.ne]: appointment_id
-      }
+        [Op.ne]: appointment_id,
+      },
     },
-    include: [{
-      model: db.Patient,
-      as: 'Patient',
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['email', 'username']
-      }]
-    }]
+    include: [
+      {
+        model: db.Patient,
+        as: "Patient",
+        include: [
+          {
+            model: db.User,
+            as: "user",
+            attributes: ["email", "username"],
+          },
+        ],
+      },
+    ],
   });
 
   // Hủy tất cả các lịch hẹn trùng giờ
   if (conflictingAppointments.length > 0) {
-    await Promise.all(conflictingAppointments.map(async (conflictAppointment) => {
-      await conflictAppointment.update({
-        status: 'cancelled',
-        cancelled_at: now.toDate(),
-        cancelled_by: 'system',
-        cancel_reason: 'Bác sĩ đã chấp nhận một lịch hẹn khác trong cùng khung giờ'
-      });
+    await Promise.all(
+      conflictingAppointments.map(async (conflictAppointment) => {
+        await conflictAppointment.update({
+          status: "cancelled",
+          cancelled_at: now.toDate(),
+          cancelled_by: "system",
+          cancel_reason:
+            "Bác sĩ đã chấp nhận một lịch hẹn khác trong cùng khung giờ",
+        });
 
-      // TODO: Gửi email thông báo cho bệnh nhân bị hủy lịch
-      const emailInfo = {
-        to: conflictAppointment.Patient.user.email,
-        subject: 'Thông báo hủy lịch hẹn',
-        patientName: conflictAppointment.Patient.user.username,
-        appointmentDate: appointmentTime.format('DD/MM/YYYY HH:mm'),
-        reason: 'Bác sĩ đã chấp nhận một lịch hẹn khác trong cùng khung giờ'
-      };
-      // await sendEmailNotification(emailInfo);
-    }));
+        // TODO: Gửi email thông báo cho bệnh nhân bị hủy lịch
+        const emailInfo = {
+          to: conflictAppointment.Patient.user.email,
+          subject: "Thông báo hủy lịch hẹn",
+          patientName: conflictAppointment.Patient.user.username,
+          appointmentDate: appointmentTime.format("DD/MM/YYYY HH:mm"),
+          reason: "Bác sĩ đã chấp nhận một lịch hẹn khác trong cùng khung giờ",
+        };
+        // await sendEmailNotification(emailInfo);
+      })
+    );
   }
 
   // Chấp nhận lịch hẹn được chọn
   await appointment.update({
-    status: 'accepted'
+    status: "accepted",
   });
 
   // Gửi email thông báo cho bệnh nhân được chấp nhận
   const emailInfo = {
     to: appointment.Patient.user.email,
-    subject: 'Thông báo chấp nhận lịch hẹn',
+    subject: "Thông báo chấp nhận lịch hẹn",
     patientName: appointment.Patient.user.username,
-    appointmentDate: appointmentTime.format('DD/MM/YYYY HH:mm')
+    appointmentDate: appointmentTime.format("DD/MM/YYYY HH:mm"),
   };
   // await sendEmailNotification(emailInfo);
 
   return {
     success: true,
-    message: 'Đã chấp nhận lịch hẹn thành công',
+    message: "Đã chấp nhận lịch hẹn thành công",
     data: {
       appointment_id: appointment.appointment_id,
       patient_name: appointment.Patient.user.username,
       patient_email: appointment.Patient.user.email,
-      appointment_datetime: appointmentTime.format('YYYY-MM-DDTHH:mm:ssZ'),
-      status: 'accepted',
-      cancelled_appointments: conflictingAppointments.map(app => ({
+      appointment_datetime: appointmentTime.format("YYYY-MM-DDTHH:mm:ssZ"),
+      status: "accepted",
+      cancelled_appointments: conflictingAppointments.map((app) => ({
         appointment_id: app.appointment_id,
         patient_name: app.Patient.user.username,
         patient_email: app.Patient.user.email,
-        status: 'cancelled'
-      }))
-    }
+        status: "cancelled",
+      })),
+    },
   };
 };
 
-export const createMedicalRecord = async (doctor_id, appointment_id, { diagnosis, treatment, notes }) => {
+export const createMedicalRecord = async (
+  doctor_id,
+  appointment_id,
+  { diagnosis, treatment, notes }
+) => {
   // Lấy thông tin lịch hẹn
   const appointment = await db.Appointment.findOne({
     where: { appointment_id },
@@ -1287,17 +1505,19 @@ export const createMedicalRecord = async (doctor_id, appointment_id, { diagnosis
 
   // Kiểm tra trạng thái lịch hẹn có phải là 'accepted' (đã khám)
   if (appointment.status !== "accepted") {
-    throw new BadRequestError("Chỉ có thể tạo hồ sơ bệnh án sau khi lịch hẹn đã được chấp nhận");
+    throw new BadRequestError(
+      "Chỉ có thể tạo hồ sơ bệnh án sau khi lịch hẹn đã được chấp nhận"
+    );
   }
 
   // Kiểm tra xem đã có hồ sơ bệnh án cho lịch hẹn này chưa
   const existingRecord = await db.MedicalRecord.findOne({
-    where: { 
+    where: {
       appointment_id,
       [Op.or]: [
         { completed_at: { [Op.not]: null } },
-        { completed_by: { [Op.not]: null } }
-      ]
+        { completed_by: { [Op.not]: null } },
+      ],
     },
   });
 
@@ -1307,7 +1527,9 @@ export const createMedicalRecord = async (doctor_id, appointment_id, { diagnosis
 
   // Validate dữ liệu đầu vào
   if (!diagnosis || !treatment) {
-    throw new BadRequestError("Thiếu thông tin chẩn đoán hoặc phương pháp điều trị");
+    throw new BadRequestError(
+      "Thiếu thông tin chẩn đoán hoặc phương pháp điều trị"
+    );
   }
 
   // Tạo hồ sơ bệnh án
@@ -1321,19 +1543,20 @@ export const createMedicalRecord = async (doctor_id, appointment_id, { diagnosis
     is_visible_to_patient: false,
     completed_at: new Date(),
     completed_by: doctor_id,
-    viewed_at: null
+    viewed_at: null,
   });
 
   return {
     success: true,
-    message: "Tạo hồ sơ bệnh án thành công. Bệnh nhân cần thanh toán để xem kết quả.",
+    message:
+      "Tạo hồ sơ bệnh án thành công. Bệnh nhân cần thanh toán để xem kết quả.",
     data: {
       record_id: medicalRecord.record_id,
       diagnosis: medicalRecord.diagnosis,
       treatment: medicalRecord.treatment,
       notes: medicalRecord.notes,
-      created_at: medicalRecord.createdAt
-    }
+      created_at: medicalRecord.createdAt,
+    },
   };
 };
 
@@ -1358,9 +1581,9 @@ const generatePrescriptionPDF = async (prescription_id) => {
               {
                 model: db.User,
                 as: "user",
-                attributes: ["username", "email"]
-              }
-            ]
+                attributes: ["username", "email"],
+              },
+            ],
           },
           {
             model: db.Doctor,
@@ -1369,16 +1592,16 @@ const generatePrescriptionPDF = async (prescription_id) => {
               {
                 model: db.Specialization,
                 as: "Specialization",
-                attributes: ["name"]
+                attributes: ["name"],
               },
               {
                 model: db.User,
                 as: "user",
-                attributes: ["username"]
-              }
-            ]
-          }
-        ]
+                attributes: ["username"],
+              },
+            ],
+          },
+        ],
       },
       {
         model: db.PrescriptionMedicine,
@@ -1387,11 +1610,11 @@ const generatePrescriptionPDF = async (prescription_id) => {
           {
             model: db.Medicine,
             as: "Medicine",
-            attributes: ["name", "unit"]
-          }
-        ]
-      }
-    ]
+            attributes: ["name", "unit"],
+          },
+        ],
+      },
+    ],
   });
 
   if (!prescription) {
@@ -1416,9 +1639,9 @@ export const createPrescriptions = async (
 ) => {
   // Kiểm tra cuộc hẹn
   const appointment = await db.Appointment.findOne({
-    where: { 
+    where: {
       appointment_id,
-      doctor_id
+      doctor_id,
     },
     include: [
       {
@@ -1426,27 +1649,31 @@ export const createPrescriptions = async (
         as: "Doctor",
         include: {
           model: db.Specialization,
-          as: "Specialization"
-        }
+          as: "Specialization",
+        },
       },
       {
         model: db.Patient, // Ensure the patient is included
-        as: "Patient"
-      }
-    ]
+        as: "Patient",
+      },
+    ],
   });
 
   if (!appointment) {
-    throw new NotFoundError("Cuộc hẹn không tồn tại hoặc không thuộc về bác sĩ này");
+    throw new NotFoundError(
+      "Cuộc hẹn không tồn tại hoặc không thuộc về bác sĩ này"
+    );
   }
 
   if (appointment.status !== "accepted") {
-    throw new BadRequestError("Chỉ được tạo đơn thuốc cho cuộc hẹn đã được tiếp nhận");
+    throw new BadRequestError(
+      "Chỉ được tạo đơn thuốc cho cuộc hẹn đã được tiếp nhận"
+    );
   }
 
   // Kiểm tra xem đã có đơn thuốc chưa
   const existingPrescription = await db.Prescription.findOne({
-    where: { appointment_id }
+    where: { appointment_id },
   });
 
   if (existingPrescription) {
@@ -1454,13 +1681,13 @@ export const createPrescriptions = async (
   }
 
   // Lấy thông tin các thuốc
-  const medicineIds = medicines.map(m => m.medicine_id);
+  const medicineIds = medicines.map((m) => m.medicine_id);
   const medicineList = await db.Medicine.findAll({
     where: {
       medicine_id: {
-        [Op.in]: medicineIds
-      }
-    }
+        [Op.in]: medicineIds,
+      },
+    },
   });
 
   if (medicineList.length !== medicineIds.length) {
@@ -1475,14 +1702,16 @@ export const createPrescriptions = async (
     created_by: doctor_id,
     status: "pending_prepare", // Đơn thuốc bắt đầu ở trạng thái chuẩn bị
     use_hospital_pharmacy,
-    createdAt: new Date()
+    createdAt: new Date(),
   });
 
   // Tạo chi tiết đơn thuốc
   const prescriptionMedicines = [];
 
   for (const medicine of medicines) {
-    const medicineInfo = medicineList.find(m => m.medicine_id === medicine.medicine_id);
+    const medicineInfo = medicineList.find(
+      (m) => m.medicine_id === medicine.medicine_id
+    );
     const total_price = medicineInfo.price * medicine.quantity;
 
     const prescriptionMedicine = await db.PrescriptionMedicine.create({
@@ -1495,7 +1724,7 @@ export const createPrescriptions = async (
       instructions: medicine.instructions,
       unit_price: medicineInfo.price,
       total_price: total_price,
-      createdAt: new Date()
+      createdAt: new Date(),
     });
 
     prescriptionMedicines.push({
@@ -1508,7 +1737,7 @@ export const createPrescriptions = async (
       dosage: medicine.dosage,
       frequency: medicine.frequency,
       duration: medicine.duration,
-      instructions: medicine.instructions
+      instructions: medicine.instructions,
     });
   }
 
@@ -1532,8 +1761,8 @@ export const createPrescriptions = async (
       appointment_id,
       status: prescription.status,
       note: prescription.note,
-      medicines: prescriptionMedicines
-    }
+      medicines: prescriptionMedicines,
+    },
   };
 };
 
@@ -1545,7 +1774,12 @@ export const createPrescriptions = async (
  * @param {number} limit - Số lượng item trên mỗi trang
  * @returns {Promise<Object>} - Danh sách thanh toán
  */
-export const getAppointmentPayments = async (doctor_id, filters = {}, page = 1, limit = 10) => {
+export const getAppointmentPayments = async (
+  doctor_id,
+  filters = {},
+  page = 1,
+  limit = 10
+) => {
   const offset = (page - 1) * limit;
   const whereClause = {};
   const paymentWhereClause = {};
@@ -1558,21 +1792,27 @@ export const getAppointmentPayments = async (doctor_id, filters = {}, page = 1, 
   // Lọc theo khoảng thời gian
   if (filters.date) {
     // Nếu có tham số date, lọc theo ngày cụ thể
-    const targetDate = dayjs.tz(filters.date, 'Asia/Ho_Chi_Minh');
+    const targetDate = dayjs.tz(filters.date, "Asia/Ho_Chi_Minh");
     whereClause.appointment_datetime = {
       [Op.between]: [
-        targetDate.startOf('day').toDate(),
-        targetDate.endOf('day').toDate()
-      ]
+        targetDate.startOf("day").toDate(),
+        targetDate.endOf("day").toDate(),
+      ],
     };
   } else if (filters.start_date || filters.end_date) {
     // Nếu không có date nhưng có start_date hoặc end_date, lọc theo khoảng thời gian
     whereClause.appointment_datetime = {};
     if (filters.start_date) {
-      whereClause.appointment_datetime[Op.gte] = dayjs.tz(filters.start_date, 'Asia/Ho_Chi_Minh').startOf('day').toDate();
+      whereClause.appointment_datetime[Op.gte] = dayjs
+        .tz(filters.start_date, "Asia/Ho_Chi_Minh")
+        .startOf("day")
+        .toDate();
     }
     if (filters.end_date) {
-      whereClause.appointment_datetime[Op.lte] = dayjs.tz(filters.end_date, 'Asia/Ho_Chi_Minh').endOf('day').toDate();
+      whereClause.appointment_datetime[Op.lte] = dayjs
+        .tz(filters.end_date, "Asia/Ho_Chi_Minh")
+        .endOf("day")
+        .toDate();
     }
   }
 
@@ -1580,7 +1820,7 @@ export const getAppointmentPayments = async (doctor_id, filters = {}, page = 1, 
   const { count, rows } = await db.Appointment.findAndCountAll({
     where: {
       ...whereClause,
-      doctor_id
+      doctor_id,
     },
     include: [
       {
@@ -1597,31 +1837,44 @@ export const getAppointmentPayments = async (doctor_id, filters = {}, page = 1, 
         as: "Payments",
         where: paymentWhereClause,
         required: true, // Luôn yêu cầu có thanh toán
-        attributes: ["payment_id", "amount", "payment_method", "status", "createdAt"],
-      }
+        attributes: [
+          "payment_id",
+          "amount",
+          "payment_method",
+          "status",
+          "createdAt",
+        ],
+      },
     ],
-    order: [['appointment_datetime', 'DESC']],
+    order: [["appointment_datetime", "DESC"]],
     limit,
     offset,
-    distinct: true
+    distinct: true,
   });
 
   // Format dữ liệu trả về
-  const payments = rows.map(appointment => ({
+  const payments = rows.map((appointment) => ({
     appointment_id: appointment.appointment_id,
-    appointment_datetime: dayjs(appointment.appointment_datetime).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
+    appointment_datetime: dayjs(appointment.appointment_datetime)
+      .tz("Asia/Ho_Chi_Minh")
+      .format("YYYY-MM-DD HH:mm:ss"),
     patient: {
-      name: appointment.Patient?.user?.username || '',
-      email: appointment.Patient?.user?.email || ''
+      name: appointment.Patient?.user?.username || "",
+      email: appointment.Patient?.user?.email || "",
     },
-    payment: appointment.Payments ? {
-      id: appointment.Payments.payment_id,
-      amount: appointment.Payments.amount ? 
-        `${appointment.Payments.amount.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-      status: appointment.Payments.status,
-      payment_method: appointment.Payments.payment_method,
-      payment_date: dayjs(appointment.Payments.createdAt).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss')
-    } : null
+    payment: appointment.Payments
+      ? {
+          id: appointment.Payments.payment_id,
+          amount: appointment.Payments.amount
+            ? `${appointment.Payments.amount.toLocaleString("vi-VN")} VNĐ`
+            : "0 VNĐ",
+          status: appointment.Payments.status,
+          payment_method: appointment.Payments.payment_method,
+          payment_date: dayjs(appointment.Payments.createdAt)
+            .tz("Asia/Ho_Chi_Minh")
+            .format("YYYY-MM-DD HH:mm:ss"),
+        }
+      : null,
   }));
 
   return {
@@ -1633,9 +1886,9 @@ export const getAppointmentPayments = async (doctor_id, filters = {}, page = 1, 
         current_page: page,
         total_pages: Math.ceil(count / limit),
         total_records: count,
-        per_page: limit
-      }
-    }
+        per_page: limit,
+      },
+    },
   };
 };
 
@@ -1647,37 +1900,49 @@ export const getAppointmentPayments = async (doctor_id, filters = {}, page = 1, 
  * @param {string} note - Ghi chú (nếu có)
  * @returns {Promise<Object>} - Thông tin thanh toán đã cập nhật
  */
-export const updatePaymentStatus = async (doctor_id, payment_id, status, note = '') => {
+export const updatePaymentStatus = async (
+  doctor_id,
+  payment_id,
+  status,
+  note = ""
+) => {
   const t = await db.sequelize.transaction();
 
   try {
     // Kiểm tra thanh toán tồn tại và thuộc về bác sĩ
     const payment = await db.Payment.findOne({
       where: { payment_id },
-      include: [{
-        model: db.Appointment,
-        as: "Appointment",
-        where: { doctor_id },
-        required: true
-      }],
-      transaction: t
+      include: [
+        {
+          model: db.Appointment,
+          as: "Appointment",
+          where: { doctor_id },
+          required: true,
+        },
+      ],
+      transaction: t,
     });
 
     if (!payment) {
-      throw new NotFoundError("Không tìm thấy thanh toán hoặc thanh toán không thuộc về bác sĩ này");
+      throw new NotFoundError(
+        "Không tìm thấy thanh toán hoặc thanh toán không thuộc về bác sĩ này"
+      );
     }
 
     // Kiểm tra trạng thái hợp lệ
-    const validStatuses = ['paid', 'pending', 'cancel'];
+    const validStatuses = ["paid", "pending", "cancel"];
     if (!validStatuses.includes(status)) {
       throw new BadRequestError("Trạng thái thanh toán không hợp lệ");
     }
 
     // Cập nhật trạng thái thanh toán
-    await payment.update({
-      status,
-      note: note || payment.note
-    }, { transaction: t });
+    await payment.update(
+      {
+        status,
+        note: note || payment.note,
+      },
+      { transaction: t }
+    );
 
     await t.commit();
 
@@ -1687,19 +1952,21 @@ export const updatePaymentStatus = async (doctor_id, payment_id, status, note = 
       data: {
         payment_id: payment.payment_id,
         appointment_id: payment.appointment_id,
-        amount: `${payment.amount.toLocaleString('vi-VN')} VNĐ`,
+        amount: `${payment.amount.toLocaleString("vi-VN")} VNĐ`,
         status: payment.status,
         payment_method: payment.payment_method,
-        payment_date: dayjs(payment.createdAt).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
-        note: payment.note
-      }
+        payment_date: dayjs(payment.createdAt)
+          .tz("Asia/Ho_Chi_Minh")
+          .format("YYYY-MM-DD HH:mm:ss"),
+        note: payment.note,
+      },
     };
   } catch (error) {
     await t.rollback();
     throw error;
   }
 };
-export const getAllMedicines = async ({ search, expiry_before}) => {
+export const getAllMedicines = async ({ search, expiry_before }) => {
   const whereClause = {};
 
   if (search) {
@@ -1731,54 +1998,60 @@ export const getAllMedicines = async ({ search, expiry_before}) => {
   };
 };
 
-export const getAllPatient = async (doctor_id, { search, page = 1, limit = 10 }) => {
+export const getAllPatient = async (
+  doctor_id,
+  { search, page = 1, limit = 10 }
+) => {
   try {
     const offset = (page - 1) * limit;
-    
+
     // Tạo điều kiện tìm kiếm
     const appointmentCondition = {
       doctor_id,
       status: {
-        [Op.in]: ['accepted', 'completed'], // Chỉ lấy các lịch hẹn đã được xác nhận hoặc hoàn thành
+        [Op.in]: ["accepted", "completed"], // Chỉ lấy các lịch hẹn đã được xác nhận hoặc hoàn thành
       },
     };
-    
+
     let patientCondition = {};
-    
+
     // Thêm điều kiện tìm kiếm nếu có
     if (search) {
       patientCondition = {
         [Op.or]: [
-          { '$Patient.user.username$': { [Op.like]: `%${search}%` } },
-          { '$Patient.user.email$': { [Op.like]: `%${search}%` } },
-          { '$Patient.phone_number$': { [Op.like]: `%${search}%` } },
-          { '$Patient.address$': { [Op.like]: `%${search}%` } } // Thêm tìm kiếm theo địa chỉ
-        ]
+          { "$Patient.user.username$": { [Op.like]: `%${search}%` } },
+          { "$Patient.user.email$": { [Op.like]: `%${search}%` } },
+          { "$Patient.phone_number$": { [Op.like]: `%${search}%` } },
+          { "$Patient.address$": { [Op.like]: `%${search}%` } }, // Thêm tìm kiếm theo địa chỉ
+        ],
       };
     }
-    
+
     // Đếm tổng số bệnh nhân
     const countQuery = await db.Appointment.findAll({
       where: { ...appointmentCondition, ...patientCondition },
       include: [
         {
           model: db.Patient,
-          as: 'Patient',
+          as: "Patient",
           include: [
             {
               model: db.User,
-              as: 'user',
-              attributes: ['user_id', 'username', 'email'],
+              as: "user",
+              attributes: ["user_id", "username", "email"],
             },
           ],
         },
       ],
       attributes: [
-        [Sequelize.fn('DISTINCT', Sequelize.col('Appointment.patient_id')), 'patient_id']
+        [
+          Sequelize.fn("DISTINCT", Sequelize.col("Appointment.patient_id")),
+          "patient_id",
+        ],
       ],
       raw: true,
     });
-    
+
     const totalPatients = countQuery.length;
 
     // Lấy danh sách bệnh nhân với phân trang
@@ -1787,22 +2060,36 @@ export const getAllPatient = async (doctor_id, { search, page = 1, limit = 10 })
       include: [
         {
           model: db.Patient,
-          as: 'Patient',
+          as: "Patient",
           include: [
             {
               model: db.User,
-              as: 'user',
-              attributes: ['user_id', 'username', 'email', 'avatar'],
+              as: "user",
+              attributes: ["user_id", "username", "email", "avatar"],
             },
           ],
         },
       ],
       attributes: [
-        [Sequelize.fn('MAX', Sequelize.col('Appointment.appointment_datetime')), 'last_appointment'],
-        [Sequelize.col('Appointment.patient_id'), 'patient_id']
+        [
+          Sequelize.fn(
+            "MAX",
+            Sequelize.col("Appointment.appointment_datetime")
+          ),
+          "last_appointment",
+        ],
+        [Sequelize.col("Appointment.patient_id"), "patient_id"],
       ],
-      group: ['Appointment.patient_id'],
-      order: [[Sequelize.fn('MAX', Sequelize.col('Appointment.appointment_datetime')), 'DESC']],
+      group: ["Appointment.patient_id"],
+      order: [
+        [
+          Sequelize.fn(
+            "MAX",
+            Sequelize.col("Appointment.appointment_datetime")
+          ),
+          "DESC",
+        ],
+      ],
       limit: parseInt(limit),
       offset: offset,
     });
@@ -1810,34 +2097,36 @@ export const getAllPatient = async (doctor_id, { search, page = 1, limit = 10 })
     if (patients.length === 0) {
       return {
         success: true,
-        message: 'Không tìm thấy bệnh nhân nào',
+        message: "Không tìm thấy bệnh nhân nào",
         data: [],
         pagination: {
           total: 0,
           current_page: parseInt(page),
           total_pages: 0,
-          per_page: parseInt(limit)
-        }
+          per_page: parseInt(limit),
+        },
       };
     }
 
     // Thực hiện thêm truy vấn để lấy toàn bộ thông tin từ bệnh nhân
-    const patientIds = patients.map(p => p.get('patient_id'));
-    
+    const patientIds = patients.map((p) => p.get("patient_id"));
+
     const fullPatientInfo = await db.Patient.findAll({
       where: { patient_id: { [Op.in]: patientIds } },
       include: [
         {
           model: db.User,
-          as: 'user',
-          attributes: ['user_id', 'username', 'email', 'avatar'],
+          as: "user",
+          attributes: ["user_id", "username", "email", "avatar"],
         },
       ],
     });
-    
+
     // Ghép thông tin bệnh nhân với thời gian cuộc hẹn gần nhất
     const patientList = fullPatientInfo.map((patient) => {
-      const appointmentInfo = patients.find(p => p.get('patient_id') === patient.patient_id);
+      const appointmentInfo = patients.find(
+        (p) => p.get("patient_id") === patient.patient_id
+      );
       return {
         patient_id: patient.patient_id,
         name: patient.user.username,
@@ -1849,58 +2138,68 @@ export const getAllPatient = async (doctor_id, { search, page = 1, limit = 10 })
         avatar: patient.user.avatar, // Vẫn lấy từ User
         health_insurance: patient.health_insurance,
         allergies: patient.allergies,
-        last_appointment: appointmentInfo ? appointmentInfo.get('last_appointment') : null
+        last_appointment: appointmentInfo
+          ? appointmentInfo.get("last_appointment")
+          : null,
       };
     });
 
     return {
       success: true,
-      message: 'Lấy danh sách bệnh nhân thành công',
+      message: "Lấy danh sách bệnh nhân thành công",
       data: patientList,
       pagination: {
         total: totalPatients,
         current_page: parseInt(page),
         total_pages: Math.ceil(totalPatients / limit),
-        per_page: parseInt(limit)
-      }
+        per_page: parseInt(limit),
+      },
     };
   } catch (error) {
-    console.error('Error fetching patients:', error);
-    throw new Error('Có lỗi xảy ra khi lấy danh sách bệnh nhân');
+    console.error("Error fetching patients:", error);
+    throw new Error("Có lỗi xảy ra khi lấy danh sách bệnh nhân");
   }
 };
 
-export const getPatientAppointment = async (doctor_id, patient_id, { status, start_date, end_date, page = 1, limit = 10 }) => {
+export const getPatientAppointment = async (
+  doctor_id,
+  patient_id,
+  { status, start_date, end_date, page = 1, limit = 10 }
+) => {
   try {
     const offset = (page - 1) * limit;
-    
+
     // Xây dựng điều kiện tìm kiếm
     let whereCondition = {
       doctor_id,
-      patient_id
+      patient_id,
     };
-    
+
     // Áp dụng lọc theo trạng thái nếu có
     if (status) {
       whereCondition.status = status;
     }
-    
+
     // Áp dụng lọc theo khoảng thời gian nếu có
     if (start_date || end_date) {
       whereCondition.appointment_datetime = {};
-      
+
       if (start_date) {
-        whereCondition.appointment_datetime[Op.gte] = dayjs(start_date).startOf('day').toDate();
+        whereCondition.appointment_datetime[Op.gte] = dayjs(start_date)
+          .startOf("day")
+          .toDate();
       }
-      
+
       if (end_date) {
-        whereCondition.appointment_datetime[Op.lte] = dayjs(end_date).endOf('day').toDate();
+        whereCondition.appointment_datetime[Op.lte] = dayjs(end_date)
+          .endOf("day")
+          .toDate();
       }
     }
 
     // Đếm tổng số cuộc hẹn
     const totalAppointments = await db.Appointment.count({
-      where: whereCondition
+      where: whereCondition,
     });
 
     // Kiểm tra xem bệnh nhân có tồn tại không
@@ -1909,52 +2208,52 @@ export const getPatientAppointment = async (doctor_id, patient_id, { status, sta
       include: [
         {
           model: db.Doctor,
-          as: 'Doctor',
+          as: "Doctor",
           include: [
             {
               model: db.User,
-              as: 'user',
-              attributes: ['user_id', 'username'],
+              as: "user",
+              attributes: ["user_id", "username"],
             },
             {
               model: db.Specialization,
-              as: 'Specialization',
-              attributes: ['name'],
+              as: "Specialization",
+              attributes: ["name"],
             },
           ],
         },
         {
           model: db.MedicalRecord,
-          as: 'MedicalRecord',
-          required: false
+          as: "MedicalRecord",
+          required: false,
         },
         {
           model: db.Prescription,
-          as: 'Prescription',
-          required: false
+          as: "Prescription",
+          required: false,
         },
         {
           model: db.Payment,
-          as: 'Payments',
-          required: false
-        }
+          as: "Payments",
+          required: false,
+        },
       ],
       limit: parseInt(limit),
       offset: offset,
-      order: [['appointment_datetime', 'DESC']], // Sắp xếp theo thời gian hẹn
+      order: [["appointment_datetime", "DESC"]], // Sắp xếp theo thời gian hẹn
     });
 
     if (appointments.length === 0) {
       return {
         success: true,
-        message: 'Không tìm thấy lịch hẹn của bệnh nhân này',
+        message: "Không tìm thấy lịch hẹn của bệnh nhân này",
         data: [],
         pagination: {
           total: 0,
           current_page: parseInt(page),
           total_pages: 0,
-          per_page: parseInt(limit)
-        }
+          per_page: parseInt(limit),
+        },
       };
     }
 
@@ -1973,23 +2272,23 @@ export const getPatientAppointment = async (doctor_id, patient_id, { status, sta
       payment_status: appointment.Payment?.status,
       cancelled_at: appointment.cancelled_at,
       cancelled_by: appointment.cancelled_by,
-      cancel_reason: appointment.cancel_reason
+      cancel_reason: appointment.cancel_reason,
     }));
 
     return {
       success: true,
-      message: 'Lấy danh sách cuộc hẹn của bệnh nhân thành công',
+      message: "Lấy danh sách cuộc hẹn của bệnh nhân thành công",
       data: patientAppointments,
       pagination: {
         total: totalAppointments,
         current_page: parseInt(page),
         total_pages: Math.ceil(totalAppointments / limit),
-        per_page: parseInt(limit)
-      }
+        per_page: parseInt(limit),
+      },
     };
   } catch (error) {
-    console.error('Error fetching appointments for patient:', error);
-    throw new Error('Có lỗi xảy ra khi lấy danh sách cuộc hẹn của bệnh nhân');
+    console.error("Error fetching appointments for patient:", error);
+    throw new Error("Có lỗi xảy ra khi lấy danh sách cuộc hẹn của bệnh nhân");
   }
 };
 export const getDoctorProfile = async (user_id) => {
@@ -2023,28 +2322,27 @@ export const getDoctorProfile = async (user_id) => {
         days: "Thứ 2 - Thứ 6",
         morning: {
           start: "08:00",
-          end: "11:30"
+          end: "11:30",
         },
         afternoon: {
           start: "13:30",
-          end: "17:00"
-        }
+          end: "17:00",
+        },
       },
       weekend: {
         days: "Thứ 7, Chủ nhật",
-        status: "Nghỉ"
-      }
+        status: "Nghỉ",
+      },
     };
 
     return {
       message: "Success",
       user: {
         ...user.toJSON(),
-        working_hours: workingHours
-      }
+        working_hours: workingHours,
+      },
     };
   } catch (error) {
     throw new Error(error.message);
   }
 };
-

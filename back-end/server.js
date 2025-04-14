@@ -8,7 +8,6 @@ import pharmacistRoutes from "./routes/pharmacistRoutes.js";
 import patientRoutes from "./routes/patientRoutes.js";
 import requestLogger from "./middleware/logger.js";
 import errorHandler from "./middleware/errorHandler.js";
-import specializationRoutes from "./routes/specializationRoutes.js";
 dotenv.config();
 
 const app = express();
@@ -16,8 +15,8 @@ const app = express();
 // Middleware để log tất cả requests
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
+  console.log("Headers:", req.headers);
+  console.log("Body:", req.body);
   next();
 });
 
@@ -33,7 +32,6 @@ app.use("/doctor", doctorRoutes);
 app.use("/admin", adminRoutes);
 app.use("/pharmacist", pharmacistRoutes);
 app.use("/patient", patientRoutes);
-app.use("/specializations", specializationRoutes);
 app.use(requestLogger);
 app.use(errorHandler);
 

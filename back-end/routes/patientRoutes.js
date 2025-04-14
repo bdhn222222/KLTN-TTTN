@@ -6,8 +6,13 @@ import {
   getAllDoctorsController,
   getDoctorProfileController,
   verifyEmailController,
-  bookAppointmentController,
-  changePasswordController
+  bookDoctorAppointmentController,
+  changePasswordController,
+  addFamilyMemberController,
+  getFamilyMembersController,
+  updateFamilyMemberController,
+  getAllAppointmentsController,
+  bookSymptomsAppointmentController,
 } from "../controllers/patientController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
@@ -51,12 +56,86 @@ router.post(
       .notEmpty()
       .withMessage("Thời gian hẹn không được để trống")
       .isISO8601()
-      .withMessage("Thời gian hẹn không hợp lệ")
+      .withMessage("Thời gian hẹn không hợp lệ"),
   ]),
-  bookAppointmentController
+  bookDoctorAppointmentController
+);
+router.get(
+  "/appointments",
+  authenticateUser,
+  authorize(["patient"]),
+  getAllAppointmentsController
+);
+router.post(
+  "/add-family-member",
+  authenticateUser,
+  authorize(["patient"]),
+  addFamilyMemberController
+);
+router.get(
+  "/family-members",
+  authenticateUser,
+  authorize(["patient"]),
+  getFamilyMembersController
 );
 
-router.post("/change-password", authenticateUser, authorize(["patient"]), changePasswordController);
+router.post(
+  "/change-password",
+  authenticateUser,
+  authorize(["patient"]),
+  changePasswordController
+);
+router.patch(
+  "/family-members/:family_member_id",
+  authenticateUser,
+  authorize(["patient"]),
+  updateFamilyMemberController
+);
+
+router.post(
+  "/book-symptoms-appointment",
+  authenticateUser,
+  authorize(["patient"]),
+  validate([
+    body("symptoms")
+      .isArray()
+      .withMessage("Danh sách triệu chứng phải là mảng")
+      .notEmpty()
+      .withMessage("Danh sách triệu chứng không được để trống"),
+    body("appointment_datetime")
+      .notEmpty()
+      .withMessage("Thời gian hẹn không được để trống")
+      .isISO8601()
+      .withMessage("Thời gian hẹn không hợp lệ"),
+    body("family_member_id")
+      .notEmpty()
+      .withMessage("ID người thân không được để trống")
+      .isInt()
+      .withMessage("ID người thân phải là số"),
+    body("family_member_data")
+      .notEmpty()
+      .withMessage("Thông tin người thân không được để trống")
+      .isObject()
+      .withMessage("Thông tin người thân không hợp lệ"),
+    body("family_member_data.username")
+      .notEmpty()
+      .withMessage("Tên người thân không được để trống"),
+    body("family_member_data.dob")
+      .notEmpty()
+      .withMessage("Ngày sinh người thân không được để trống")
+      .isISO8601()
+      .withMessage("Ngày sinh không hợp lệ"),
+    body("family_member_data.phone_number")
+      .notEmpty()
+      .withMessage("Số điện thoại người thân không được để trống"),
+    body("family_member_data.gender")
+      .notEmpty()
+      .withMessage("Giới tính người thân không được để trống")
+      .isIn(["male", "female"])
+      .withMessage("Giới tính không hợp lệ"),
+  ]),
+  bookSymptomsAppointmentController
+);
 
 export default router;
 
