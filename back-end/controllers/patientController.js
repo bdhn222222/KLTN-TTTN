@@ -15,6 +15,7 @@ import {
   getAllAppointments,
   bookSymptomsAppointment,
   getAllSymptoms,
+  getDoctorDayOff,
 } from "../services/patientService.js";
 import BadRequestError from "../errors/bad_request.js";
 import UnauthorizedError from "../errors/unauthorized.js";
@@ -410,6 +411,21 @@ export const getAllSymptomsController = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Error in getAllSymptomsController:", error);
+    next(error);
+  }
+};
+
+export const getDoctorDayOffController = async (req, res, next) => {
+  try {
+    const { doctor_id } = req.params;
+
+    if (!doctor_id) {
+      throw new BadRequestError("Thiếu thông tin ID bác sĩ");
+    }
+
+    const result = await getDoctorDayOff(doctor_id);
+    return res.status(200).json(result);
+  } catch (error) {
     next(error);
   }
 };

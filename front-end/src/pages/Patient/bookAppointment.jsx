@@ -32,6 +32,7 @@ import {
   Rate,
   Typography,
   Calendar,
+  Alert,
 } from "antd";
 import {
   PlusOutlined,
@@ -176,6 +177,10 @@ const BookAppointment = () => {
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [tempSelectedDate, setTempSelectedDate] = useState(null);
+  const [doctorDayOffs, setDoctorDayOffs] = useState([]);
+  const [dateMessage, setDateMessage] = useState("");
+  const [timeSlots, setTimeSlots] = useState([]);
 
   // State cho modal
   const [showSpecializationModal, setShowSpecializationModal] = useState(false);
@@ -897,9 +902,29 @@ const BookAppointment = () => {
   };
 
   // Xử lý khi chọn bác sĩ
-  const handleDoctorSelect = (doctorId) => {
+  const handleDoctorSelect = async (doctorId) => {
     setSelectedDoctor(doctorId);
-    setShowDoctorModal(false);
+    // Reset các state liên quan đến lịch khi đổi bác sĩ
+    setSelectedDate(null);
+    setTempSelectedDate(null);
+    setSelectedTime("");
+    setTimeSlots([]);
+    setDateMessage("");
+
+    // Fetch lịch nghỉ của bác sĩ mới
+    try {
+      const response = await axios.get(
+        `${
+          import.meta.env.VITE_API_URL
+        }/api/patients/doctors/${doctorId}/day-offs`
+      );
+      if (response.data.success) {
+        setDoctorDayOffs(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching doctor day-offs:", error);
+      message.error("Không thể lấy thông tin lịch nghỉ của bác sĩ");
+    }
   };
 
   // Xử lý khi chọn ca (sáng/chiều)
@@ -1739,6 +1764,7 @@ const BookAppointment = () => {
                   </Col>
                 </Row>
 
+                {/* Cập nhật Modal Calendar */}
                 <Modal
                   title={
                     <div style={{ color: "#1E3A8A", fontWeight: 600 }}>
@@ -1746,8 +1772,37 @@ const BookAppointment = () => {
                     </div>
                   }
                   open={showCalendar}
-                  onCancel={() => setShowCalendar(false)}
-                  footer={null}
+                  onCancel={() => {
+                    setShowCalendar(false);
+                    setTempSelectedDate(null);
+                  }}
+                  footer={[
+                    <Button
+                      key="cancel"
+                      onClick={() => {
+                        setShowCalendar(false);
+                        setTempSelectedDate(null);
+                      }}
+                    >
+                      Hủy
+                    </Button>,
+                    <Button
+                      key="submit"
+                      type="primary"
+                      className="!bg-blue-900"
+                      onClick={() => {
+                        if (tempSelectedDate) {
+                          setSelectedDate(tempSelectedDate);
+                          updateAvailableTimeSlots(tempSelectedDate);
+                          setShowCalendar(false);
+                          setTempSelectedDate(null);
+                          setSelectedTime(""); // Reset selected time when date changes
+                        }
+                      }}
+                    >
+                      Xác nhận
+                    </Button>,
+                  ]}
                   width={400}
                 >
                   <div className="custom-calendar">
@@ -1758,20 +1813,12 @@ const BookAppointment = () => {
                       }}
                       disabledDate={(current) => {
                         const today = dayjs();
-                        const twoHoursLater = today.add(2, "hour");
-                        return (
-                          current.day() === 0 || // Sunday
-                          current.day() === 6 || // Saturday
-                          current.isBefore(today, "day") ||
-                          (current.isSame(today, "day") &&
-                            current.isBefore(twoHoursLater))
-                        );
+                        return current.isBefore(today, "day");
                       }}
                       onSelect={(date) => {
-                        handleDateSelect(date);
-                        setShowCalendar(false);
+                        setTempSelectedDate(date);
                       }}
-                      value={selectedDate}
+                      value={tempSelectedDate || selectedDate || dayjs()}
                       mode="month"
                     />
                   </div>
@@ -1780,23 +1827,16 @@ const BookAppointment = () => {
 
               {selectedDate && (
                 <div>
-                  <h3 className="text-base font-medium mb-2">
-                    <ClockCircleOutlined /> Ca khám
-                  </h3>
-                  <Radio.Group
-                    onChange={(e) => handleSessionSelect(e.target.value)}
-                    value={selectedSession}
-                    buttonStyle="solid"
-                  >
-                    <Radio.Button value="morning">
-                      Ca sáng (8:00 - 11:30)
-                    </Radio.Button>
-                    <Radio.Button value="afternoon">
-                      Ca chiều (13:30 - 17:00)
-                    </Radio.Button>
-                  </Radio.Group>
+                  {dateMessage && (
+                    <Alert
+                      message={dateMessage}
+                      type={timeSlots.length === 0 ? "error" : "warning"}
+                      showIcon
+                      style={{ marginBottom: 16 }}
+                    />
+                  )}
 
-                  {selectedSession && (
+                  {timeSlots.length > 0 && (
                     <div className="mt-4">
                       <h3 className="text-base font-medium mb-2">
                         <ClockCircleOutlined /> Giờ khám
@@ -1807,7 +1847,7 @@ const BookAppointment = () => {
                         buttonStyle="solid"
                       >
                         <div className="flex flex-wrap gap-2">
-                          {getSessionTimes().map((time) => (
+                          {timeSlots.map((time) => (
                             <Radio.Button key={time} value={time}>
                               {time}
                             </Radio.Button>
@@ -1903,11 +1943,115 @@ const BookAppointment = () => {
     },
   ];
 
+  // Thêm hàm kiểm tra ngày nghỉ
+  const isDayOff = (date) => {
+    const formattedDate = dayjs(date).format("YYYY-MM-DD");
+    return doctorDayOffs.find((dayOff) => dayOff.off_date === formattedDate);
+  };
+
+  // Hàm lấy các khung giờ buổi sáng
+  const getMorningTimeSlots = () => {
+    const slots = [];
+    for (let h = 8; h <= 11; h++) {
+      for (let m of ["00", "30"]) {
+        if (h === 11 && m === "30") continue;
+        slots.push(`${h.toString().padStart(2, "0")}:${m}`);
+      }
+    }
+    return slots;
+  };
+
+  // Hàm lấy các khung giờ buổi chiều
+  const getAfternoonTimeSlots = () => {
+    const slots = [];
+    for (let h = 13; h <= 17; h++) {
+      for (let m of ["00", "30"]) {
+        if (h === 13 && m === "00") continue;
+        if (h === 17 && m === "30") continue;
+        slots.push(`${h.toString().padStart(2, "0")}:${m}`);
+      }
+    }
+    return slots;
+  };
+
+  // Hàm cập nhật khung giờ dựa trên ngày được chọn
+  const updateAvailableTimeSlots = (date) => {
+    if (!date) {
+      setTimeSlots([]);
+      setDateMessage("");
+      return;
+    }
+
+    const selectedDay = dayjs(date);
+    const dayOfWeek = selectedDay.day();
+
+    // Kiểm tra cuối tuần
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      setTimeSlots([]);
+      setDateMessage("Không có lịch đặt vào cuối tuần");
+      return;
+    }
+
+    // Kiểm tra ngày nghỉ của bác sĩ
+    const dayOff = isDayOff(date);
+    if (dayOff) {
+      if (dayOff.off_morning && dayOff.off_afternoon) {
+        setTimeSlots([]);
+        setDateMessage("Bác sĩ nghỉ toàn bộ ngày này");
+        return;
+      }
+
+      if (dayOff.off_morning) {
+        setTimeSlots(getAfternoonTimeSlots());
+        setDateMessage("Bác sĩ nghỉ buổi sáng, chỉ có lịch buổi chiều");
+        return;
+      }
+
+      if (dayOff.off_afternoon) {
+        setTimeSlots(getMorningTimeSlots());
+        setDateMessage("Bác sĩ nghỉ buổi chiều, chỉ có lịch buổi sáng");
+        return;
+      }
+    }
+
+    // Ngày bình thường
+    setTimeSlots([...getMorningTimeSlots(), ...getAfternoonTimeSlots()]);
+    setDateMessage("");
+  };
+
+  // Hàm lấy thông tin ngày nghỉ của bác sĩ
+  const fetchDoctorDayOffs = async (doctorId) => {
+    try {
+      const response = await axios.get(
+        `${url1}/patient/doctor/${doctorId}/day-off`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
+      if (response.data.success) {
+        setDoctorDayOffs(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching doctor day offs:", error);
+      notification.error({
+        message: "Lỗi",
+        description: "Không thể lấy thông tin ngày nghỉ của bác sĩ",
+      });
+    }
+  };
+
+  // Cập nhật useEffect để lấy thông tin ngày nghỉ khi chọn bác sĩ
+  useEffect(() => {
+    if (selectedDoctor?.doctor_id) {
+      fetchDoctorDayOffs(selectedDoctor.doctor_id);
+    }
+  }, [selectedDoctor]);
+
+  // Cập nhật hàm handleDateSelect
   const handleDateSelect = (date) => {
-    // Ensure we're working with a dayjs object
     const selectedDate = dayjs(date);
-    setSelectedDate(selectedDate);
-    setSelectedSession(null); // Reset session when date changes
+    setTempSelectedDate(selectedDate);
+    updateAvailableTimeSlots(selectedDate);
   };
 
   return (
@@ -1939,7 +2083,14 @@ const BookAppointment = () => {
               )}
 
               {currentStep < steps.length - 1 && (
-                <Button onClick={nextStep} className="!bg-blue-900 !text-white">
+                <Button
+                  onClick={nextStep}
+                  className="!bg-blue-900 !text-white"
+                  disabled={
+                    currentStep === 1 &&
+                    (!selectedDate || !selectedTime || timeSlots.length === 0)
+                  }
+                >
                   Tiếp theo
                 </Button>
               )}

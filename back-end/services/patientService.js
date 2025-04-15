@@ -1926,3 +1926,54 @@ export const getAllSymptoms = async () => {
     );
   }
 };
+
+export const getDoctorDayOff = async (doctor_id) => {
+  const t = await db.sequelize.transaction();
+
+  try {
+    // Kiểm tra bác sĩ có tồn tại không
+    const doctor = await db.Doctor.findByPk(doctor_id, {
+      transaction: t,
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy bác sĩ");
+    }
+
+    // Lấy tất cả ngày nghỉ của bác sĩ
+    const dayOffs = await db.DoctorDayOff.findAll({
+      where: {
+        doctor_id,
+        status: "active",
+        off_date: {
+          [Op.gte]: dayjs().format("YYYY-MM-DD"), // Chỉ lấy ngày nghỉ từ hôm nay trở đi
+        },
+      },
+      order: [["off_date", "ASC"]],
+      transaction: t,
+    });
+
+    // Format dữ liệu trả về
+    const formattedDayOffs = dayOffs.map((dayOff) => ({
+      day_off_id: dayOff.day_off_id,
+      off_date: dayjs(dayOff.off_date).format("YYYY-MM-DD"),
+      off_morning: dayOff.off_morning,
+      off_afternoon: dayOff.off_afternoon,
+      reason: dayOff.reason,
+      status: dayOff.status,
+      created_at: dayjs(dayOff.createdAt).format("YYYY-MM-DD HH:mm:ss"),
+      updated_at: dayjs(dayOff.updatedAt).format("YYYY-MM-DD HH:mm:ss"),
+    }));
+
+    await t.commit();
+
+    return {
+      success: true,
+      message: "Lấy danh sách ngày nghỉ của bác sĩ thành công",
+      data: formattedDayOffs,
+    };
+  } catch (error) {
+    await t.rollback();
+    throw error;
+  }
+};

@@ -15,6 +15,7 @@ import {
   bookSymptomsAppointmentController,
   getFamilyMemberByIdController,
   getAllSymptomsController,
+  getDoctorDayOffController,
 } from "../controllers/patientController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
@@ -153,6 +154,9 @@ router.get(
   authorize(["patient"]),
   getAllSymptomsController
 );
+
+// Get doctor's day off information
+router.get("/doctor/:doctor_id/day-off", getDoctorDayOffController);
 
 export default router;
 
