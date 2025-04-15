@@ -1974,7 +1974,31 @@ const BookAppointment = () => {
     return slots;
   };
 
-  // Hàm cập nhật khung giờ dựa trên ngày được chọn
+  // Thêm style cho card được chọn
+  const DateCard = ({ date, isSelected, onClick }) => {
+    const dayjs = require("dayjs");
+    const d = dayjs(date);
+
+    return (
+      <div
+        onClick={onClick}
+        className={`cursor-pointer p-4 rounded-lg transition-all duration-300 ${
+          isSelected
+            ? "border-2 border-blue-900 bg-blue-50"
+            : "border border-gray-200 hover:border-blue-900 hover:bg-blue-50"
+        }`}
+      >
+        <div className="text-xl font-semibold text-blue-900 text-center">
+          {d.format("DD/MM")}
+        </div>
+        <div className="text-gray-500 text-center">
+          {`Thứ ${d.day() === 0 ? "CN" : d.day() + 1}`}
+        </div>
+      </div>
+    );
+  };
+
+  // Cập nhật hàm updateAvailableTimeSlots để kiểm tra thời gian hiện tại
   const updateAvailableTimeSlots = (date) => {
     if (!date) {
       setTimeSlots([]);
@@ -1984,6 +2008,8 @@ const BookAppointment = () => {
 
     const selectedDay = dayjs(date);
     const dayOfWeek = selectedDay.day();
+    const now = dayjs();
+    const isSameDay = selectedDay.isSame(now, "day");
 
     // Kiểm tra cuối tuần
     if (dayOfWeek === 0 || dayOfWeek === 6) {
@@ -2014,9 +2040,107 @@ const BookAppointment = () => {
       }
     }
 
-    // Ngày bình thường
-    setTimeSlots([...getMorningTimeSlots(), ...getAfternoonTimeSlots()]);
+    // Lấy tất cả khung giờ có thể
+    let availableSlots = [...getMorningTimeSlots(), ...getAfternoonTimeSlots()];
+
+    // Nếu là ngày hiện tại, chỉ hiển thị các khung giờ từ 2 tiếng sau trở đi
+    if (isSameDay) {
+      const currentHour = now.hour();
+      const currentMinute = now.minute();
+
+      availableSlots = availableSlots.filter((slot) => {
+        const [slotHour, slotMinute] = slot.split(":").map(Number);
+        const slotTime = dayjs().hour(slotHour).minute(slotMinute);
+        return slotTime.diff(now, "hour", true) >= 2;
+      });
+
+      if (availableSlots.length === 0) {
+        setDateMessage("Không còn khung giờ nào phù hợp trong ngày hôm nay");
+      }
+    }
+
+    setTimeSlots(availableSlots);
     setDateMessage("");
+  };
+
+  // Cập nhật phần render date selection
+  const renderDateSelection = () => {
+    const today = dayjs();
+    const dates = [];
+
+    // Tạo danh sách 3 ngày kế tiếp (không tính thứ 7, chủ nhật)
+    let currentDate = today;
+    while (dates.length < 3) {
+      if (currentDate.day() !== 0 && currentDate.day() !== 6) {
+        dates.push(currentDate);
+      }
+      currentDate = currentDate.add(1, "day");
+    }
+
+    return (
+      <div>
+        <div className="text-lg font-medium mb-4">Thời gian khám*</div>
+        <div className="grid grid-cols-4 gap-4">
+          {dates.map((date) => (
+            <DateCard
+              key={date.format("YYYY-MM-DD")}
+              date={date}
+              isSelected={selectedDate && selectedDate.isSame(date, "day")}
+              onClick={() => {
+                console.log("Date card clicked:", date.format("YYYY-MM-DD"));
+                handleDateSelect(date);
+              }}
+            />
+          ))}
+          <div
+            onClick={() => setShowCalendar(true)}
+            className={`cursor-pointer p-4 rounded-lg border border-gray-200 hover:border-blue-900 hover:bg-blue-50 flex flex-col items-center justify-center ${
+              selectedDate && !dates.some((d) => selectedDate.isSame(d, "day"))
+                ? "border-2 border-blue-900 bg-blue-50"
+                : ""
+            }`}
+          >
+            <CalendarOutlined className="text-2xl text-blue-900" />
+            <div className="mt-2 text-center">
+              {selectedDate && !dates.some((d) => selectedDate.isSame(d, "day"))
+                ? selectedDate.format("DD/MM")
+                : "Ngày khác"}
+            </div>
+          </div>
+        </div>
+
+        {/* Hiển thị thông báo và khung giờ */}
+        {dateMessage && (
+          <Alert
+            message={dateMessage}
+            type={timeSlots.length === 0 ? "error" : "warning"}
+            showIcon
+            style={{ marginTop: 16 }}
+          />
+        )}
+
+        {timeSlots.length > 0 && (
+          <div className="mt-4">
+            <h3 className="text-base font-medium mb-2">
+              <ClockCircleOutlined /> Giờ khám
+            </h3>
+            <Radio.Group
+              onChange={(e) => setSelectedTime(e.target.value)}
+              value={selectedTime}
+              buttonStyle="solid"
+            >
+              <div className="flex flex-wrap gap-2">
+                {timeSlots.map((time) => (
+                  <Radio.Button key={time} value={time}>
+                    {time}
+                  </Radio.Button>
+                ))}
+              </div>
+            </Radio.Group>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Hàm lấy thông tin ngày nghỉ của bác sĩ
@@ -2050,7 +2174,8 @@ const BookAppointment = () => {
   // Cập nhật hàm handleDateSelect
   const handleDateSelect = (date) => {
     const selectedDate = dayjs(date);
-    setTempSelectedDate(selectedDate);
+    setSelectedDate(selectedDate);
+    setTempSelectedDate(null);
     updateAvailableTimeSlots(selectedDate);
   };
 
