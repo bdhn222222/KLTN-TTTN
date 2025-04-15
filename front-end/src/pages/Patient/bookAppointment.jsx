@@ -30,6 +30,8 @@ import {
   Spin,
   message,
   Rate,
+  Typography,
+  Calendar,
 } from "antd";
 import {
   PlusOutlined,
@@ -42,6 +44,7 @@ import {
   UserAddOutlined,
   WomanOutlined,
   ManOutlined,
+  MailOutlined,
 } from "@ant-design/icons";
 
 // Kích hoạt plugins cho dayjs
@@ -133,6 +136,21 @@ const styles = `
     margin-bottom: 8px;
     color: #1890ff;
   }
+
+  .custom-calendar .ant-picker-calendar {
+    background: white;
+    border-radius: 8px;
+  }
+  .custom-calendar .ant-picker-calendar-date-today {
+    border-color: #1E3A8A;
+  }
+  .custom-calendar .ant-picker-calendar-date-selected {
+    background: #1E3A8A;
+    color: white;
+  }
+  .custom-calendar .ant-picker-calendar-date:hover {
+    background: #F8FAFC;
+  }
 `;
 
 const styleSheet = document.createElement("style");
@@ -157,6 +175,7 @@ const BookAppointment = () => {
   const [selectedSpecialization, setSelectedSpecialization] = useState(null);
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
   const [currentStep, setCurrentStep] = useState(0);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   // State cho modal
   const [showSpecializationModal, setShowSpecializationModal] = useState(false);
@@ -816,19 +835,21 @@ const BookAppointment = () => {
 
   // Ngày có thể đặt lịch (hiện tại + 7 ngày tới, trừ thứ 7 và chủ nhật)
   const getAvailableDates = () => {
+    const today = dayjs();
     const dates = [];
-    let currentDate = dayjs().tz("Asia/Ho_Chi_Minh");
+    let currentDate = today;
 
-    for (let i = 0; i < 14; i++) {
-      const date = currentDate.add(i, "day");
-      const day = date.day(); // 0 = Sunday, 6 = Saturday
-
-      if (day !== 0 && day !== 6) {
+    // Get next 3 available weekdays
+    while (dates.length < 3) {
+      currentDate = currentDate.add(1, "day");
+      if (currentDate.day() !== 0 && currentDate.day() !== 6) {
+        // Skip weekends
         dates.push({
-          value: date.format("YYYY-MM-DD"),
-          label: date.format("DD/MM/YYYY"),
-          day: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][day],
-          isToday: i === 0,
+          date: currentDate,
+          day: `Thứ ${
+            currentDate.day() === 0 ? "Chủ nhật" : currentDate.day() + 1
+          }`,
+          disabled: false,
         });
       }
     }
@@ -1001,10 +1022,10 @@ const BookAppointment = () => {
             style={{
               width: 100,
               cursor: "pointer",
-              backgroundColor: selectedMember === "self" ? "#e6f7ff" : "white",
+              backgroundColor: selectedMember === "self" ? "#white" : "white",
               border:
                 selectedMember === "self"
-                  ? "2px solid #1890ff"
+                  ? "2px solid #1E3A8A"
                   : "1px solid #f0f0f0",
               flexShrink: 0,
             }}
@@ -1053,8 +1074,12 @@ const BookAppointment = () => {
                 cursor: "pointer",
                 border:
                   selectedMember === member.family_member_id.toString()
-                    ? "2px solid #1890ff"
+                    ? "2px solid #09437a"
                     : "1px solid #f0f0f0",
+                backgroundColor:
+                  selectedMember === member.family_member_id.toString()
+                    ? "white"
+                    : "white",
                 flexShrink: 0,
               }}
               onClick={() => handleMemberSelect(member)}
@@ -1082,7 +1107,11 @@ const BookAppointment = () => {
   // Update the doctor modal content
   const renderDoctorModal = () => (
     <Modal
-      title="Chọn bác sĩ"
+      title={
+        <div style={{ color: "#1E3A8A", fontWeight: 600 }}>
+          Chọn bác sĩ Khoa {selectedSpecialization?.name}
+        </div>
+      }
       open={showDoctorModal}
       onCancel={() => setShowDoctorModal(false)}
       footer={null}
@@ -1108,11 +1137,11 @@ const BookAppointment = () => {
                   marginBottom: "16px",
                   borderColor:
                     selectedDoctor?.doctor_id === doctor.doctor_id
-                      ? "#1890ff"
-                      : "#d9d9d9",
+                      ? "#09437a"
+                      : "#043059",
                   backgroundColor:
                     selectedDoctor?.doctor_id === doctor.doctor_id
-                      ? "#e6f7ff"
+                      ? "white"
                       : "white",
                 }}
               >
@@ -1130,15 +1159,22 @@ const BookAppointment = () => {
                           margin: 0,
                           color:
                             selectedDoctor?.doctor_id === doctor.doctor_id
-                              ? "#1890ff"
-                              : "#000",
+                              ? "#043059"
+                              : "#000000",
                           fontSize: "18px",
                           fontWeight: 600,
                         }}
                       >
                         {doctor.user?.username}
                       </h3>
-                      <Tag color="blue" style={{ marginTop: "4px" }}>
+                      <Tag
+                        color={
+                          selectedDoctor?.doctor_id === doctor.doctor_id
+                            ? "#043059"
+                            : "#666666"
+                        }
+                        style={{ marginTop: "4px" }}
+                      >
                         {doctor.Specialization?.name}
                       </Tag>
                     </div>
@@ -1150,32 +1186,87 @@ const BookAppointment = () => {
                         marginBottom: "8px",
                       }}
                     >
-                      <div>
+                      <div
+                        style={{
+                          color:
+                            selectedDoctor?.doctor_id === doctor.doctor_id
+                              ? "#043059"
+                              : "#000000",
+                        }}
+                      >
                         <strong>Học vị:</strong>{" "}
                         {doctor.degree || "Chưa cập nhật"}
                       </div>
-                      <div>
+                      <div
+                        style={{
+                          color:
+                            selectedDoctor?.doctor_id === doctor.doctor_id
+                              ? "#043059"
+                              : "#000000",
+                        }}
+                      >
                         <strong>Kinh nghiệm:</strong> {doctor.experience_years}{" "}
                         năm
                       </div>
                     </div>
 
                     <div style={{ marginBottom: "8px" }}>
-                      <strong>Đánh giá:</strong>{" "}
+                      <strong
+                        style={{
+                          color:
+                            selectedDoctor?.doctor_id === doctor.doctor_id
+                              ? "#043059"
+                              : "#000000",
+                        }}
+                      >
+                        Đánh giá:
+                      </strong>{" "}
                       <Rate
                         disabled
                         defaultValue={doctor.rating || 0}
-                        style={{ fontSize: "14px" }}
+                        style={{
+                          fontSize: "14px",
+                          color:
+                            selectedDoctor?.doctor_id === doctor.doctor_id
+                              ? "#043059"
+                              : "#666666",
+                        }}
                       />
-                      <span style={{ marginLeft: "8px" }}>
+                      <span
+                        style={{
+                          marginLeft: "8px",
+                          color:
+                            selectedDoctor?.doctor_id === doctor.doctor_id
+                              ? "#043059"
+                              : "#666666",
+                        }}
+                      >
                         ({doctor.rating || 0})
                       </span>
                     </div>
 
-                    <div style={{ color: "#666" }}>
-                      <strong>Mô tả:</strong>
-                      <br />
-                      {doctor.description || "Chưa có mô tả"}
+                    <div>
+                      <strong
+                        style={{
+                          color:
+                            selectedDoctor?.doctor_id === doctor.doctor_id
+                              ? "#043059"
+                              : "#000000",
+                        }}
+                      >
+                        Mô tả:
+                      </strong>
+                      <div
+                        style={{
+                          color:
+                            selectedDoctor?.doctor_id === doctor.doctor_id
+                              ? "#043059"
+                              : "#666666",
+                          marginTop: "4px",
+                        }}
+                      >
+                        {doctor.description || "Chưa có mô tả"}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1196,7 +1287,7 @@ const BookAppointment = () => {
   const renderSpecializationCards = () => (
     <Card
       title={
-        <div className="text-blue-600">
+        <div style={{ color: "#1E3A8A", fontWeight: 600 }}>
           <MedicineBoxOutlined /> Chọn chuyên khoa
         </div>
       }
@@ -1209,7 +1300,9 @@ const BookAppointment = () => {
             <Col xs={12} sm={8} md={6} key={specialization.specialization_id}>
               <Card
                 hoverable
-                bodyStyle={{ padding: "12px", textAlign: "center" }}
+                styles={{
+                  body: { padding: "12px", textAlign: "center" },
+                }}
                 className={`specialization-card ${
                   selectedSpecialization?.specialization_id ===
                   specialization.specialization_id
@@ -1225,8 +1318,13 @@ const BookAppointment = () => {
                   border:
                     selectedSpecialization?.specialization_id ===
                     specialization.specialization_id
-                      ? "2px solid #1890ff"
+                      ? "2px solid #1E3A8A"
                       : "1px solid #d9d9d9",
+                  backgroundColor:
+                    selectedSpecialization?.specialization_id ===
+                    specialization.specialization_id
+                      ? "white"
+                      : "white",
                 }}
               >
                 {specialization.name}
@@ -1245,6 +1343,7 @@ const BookAppointment = () => {
     {
       key: "doctor",
       label: "Đặt lịch theo bác sĩ",
+      color: "#1E3A8A",
       children: (
         <div className="mb-6">
           {renderSpecializationCards()}
@@ -1255,11 +1354,12 @@ const BookAppointment = () => {
     {
       key: "symptoms",
       label: "Đặt lịch theo triệu chứng",
+      color: "#1E3A8A",
       children: (
         <div className="mb-6">
           <Card
             title={
-              <div className="text-blue-600">
+              <div style={{ color: "#1E3A8A", fontWeight: 600 }}>
                 <CheckCircleOutlined /> Chọn triệu chứng
               </div>
             }
@@ -1292,67 +1392,53 @@ const BookAppointment = () => {
                 className="custom-scrollbar"
               >
                 <Checkbox.Group
-                  onChange={handleSymptomToggle}
-                  value={selectedSymptoms}
                   style={{ width: "100%" }}
+                  value={selectedSymptoms}
+                  onChange={handleSymptomToggle}
+                  className="custom-checkbox-group"
                 >
-                  <Row gutter={[16, 16]}>
+                  <Row
+                    gutter={[16, 16]}
+                    className="symptoms-scroll custom-scrollbar"
+                  >
                     {symptoms.map((symptom) => (
                       <Col span={8} key={symptom.symptom_id}>
-                        <Card
-                          hoverable
-                          className="symptom-item"
+                        <Checkbox
+                          value={symptom.symptom_id}
                           style={{
-                            height: "80px",
-                            borderRadius: "8px",
                             border: selectedSymptoms.includes(
                               symptom.symptom_id
                             )
-                              ? "2px solid #1890ff"
+                              ? "2px solid #1E3A8A"
                               : "1px solid #d9d9d9",
                             backgroundColor: selectedSymptoms.includes(
                               symptom.symptom_id
                             )
-                              ? "#e6f7ff"
+                              ? "white"
                               : "white",
-                            transition: "all 0.3s",
-                            display: "flex",
-                            flexDirection: "column",
-                            justifyContent: "center",
+                            borderRadius: "6px",
+                            padding: "12px",
+                            width: "100%",
+                            marginRight: 0,
                           }}
                         >
-                          <div
+                          <span
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              padding: "8px",
+                              color: selectedSymptoms.includes(
+                                symptom.symptom_id
+                              )
+                                ? "#1E3A8A"
+                                : "#666666",
+                              fontWeight: selectedSymptoms.includes(
+                                symptom.symptom_id
+                              )
+                                ? 500
+                                : 400,
                             }}
                           >
-                            <Checkbox
-                              value={symptom.symptom_id}
-                              style={{ marginRight: "8px" }}
-                            />
-                            <div
-                              style={{
-                                flex: 1,
-                                fontSize: "14px",
-                                fontWeight: selectedSymptoms.includes(
-                                  symptom.symptom_id
-                                )
-                                  ? "500"
-                                  : "normal",
-                                lineHeight: "1.4",
-                                overflow: "hidden",
-                                display: "-webkit-box",
-                                WebkitLineClamp: "3",
-                                WebkitBoxOrient: "vertical",
-                                textOverflow: "ellipsis",
-                              }}
-                            >
-                              {symptom.name}
-                            </div>
-                          </div>
-                        </Card>
+                            {symptom.name}
+                          </span>
+                        </Checkbox>
                       </Col>
                     ))}
                   </Row>
@@ -1369,6 +1455,24 @@ const BookAppointment = () => {
       ),
     },
   ];
+
+  // Add CSS styles
+  const tabStyle = {
+    ".antTabsTab": {
+      color: "#1E3A8A !important",
+      "&:hover": {
+        color: "#2563EB !important",
+      },
+    },
+    ".antTabsTabActive": {
+      "& .antTabsTabBtn": {
+        color: "#1E3A8A !important",
+      },
+    },
+    ".antTabsInkBar": {
+      backgroundColor: "#1E3A8A !important",
+    },
+  };
 
   // Nội dung các bước
   const steps = [
@@ -1415,7 +1519,7 @@ const BookAppointment = () => {
                 <Col span={12}>
                   <Form.Item
                     name="username"
-                    label="Họ và tên"
+                    label={<span style={{ color: "#1E3A8A" }}>Họ và tên</span>}
                     rules={[
                       { required: true, message: "Vui lòng nhập họ tên!" },
                     ]}
@@ -1426,7 +1530,7 @@ const BookAppointment = () => {
                 <Col span={12}>
                   <Form.Item
                     name="dob"
-                    label="Ngày sinh"
+                    label={<span style={{ color: "#1E3A8A" }}>Ngày sinh</span>}
                     rules={[
                       { required: true, message: "Vui lòng chọn ngày sinh!" },
                     ]}
@@ -1443,7 +1547,9 @@ const BookAppointment = () => {
                 <Col span={12}>
                   <Form.Item
                     name="phone_number"
-                    label="Số điện thoại"
+                    label={
+                      <span style={{ color: "#1E3A8A" }}>Số điện thoại</span>
+                    }
                     rules={[
                       {
                         required: true,
@@ -1457,7 +1563,7 @@ const BookAppointment = () => {
                 <Col span={12}>
                   <Form.Item
                     name="gender"
-                    label="Giới tính"
+                    label={<span style={{ color: "#1E3A8A" }}>Giới tính</span>}
                     rules={[
                       { required: true, message: "Vui lòng chọn giới tính!" },
                     ]}
@@ -1479,46 +1585,197 @@ const BookAppointment = () => {
       content: (
         <div className="mt-8">
           <Tabs
+            defaultActiveKey="doctor"
             activeKey={activeTab}
             onChange={setActiveTab}
             type="card"
             tabBarStyle={{ marginBottom: 24 }}
             items={tabItems}
+            className="custom-tabs"
+            style={tabStyle}
           />
 
           <Divider />
 
+          {/* Hiển thị thông tin bác sĩ đã chọn */}
+          {selectedDoctor && (
+            <Card
+              style={{
+                marginBottom: "20px",
+                backgroundColor: "#white",
+                borderBottom: "3px solid #1E3A8A",
+              }}
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "16px" }}
+              >
+                <Avatar
+                  size={80}
+                  src={selectedDoctor.user?.avatar}
+                  icon={<UserOutlined />}
+                  style={{
+                    backgroundColor: "#1E3A8A",
+                    border: "1px solid #1E3A8A",
+                  }}
+                />
+                <div style={{ flex: 1 }}>
+                  <h3
+                    className="flex items-center gap-2"
+                    style={{
+                      margin: "0 0 4px 0",
+                      color: "#1E3A8A",
+                      fontSize: "16px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {selectedDoctor.user?.username}
+                    <Tag color="#2646a3" className="ml-2 font-normal">
+                      Khoa {selectedDoctor.Specialization?.name}
+                    </Tag>
+                  </h3>
+                  <div
+                    style={{ display: "flex", gap: "8px", marginBottom: "4px" }}
+                  >
+                    {/* <Tag color="blue">
+                      Khoa {selectedDoctor.Specialization?.name}
+                    </Tag> */}
+                    <div>
+                      <strong>Học vị:</strong>{" "}
+                      {selectedDoctor.degree || "Chưa cập nhật"}
+                    </div>
+                  </div>
+                  <div style={{ color: "#666", fontSize: "14px" }}>
+                    <MailOutlined style={{ marginRight: "6px" }} />
+                    {selectedDoctor.user?.email || "Chưa cập nhật email"}
+                  </div>
+                </div>
+                <Button
+                  className="!text-blue-900 !border-none !bg-white hover"
+                  icon={<EditOutlined />}
+                  onClick={() => setShowDoctorModal(true)}
+                >
+                  Thay đổi
+                </Button>
+              </div>
+            </Card>
+          )}
+
           <div className="mt-6">
             <Card
               title={
-                <div>
+                <div style={{ color: "#1E3A8A", fontWeight: 600 }}>
                   <CalendarOutlined /> Chọn thời gian khám
                 </div>
               }
             >
               <div className="mb-4">
-                <h3 className="text-base font-medium mb-2">Ngày khám</h3>
-                <Radio.Group
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  value={selectedDate}
-                  buttonStyle="solid"
+                <Typography.Title
+                  level={5}
+                  style={{ marginBottom: 16, color: "#1E3A8A" }}
                 >
-                  <div className="flex flex-wrap gap-2">
-                    {getAvailableDates().map((date) => (
-                      <Radio.Button key={date.value} value={date.value}>
-                        <div className="text-center">
-                          <div>{date.day}</div>
-                          <div className="font-medium">
-                            {date.value.split("-")[2]}
-                          </div>
-                          <div className="text-xs">
-                            {date.label.split("/").slice(1).join("/")}
-                          </div>
+                  Thời gian khám*
+                </Typography.Title>
+                <Row gutter={[16, 16]}>
+                  {getAvailableDates().map((dateObj) => (
+                    <Col span={6} key={dateObj.date.format("DD/MM")}>
+                      <Card
+                        hoverable
+                        style={{
+                          textAlign: "center",
+                          cursor: "pointer",
+                          backgroundColor:
+                            selectedDate &&
+                            selectedDate.format("DD/MM") ===
+                              dateObj.date.format("DD/MM")
+                              ? "#F8FAFC"
+                              : "white",
+                          border:
+                            selectedDate &&
+                            selectedDate.format("DD/MM") ===
+                              dateObj.date.format("DD/MM")
+                              ? "2px solid #1E3A8A"
+                              : "1px solid #d9d9d9",
+                        }}
+                        onClick={() => handleDateSelect(dateObj.date)}
+                      >
+                        <div
+                          style={{
+                            fontSize: "18px",
+                            fontWeight: "bold",
+                            color: "#1E3A8A",
+                          }}
+                        >
+                          {dateObj.date.format("DD/MM")}
                         </div>
-                      </Radio.Button>
-                    ))}
+                        <div style={{ color: "#666666" }}>{dateObj.day}</div>
+                      </Card>
+                    </Col>
+                  ))}
+                  <Col span={6}>
+                    <Card
+                      hoverable
+                      style={{
+                        textAlign: "center",
+                        borderStyle: "dashed",
+                        cursor: "pointer",
+                        height: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                      onClick={() => setShowCalendar(true)}
+                    >
+                      <div style={{ color: "#666666" }}>
+                        <CalendarOutlined
+                          style={{
+                            fontSize: "24px",
+                            marginBottom: 8,
+                            display: "block",
+                          }}
+                        />
+                        <div>Ngày khác</div>
+                      </div>
+                    </Card>
+                  </Col>
+                </Row>
+
+                <Modal
+                  title={
+                    <div style={{ color: "#1E3A8A", fontWeight: 600 }}>
+                      <CalendarOutlined /> Chọn ngày khám
+                    </div>
+                  }
+                  open={showCalendar}
+                  onCancel={() => setShowCalendar(false)}
+                  footer={null}
+                  width={400}
+                >
+                  <div className="custom-calendar">
+                    <Calendar
+                      fullscreen={false}
+                      style={{
+                        borderRadius: "8px",
+                      }}
+                      disabledDate={(current) => {
+                        const today = dayjs();
+                        const twoHoursLater = today.add(2, "hour");
+                        return (
+                          current.day() === 0 || // Sunday
+                          current.day() === 6 || // Saturday
+                          current.isBefore(today, "day") ||
+                          (current.isSame(today, "day") &&
+                            current.isBefore(twoHoursLater))
+                        );
+                      }}
+                      onSelect={(date) => {
+                        handleDateSelect(date);
+                        setShowCalendar(false);
+                      }}
+                      value={selectedDate}
+                      mode="month"
+                    />
                   </div>
-                </Radio.Group>
+                </Modal>
               </div>
 
               {selectedDate && (
@@ -1632,7 +1889,7 @@ const BookAppointment = () => {
                     symptoms.length > 0 &&
                     selectedSymptoms &&
                     selectedSymptoms.map((symptomId) => (
-                      <Tag key={symptomId} color="blue">
+                      <Tag key={symptomId} color="#1E3A8A">
                         {symptoms.find((s) => s.symptom_id === symptomId)
                           ?.name || ""}
                       </Tag>
@@ -1645,6 +1902,13 @@ const BookAppointment = () => {
       ),
     },
   ];
+
+  const handleDateSelect = (date) => {
+    // Ensure we're working with a dayjs object
+    const selectedDate = dayjs(date);
+    setSelectedDate(selectedDate);
+    setSelectedSession(null); // Reset session when date changes
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -1675,7 +1939,7 @@ const BookAppointment = () => {
               )}
 
               {currentStep < steps.length - 1 && (
-                <Button type="primary" onClick={nextStep}>
+                <Button onClick={nextStep} className="!bg-blue-900 !text-white">
                   Tiếp theo
                 </Button>
               )}
@@ -1718,9 +1982,11 @@ const BookAppointment = () => {
       </Modal>
 
       <Modal
-        title={`Chọn bác sĩ Khoa ${
-          selectedSpecialization ? selectedSpecialization.name : ""
-        }`}
+        title={
+          <div style={{ color: "#1E3A8A", fontWeight: 600 }}>
+            Chọn bác sĩ Khoa {selectedSpecialization?.name}
+          </div>
+        }
         open={showDoctorModal}
         onCancel={() => setShowDoctorModal(false)}
         footer={null}
@@ -1746,12 +2012,16 @@ const BookAppointment = () => {
                     marginBottom: "16px",
                     borderColor:
                       selectedDoctor?.doctor_id === doctor.doctor_id
-                        ? "#1890ff"
+                        ? "#1E3A8A"
                         : "#d9d9d9",
                     backgroundColor:
                       selectedDoctor?.doctor_id === doctor.doctor_id
-                        ? "#e6f7ff"
+                        ? "white"
                         : "white",
+                    color:
+                      selectedDoctor?.doctor_id === doctor.doctor_id
+                        ? "#1E3A8A"
+                        : "#black",
                   }}
                 >
                   <div style={{ display: "flex", gap: "20px" }}>
@@ -1768,15 +2038,22 @@ const BookAppointment = () => {
                             margin: 0,
                             color:
                               selectedDoctor?.doctor_id === doctor.doctor_id
-                                ? "#1890ff"
-                                : "#000",
+                                ? "#043059"
+                                : "#000000",
                             fontSize: "18px",
                             fontWeight: 600,
                           }}
                         >
                           {doctor.user?.username}
                         </h3>
-                        <Tag color="blue" style={{ marginTop: "4px" }}>
+                        <Tag
+                          color={
+                            selectedDoctor?.doctor_id === doctor.doctor_id
+                              ? "#043059"
+                              : "#666666"
+                          }
+                          style={{ marginTop: "4px" }}
+                        >
                           {doctor.Specialization?.name}
                         </Tag>
                       </div>
@@ -1788,32 +2065,87 @@ const BookAppointment = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        <div>
+                        <div
+                          style={{
+                            color:
+                              selectedDoctor?.doctor_id === doctor.doctor_id
+                                ? "#043059"
+                                : "#000000",
+                          }}
+                        >
                           <strong>Học vị:</strong>{" "}
                           {doctor.degree || "Chưa cập nhật"}
                         </div>
-                        <div>
+                        <div
+                          style={{
+                            color:
+                              selectedDoctor?.doctor_id === doctor.doctor_id
+                                ? "#043059"
+                                : "#000000",
+                          }}
+                        >
                           <strong>Kinh nghiệm:</strong>{" "}
                           {doctor.experience_years} năm
                         </div>
                       </div>
 
                       <div style={{ marginBottom: "8px" }}>
-                        <strong>Đánh giá:</strong>{" "}
+                        <strong
+                          style={{
+                            color:
+                              selectedDoctor?.doctor_id === doctor.doctor_id
+                                ? "#043059"
+                                : "#000000",
+                          }}
+                        >
+                          Đánh giá:
+                        </strong>{" "}
                         <Rate
                           disabled
                           defaultValue={doctor.rating || 0}
-                          style={{ fontSize: "14px" }}
+                          style={{
+                            fontSize: "14px",
+                            color:
+                              selectedDoctor?.doctor_id === doctor.doctor_id
+                                ? "#043059"
+                                : "#666666",
+                          }}
                         />
-                        <span style={{ marginLeft: "8px" }}>
+                        <span
+                          style={{
+                            marginLeft: "8px",
+                            color:
+                              selectedDoctor?.doctor_id === doctor.doctor_id
+                                ? "#043059"
+                                : "#666666",
+                          }}
+                        >
                           ({doctor.rating || 0})
                         </span>
                       </div>
 
-                      <div style={{ color: "#666" }}>
-                        <strong>Mô tả:</strong>
-                        <br />
-                        {doctor.description || "Chưa có mô tả"}
+                      <div>
+                        <strong
+                          style={{
+                            color:
+                              selectedDoctor?.doctor_id === doctor.doctor_id
+                                ? "#043059"
+                                : "#000000",
+                          }}
+                        >
+                          Mô tả:
+                        </strong>
+                        <div
+                          style={{
+                            color:
+                              selectedDoctor?.doctor_id === doctor.doctor_id
+                                ? "#043059"
+                                : "#666666",
+                            marginTop: "4px",
+                          }}
+                        >
+                          {doctor.description || "Chưa có mô tả"}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2022,8 +2354,6 @@ const BookAppointment = () => {
           </Row>
         </Form>
       </Modal>
-
-      {/* <Footer /> */}
     </div>
   );
 };
