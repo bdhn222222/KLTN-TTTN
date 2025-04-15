@@ -14,6 +14,7 @@ import {
   deleteFamilyMember,
   getAllAppointments,
   bookSymptomsAppointment,
+  getAllSymptoms,
 } from "../services/patientService.js";
 import BadRequestError from "../errors/bad_request.js";
 import UnauthorizedError from "../errors/unauthorized.js";
@@ -376,6 +377,29 @@ export const getFamilyMemberByIdController = async (req, res, next) => {
       data: familyMember,
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllSymptomsController = async (req, res, next) => {
+  try {
+    const symptoms = await getAllSymptoms();
+
+    if (!symptoms || symptoms.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "Không có triệu chứng nào trong hệ thống",
+        data: [],
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Lấy danh sách triệu chứng thành công",
+      data: symptoms,
+    });
+  } catch (error) {
+    console.error("Error in getAllSymptomsController:", error);
     next(error);
   }
 };

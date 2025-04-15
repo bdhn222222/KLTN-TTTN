@@ -26,6 +26,7 @@ import {
   List,
   Badge,
   notification,
+  Empty,
 } from "antd";
 import {
   PlusOutlined,
@@ -46,7 +47,6 @@ dayjs.extend(timezone);
 
 const { Step } = Steps;
 const { Option } = Select;
-const { TabPane } = Tabs;
 
 const BookAppointment = () => {
   const navigate = useNavigate();
@@ -108,6 +108,8 @@ const BookAppointment = () => {
         notification.error({
           message: "Lỗi xác thực",
           description: "Vui lòng đăng nhập lại",
+          placement: "topRight",
+          duration: 3,
         });
         navigate("/login");
         return;
@@ -123,11 +125,45 @@ const BookAppointment = () => {
           ...member,
           dob: member.date_of_birth || member.dob,
         }));
+
+        // Kiểm tra xem đã có relationship "me" chưa
+        const hasMeRelationship = familyMembersWithDob.some(
+          (member) => member.relationship === "me"
+        );
+
+        if (!hasMeRelationship) {
+          // Nếu chưa có, thêm thông tin người dùng hiện tại với relationship "me"
+          const userResponse = await axios.get(`${url1}/patients/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (userResponse.data.success && userResponse.data.data) {
+            const currentUser = userResponse.data.data;
+            const meRelationship = {
+              ...currentUser,
+              relationship: "me",
+              family_member_id: currentUser.user_id,
+              dob: currentUser.date_of_birth || currentUser.dob,
+            };
+            familyMembersWithDob.unshift(meRelationship);
+          }
+        }
+
         setFamilyMembers(familyMembersWithDob);
+
+        // Tự động chọn "me" làm người khám mặc định
+        const meUser = familyMembersWithDob.find(
+          (member) => member.relationship === "me"
+        );
+        if (meUser) {
+          handleMemberSelect(meUser);
+        }
       } else {
         notification.warning({
           message: "Chưa có người thân",
           description: "Bạn chưa thêm người thân nào vào danh sách",
+          placement: "topRight",
+          duration: 3,
         });
         setFamilyMembers([]);
       }
@@ -137,19 +173,17 @@ const BookAppointment = () => {
         notification.error({
           message: "Lỗi xác thực",
           description: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+          placement: "topRight",
+          duration: 3,
         });
         navigate("/login");
-      } else if (error.response?.status === 404) {
-        notification.error({
-          message: "Lỗi",
-          description:
-            "Không tìm thấy API endpoint. Vui lòng kiểm tra lại đường dẫn.",
-        });
       } else {
         notification.error({
           message: "Lỗi kết nối",
           description:
             "Không thể lấy danh sách người thân. Vui lòng thử lại sau.",
+          placement: "topRight",
+          duration: 3,
         });
       }
       setFamilyMembers([]);
@@ -157,6 +191,10 @@ const BookAppointment = () => {
       setFamilyMembersLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchFamilyMembers();
+  }, [url1, navigate]);
 
   // Lấy thông tin chi tiết người thân
   const showMemberDetail = async (member) => {
@@ -232,10 +270,6 @@ const BookAppointment = () => {
     }
   };
 
-  useEffect(() => {
-    fetchFamilyMembers();
-  }, [url1, navigate]);
-
   // Lấy thông tin người dùng hiện tại
   const fetchCurrentUser = async () => {
     try {
@@ -282,7 +316,7 @@ const BookAppointment = () => {
   // Lấy danh sách bác sĩ
   const fetchDoctors = async () => {
     try {
-      const response = await axios.get("/api/patients/doctors");
+      const response = await axios.get(`${url1}/patient/doctors`);
       setDoctors(response.data.data);
       // Nhóm bác sĩ theo chuyên khoa
       if (response.data.data && response.data.data.length > 0) {
@@ -375,29 +409,73 @@ const BookAppointment = () => {
   // Lấy danh sách triệu chứng
   const fetchSymptoms = async () => {
     try {
-      const response = await axios.get("/api/patients/symptoms");
-      setSymptoms(response.data.data);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        notification.error({
+          message: "Lỗi xác thực",
+          description: "Vui lòng đăng nhập lại",
+          placement: "topRight",
+          duration: 3,
+        });
+        navigate("/login");
+        return;
+      }
+
+      const response = await axios.get(`${url1}/patient/symptoms`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      console.log("Symptoms API response:", response.data);
+
+      if (response.data.success && response.data.data) {
+        const symptomsData = response.data.data.data || [];
+        setSymptoms(symptomsData);
+        console.log("Set symptoms:", symptomsData);
+      } else {
+        setSymptoms([]);
+        notification.warning({
+          message: "Thông báo",
+          description: response.data.message || "Không có triệu chứng nào",
+          placement: "topRight",
+          duration: 3,
+        });
+      }
     } catch (error) {
       console.error("Error fetching symptoms:", error);
-      // Dữ liệu mẫu nếu API không hoạt động
-      setSymptoms([
-        { symptom_id: 1, name: "Đau đầu" },
-        { symptom_id: 2, name: "Sốt" },
-        { symptom_id: 3, name: "Ho" },
-        { symptom_id: 4, name: "Đau bụng" },
-        { symptom_id: 5, name: "Mệt mỏi" },
-      ]);
-      notification.error({
-        message: "Lỗi kết nối",
-        description: "Sử dụng dữ liệu mẫu cho triệu chứng",
-      });
+      if (error.response?.status === 401) {
+        notification.error({
+          message: "Lỗi xác thực",
+          description: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+          placement: "topRight",
+          duration: 3,
+        });
+        navigate("/login");
+      } else {
+        setSymptoms([]);
+        notification.error({
+          message: "Lỗi kết nối",
+          description: "Không thể lấy danh sách triệu chứng",
+          placement: "topRight",
+          duration: 3,
+        });
+      }
     }
   };
+
+  // Gọi API khi component mount
+  useEffect(() => {
+    fetchSymptoms();
+  }, []);
+
+  // Log symptoms state khi nó thay đổi
+  useEffect(() => {
+    console.log("Current symptoms state:", symptoms);
+  }, [symptoms]);
 
   // Lấy danh sách chuyên khoa
   const fetchSpecializations = async () => {
     try {
-      const response = await axios.get("/api/patients/specializations");
+      const response = await axios.get(`${url1}/patient/specializations`);
       setSpecializations(response.data.data);
     } catch (error) {
       console.error("Error fetching specializations:", error);
@@ -421,7 +499,6 @@ const BookAppointment = () => {
 
   useEffect(() => {
     fetchDoctors();
-    fetchSymptoms();
     fetchSpecializations();
   }, [url1, navigate]);
 
@@ -442,7 +519,7 @@ const BookAppointment = () => {
       };
 
       const response = await axios.patch(
-        `${url1}/api/patients/family-members/${selectedFamilyMember.family_member_id}`,
+        `${url1}/patient/family-members/${selectedFamilyMember.family_member_id}`,
         formattedValues,
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -451,8 +528,10 @@ const BookAppointment = () => {
 
       if (response.data.success) {
         notification.success({
-          message: "Thành công",
-          description: "Cập nhật thông tin thành công!",
+          message: "Cập nhật thành công",
+          description: "Thông tin người thân đã được cập nhật thành công!",
+          placement: "topRight",
+          duration: 3,
         });
         setShowMemberDetailModal(false);
 
@@ -471,13 +550,24 @@ const BookAppointment = () => {
         });
 
         setFamilyMembers(updatedFamilyMembers);
+      } else {
+        notification.error({
+          message: "Cập nhật thất bại",
+          description:
+            response.data.message || "Không thể cập nhật thông tin người thân",
+          placement: "topRight",
+          duration: 3,
+        });
       }
     } catch (error) {
       console.error("Error updating member:", error);
       notification.error({
-        message: "Lỗi",
+        message: "Cập nhật thất bại",
         description:
-          error.response?.data?.message || "Cập nhật thông tin thất bại",
+          error.response?.data?.message ||
+          "Có lỗi xảy ra khi cập nhật thông tin",
+        placement: "topRight",
+        duration: 3,
       });
     }
   };
@@ -498,7 +588,7 @@ const BookAppointment = () => {
       };
 
       const response = await axios.post(
-        `/api/patients/add-family-member`,
+        `${url1}/patient/add-family-member`,
         formattedValues,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -508,8 +598,10 @@ const BookAppointment = () => {
       if (response.data.success) {
         const newMember = response.data.data;
         notification.success({
-          message: "Thành công",
+          message: "Thêm thành công",
           description: "Thêm người thân mới thành công!",
+          placement: "topRight",
+          duration: 3,
         });
         setShowAddMemberModal(false);
 
@@ -524,25 +616,92 @@ const BookAppointment = () => {
 
         // Chọn người thân mới thêm vào để đặt lịch
         handleMemberSelect(memberWithDob);
+      } else {
+        notification.error({
+          message: "Thêm thất bại",
+          description: response.data.message || "Không thể thêm người thân mới",
+          placement: "topRight",
+          duration: 3,
+        });
       }
     } catch (error) {
       if (error.response) {
         notification.error({
-          message: "Lỗi",
-          description: `Lỗi: ${error.response.data.message}`,
+          message: "Thêm thất bại",
+          description:
+            error.response.data.message || "Không thể thêm người thân mới",
+          placement: "topRight",
+          duration: 3,
         });
       } else if (error.request) {
         notification.error({
           message: "Lỗi kết nối",
           description: "Không thể kết nối đến máy chủ",
+          placement: "topRight",
+          duration: 3,
         });
       } else {
         notification.error({
           message: "Lỗi",
           description: "Có lỗi xảy ra khi thêm người thân mới",
+          placement: "topRight",
+          duration: 3,
         });
       }
     }
+  };
+
+  // Xử lý khi thay đổi trang trong modal chọn bác sĩ
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  // Ngày có thể đặt lịch (hiện tại + 7 ngày tới, trừ thứ 7 và chủ nhật)
+  const getAvailableDates = () => {
+    const dates = [];
+    let currentDate = dayjs().tz("Asia/Ho_Chi_Minh");
+
+    for (let i = 0; i < 14; i++) {
+      const date = currentDate.add(i, "day");
+      const day = date.day(); // 0 = Sunday, 6 = Saturday
+
+      if (day !== 0 && day !== 6) {
+        dates.push({
+          value: date.format("YYYY-MM-DD"),
+          label: date.format("DD/MM/YYYY"),
+          day: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][day],
+          isToday: i === 0,
+        });
+      }
+    }
+
+    return dates;
+  };
+
+  // Lấy danh sách giờ khám theo ca
+  const getSessionTimes = () => {
+    if (!selectedSession) return [];
+
+    const times = [];
+    if (selectedSession === "morning") {
+      // Ca sáng: 8:00-11:30, mỗi 30 phút
+      for (let h = 8; h <= 11; h++) {
+        for (let m of ["00", "30"]) {
+          if (h === 11 && m === "30") continue;
+          times.push(`${h.toString().padStart(2, "0")}:${m}`);
+        }
+      }
+    } else {
+      // Ca chiều: 13:30-17:00, mỗi 30 phút
+      for (let h = 13; h <= 17; h++) {
+        for (let m of ["00", "30"]) {
+          if (h === 13 && m === "00") continue;
+          if (h === 17 && m === "30") continue;
+          times.push(`${h.toString().padStart(2, "0")}:${m}`);
+        }
+      }
+    }
+    return times;
   };
 
   // Xử lý khi thay đổi thông tin bệnh nhân/người thân
@@ -578,32 +737,6 @@ const BookAppointment = () => {
     setSelectedTime(""); // Reset thời gian khi chọn ca mới
   };
 
-  // Lấy danh sách giờ khám theo ca
-  const getSessionTimes = () => {
-    if (!selectedSession) return [];
-
-    const times = [];
-    if (selectedSession === "morning") {
-      // Ca sáng: 8:00-11:30, mỗi 30 phút
-      for (let h = 8; h <= 11; h++) {
-        for (let m of ["00", "30"]) {
-          if (h === 11 && m === "30") continue;
-          times.push(`${h.toString().padStart(2, "0")}:${m}`);
-        }
-      }
-    } else {
-      // Ca chiều: 13:30-17:00, mỗi 30 phút
-      for (let h = 13; h <= 17; h++) {
-        for (let m of ["00", "30"]) {
-          if (h === 13 && m === "00") continue;
-          if (h === 17 && m === "30") continue;
-          times.push(`${h.toString().padStart(2, "0")}:${m}`);
-        }
-      }
-    }
-    return times;
-  };
-
   // Chuyển đến bước tiếp theo
   const nextStep = () => {
     setCurrentStep(currentStep + 1);
@@ -613,173 +746,6 @@ const BookAppointment = () => {
   const prevStep = () => {
     setCurrentStep(currentStep - 1);
   };
-
-  // Xử lý khi thay đổi trang trong modal chọn bác sĩ
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
-  };
-
-  // Ngày có thể đặt lịch (hiện tại + 7 ngày tới, trừ thứ 7 và chủ nhật)
-  const getAvailableDates = () => {
-    const dates = [];
-    let currentDate = dayjs().tz("Asia/Ho_Chi_Minh");
-
-    for (let i = 0; i < 14; i++) {
-      const date = currentDate.add(i, "day");
-      const day = date.day(); // 0 = Sunday, 6 = Saturday
-
-      if (day !== 0 && day !== 6) {
-        dates.push({
-          value: date.format("YYYY-MM-DD"),
-          label: date.format("DD/MM/YYYY"),
-          day: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][day],
-          isToday: i === 0,
-        });
-      }
-    }
-
-    return dates;
-  };
-
-  // Xử lý đặt lịch theo bác sĩ
-  const handleBookByDoctor = async () => {
-    if (!selectedDoctor || !selectedDate || !selectedTime) {
-      notification.error({
-        message: "Thiếu thông tin",
-        description: "Vui lòng chọn đầy đủ thông tin bác sĩ, ngày và giờ khám",
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("token");
-
-      // Kết hợp ngày và giờ để tạo thành datetime
-      const appointmentDatetime = `${selectedDate}T${selectedTime}:00`;
-
-      const requestData = {
-        doctor_id: selectedDoctor,
-        appointment_datetime: appointmentDatetime,
-      };
-
-      // Nếu chọn người thân
-      if (selectedMember !== "self") {
-        if (selectedMember === "new") {
-          // Tạo người thân mới và đặt lịch
-          const newFamilyMember = await axios.post(
-            "/api/patients/family-members",
-            patientData,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          requestData.family_member_id =
-            newFamilyMember.data.data.family_member_id;
-        } else {
-          // Cập nhật thông tin người thân và đặt lịch
-          requestData.family_member_id = parseInt(selectedMember);
-          requestData.family_member_data = patientData;
-        }
-      }
-
-      // Gọi API đặt lịch
-      const response = await axios.post(
-        "/api/patients/appointments/book-doctor",
-        requestData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      notification.success({
-        message: "Thành công",
-        description: "Đặt lịch khám thành công!",
-      });
-      navigate("/my-appointments");
-    } catch (error) {
-      console.error("Error booking appointment:", error);
-      notification.error({
-        message: "Lỗi đặt lịch",
-        description:
-          error.response?.data?.message || "Đặt lịch không thành công",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Xử lý đặt lịch theo triệu chứng
-  const handleBookBySymptoms = async () => {
-    if (selectedSymptoms.length === 0 || !selectedDate || !selectedTime) {
-      notification.error({
-        message: "Thiếu thông tin",
-        description: "Vui lòng chọn ít nhất một triệu chứng, ngày và giờ khám",
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("token");
-
-      // Kết hợp ngày và giờ để tạo thành datetime
-      const appointmentDatetime = `${selectedDate}T${selectedTime}:00`;
-
-      const requestData = {
-        symptoms: selectedSymptoms,
-        appointment_datetime: appointmentDatetime,
-      };
-
-      // Nếu chọn người thân
-      if (selectedMember !== "self") {
-        if (selectedMember === "new") {
-          // Tạo người thân mới và đặt lịch
-          const newFamilyMember = await axios.post(
-            "/api/patients/family-members",
-            patientData,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          requestData.family_member_id =
-            newFamilyMember.data.data.family_member_id;
-        } else {
-          // Cập nhật thông tin người thân và đặt lịch
-          requestData.family_member_id = parseInt(selectedMember);
-          requestData.family_member_data = patientData;
-        }
-      }
-
-      // Gọi API đặt lịch theo triệu chứng
-      const response = await axios.post(
-        "/api/patients/appointments/book-symptoms",
-        requestData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      notification.success({
-        message: "Thành công",
-        description: "Đặt lịch khám thành công!",
-      });
-      navigate("/my-appointments");
-    } catch (error) {
-      console.error("Error booking appointment:", error);
-      notification.error({
-        message: "Lỗi đặt lịch",
-        description:
-          error.response?.data?.message || "Đặt lịch không thành công",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Xử lý form submit
-  const handleFinish = () => {
-    if (activeTab === "doctor") {
-      handleBookByDoctor();
-    } else {
-      handleBookBySymptoms();
-    }
-  };
-
-  const availableDates = getAvailableDates();
-  const sessionTimes = getSessionTimes();
 
   // Function để hiển thị modal thêm người thân mới
   const handleAddNewMember = () => {
@@ -963,6 +929,134 @@ const BookAppointment = () => {
     );
   };
 
+  // Thêm items cho Tabs
+  const tabItems = [
+    {
+      key: "doctor",
+      label: "Đặt lịch theo bác sĩ",
+      children: (
+        <div className="mb-6">
+          <Button
+            type="primary"
+            size="large"
+            icon={<MedicineBoxOutlined />}
+            onClick={() => setShowSpecializationModal(true)}
+            className="mb-4"
+          >
+            Chọn chuyên khoa và bác sĩ
+          </Button>
+
+          {selectedDoctor && (
+            <Card
+              className="mt-4"
+              title={
+                <div className="text-blue-600">
+                  <MedicineBoxOutlined /> Bác sĩ đã chọn
+                </div>
+              }
+            >
+              <div className="flex items-center">
+                {doctors &&
+                doctors.length > 0 &&
+                doctors.find(
+                  (d) => d.doctor_id.toString() === selectedDoctor.toString()
+                )?.user?.avatar_url ? (
+                  <Avatar
+                    size={64}
+                    src={
+                      doctors.find(
+                        (d) =>
+                          d.doctor_id.toString() === selectedDoctor.toString()
+                      )?.user?.avatar_url
+                    }
+                  />
+                ) : (
+                  <Avatar
+                    size={64}
+                    icon={<UserOutlined />}
+                    style={{ backgroundColor: "#1890ff" }}
+                  />
+                )}
+                <div className="ml-4">
+                  <h3 className="text-lg font-medium">
+                    {(doctors &&
+                      doctors.length > 0 &&
+                      doctors.find(
+                        (d) =>
+                          d.doctor_id.toString() === selectedDoctor.toString()
+                      )?.user?.username) ||
+                      "Bác sĩ đã chọn"}
+                  </h3>
+                  <p className="text-gray-500">
+                    {(doctors &&
+                      doctors.length > 0 &&
+                      doctors.find(
+                        (d) =>
+                          d.doctor_id.toString() === selectedDoctor.toString()
+                      )?.Specialization?.name) ||
+                      ""}{" "}
+                    {(doctors &&
+                      doctors.length > 0 &&
+                      doctors.find(
+                        (d) =>
+                          d.doctor_id.toString() === selectedDoctor.toString()
+                      )?.degree) ||
+                      ""}
+                  </p>
+                  <p className="text-sm">
+                    {(doctors &&
+                      doctors.length > 0 &&
+                      doctors.find(
+                        (d) =>
+                          d.doctor_id.toString() === selectedDoctor.toString()
+                      )?.description) ||
+                      ""}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "symptoms",
+      label: "Đặt lịch theo triệu chứng",
+      children: (
+        <div className="mb-6">
+          <Card
+            title={
+              <div className="text-blue-600">
+                <CheckCircleOutlined /> Chọn triệu chứng
+              </div>
+            }
+          >
+            {symptoms && symptoms.length > 0 ? (
+              <Checkbox.Group
+                onChange={handleSymptomToggle}
+                value={selectedSymptoms}
+              >
+                <Row gutter={[16, 16]}>
+                  {symptoms.map((symptom) => (
+                    <Col span={8} key={symptom.symptom_id}>
+                      <Card hoverable size="small">
+                        <Checkbox value={symptom.symptom_id}>
+                          {symptom.name}
+                        </Checkbox>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              </Checkbox.Group>
+            ) : (
+              <Empty description="Không có triệu chứng nào" />
+            )}
+          </Card>
+        </div>
+      ),
+    },
+  ];
+
   // Nội dung các bước
   const steps = [
     {
@@ -1076,125 +1170,8 @@ const BookAppointment = () => {
             onChange={setActiveTab}
             type="card"
             tabBarStyle={{ marginBottom: 24 }}
-          >
-            <TabPane tab="Đặt lịch theo bác sĩ" key="doctor">
-              <div className="mb-6">
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={<MedicineBoxOutlined />}
-                  onClick={() => setShowSpecializationModal(true)}
-                  className="mb-4"
-                >
-                  Chọn chuyên khoa và bác sĩ
-                </Button>
-
-                {selectedDoctor && (
-                  <Card
-                    className="mt-4"
-                    title={
-                      <div className="text-blue-600">
-                        <MedicineBoxOutlined /> Bác sĩ đã chọn
-                      </div>
-                    }
-                  >
-                    <div className="flex items-center">
-                      {doctors &&
-                      doctors.length > 0 &&
-                      doctors.find(
-                        (d) =>
-                          d.doctor_id.toString() === selectedDoctor.toString()
-                      )?.user?.avatar_url ? (
-                        <Avatar
-                          size={64}
-                          src={
-                            doctors.find(
-                              (d) =>
-                                d.doctor_id.toString() ===
-                                selectedDoctor.toString()
-                            )?.user?.avatar_url
-                          }
-                        />
-                      ) : (
-                        <Avatar
-                          size={64}
-                          icon={<UserOutlined />}
-                          style={{ backgroundColor: "#1890ff" }}
-                        />
-                      )}
-                      <div className="ml-4">
-                        <h3 className="text-lg font-medium">
-                          {(doctors &&
-                            doctors.length > 0 &&
-                            doctors.find(
-                              (d) =>
-                                d.doctor_id.toString() ===
-                                selectedDoctor.toString()
-                            )?.user?.username) ||
-                            "Bác sĩ đã chọn"}
-                        </h3>
-                        <p className="text-gray-500">
-                          {(doctors &&
-                            doctors.length > 0 &&
-                            doctors.find(
-                              (d) =>
-                                d.doctor_id.toString() ===
-                                selectedDoctor.toString()
-                            )?.Specialization?.name) ||
-                            ""}{" "}
-                          {(doctors &&
-                            doctors.length > 0 &&
-                            doctors.find(
-                              (d) =>
-                                d.doctor_id.toString() ===
-                                selectedDoctor.toString()
-                            )?.degree) ||
-                            ""}
-                        </p>
-                        <p className="text-sm">
-                          {(doctors &&
-                            doctors.length > 0 &&
-                            doctors.find(
-                              (d) =>
-                                d.doctor_id.toString() ===
-                                selectedDoctor.toString()
-                            )?.description) ||
-                            ""}
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-              </div>
-            </TabPane>
-            <TabPane tab="Đặt lịch theo triệu chứng" key="symptoms">
-              <div className="mb-6">
-                <Card
-                  title={
-                    <div className="text-blue-600">
-                      <CheckCircleOutlined /> Chọn triệu chứng
-                    </div>
-                  }
-                >
-                  <Checkbox.Group
-                    onChange={handleSymptomToggle}
-                    value={selectedSymptoms}
-                  >
-                    <Row>
-                      {symptoms &&
-                        symptoms.map((symptom) => (
-                          <Col span={8} key={symptom.symptom_id}>
-                            <Checkbox value={symptom.symptom_id}>
-                              {symptom.name}
-                            </Checkbox>
-                          </Col>
-                        ))}
-                    </Row>
-                  </Checkbox.Group>
-                </Card>
-              </div>
-            </TabPane>
-          </Tabs>
+            items={tabItems}
+          />
 
           <Divider />
 
@@ -1214,7 +1191,7 @@ const BookAppointment = () => {
                   buttonStyle="solid"
                 >
                   <div className="flex flex-wrap gap-2">
-                    {availableDates.map((date) => (
+                    {getAvailableDates().map((date) => (
                       <Radio.Button key={date.value} value={date.value}>
                         <div className="text-center">
                           <div>{date.day}</div>
@@ -1260,7 +1237,7 @@ const BookAppointment = () => {
                         buttonStyle="solid"
                       >
                         <div className="flex flex-wrap gap-2">
-                          {sessionTimes.map((time) => (
+                          {getSessionTimes().map((time) => (
                             <Radio.Button key={time} value={time}>
                               {time}
                             </Radio.Button>
@@ -1545,10 +1522,11 @@ const BookAppointment = () => {
               >
                 <Select>
                   <Select.Option value="me">Bản thân</Select.Option>
-                  <Select.Option value="parent">Cha/Mẹ</Select.Option>
-                  <Select.Option value="spouse">Vợ/Chồng</Select.Option>
                   <Select.Option value="child">Con</Select.Option>
-                  <Select.Option value="sibling">Anh/Chị/Em</Select.Option>
+                  <Select.Option value="father">Ba</Select.Option>
+                  <Select.Option value="mother">Mẹ</Select.Option>
+                  <Select.Option value="wife">Vợ</Select.Option>
+                  <Select.Option value="husband">Chồng</Select.Option>
                   <Select.Option value="other">Khác</Select.Option>
                 </Select>
               </Form.Item>
@@ -1644,10 +1622,11 @@ const BookAppointment = () => {
                 ]}
               >
                 <Select>
-                  <Select.Option value="parent">Cha/Mẹ</Select.Option>
-                  <Select.Option value="spouse">Vợ/Chồng</Select.Option>
+                  <Select.Option value="father">Ba</Select.Option>
+                  <Select.Option value="mother">Mẹ</Select.Option>
+                  <Select.Option value="wife">Vợ</Select.Option>
+                  <Select.Option value="husband">Chồng</Select.Option>
                   <Select.Option value="child">Con</Select.Option>
-                  <Select.Option value="sibling">Anh/Chị/Em</Select.Option>
                   <Select.Option value="other">Khác</Select.Option>
                 </Select>
               </Form.Item>

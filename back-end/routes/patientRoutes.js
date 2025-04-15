@@ -14,6 +14,7 @@ import {
   getAllAppointmentsController,
   bookSymptomsAppointmentController,
   getFamilyMemberByIdController,
+  getAllSymptomsController,
 } from "../controllers/patientController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
@@ -143,6 +144,14 @@ router.post(
       .withMessage("Giới tính không hợp lệ"),
   ]),
   bookSymptomsAppointmentController
+);
+
+// Route để lấy danh sách triệu chứng
+router.get(
+  "/symptoms",
+  authenticateUser,
+  authorize(["patient"]),
+  getAllSymptomsController
 );
 
 export default router;

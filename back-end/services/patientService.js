@@ -13,6 +13,7 @@ import { sendVerifyLink } from "../utils/gmail.js";
 import CompensationCode from "../models/compensationCode.js";
 import { Model, DataTypes } from "sequelize";
 import ForbiddenError from "../errors/forbidden.js";
+import InternalServerError from "../errors/internalServerError.js";
 
 // Kích hoạt các plugin
 dayjs.extend(utc);
@@ -1869,5 +1870,59 @@ export const getFamilyMemberById = async (user_id, family_member_id) => {
     // Rollback transaction nếu có lỗi
     await t.rollback();
     throw error;
+  }
+};
+
+export const getAllSymptoms = async () => {
+  const t = await db.sequelize.transaction();
+
+  try {
+    // Lấy tất cả triệu chứng và sắp xếp theo tên
+    const symptoms = await db.Symptom.findAll({
+      attributes: ["symptom_id", "name"],
+      order: [["name", "ASC"]],
+      include: [
+        {
+          model: db.Specialization,
+          as: "specializations",
+          attributes: ["specialization_id", "name"],
+          through: { attributes: [] }, // Không lấy thông tin từ bảng trung gian
+        },
+      ],
+      transaction: t,
+    });
+
+    // Kiểm tra nếu không có triệu chứng nào
+    if (!symptoms || symptoms.length === 0) {
+      await t.commit();
+      return {
+        success: true,
+        message: "Không có triệu chứng nào trong hệ thống",
+        data: [],
+      };
+    }
+
+    // Format lại dữ liệu trước khi trả về
+    const formattedSymptoms = symptoms.map((symptom) => ({
+      symptom_id: symptom.symptom_id,
+      name: symptom.name,
+      specializations: symptom.specializations.map((spec) => ({
+        specialization_id: spec.specialization_id,
+        name: spec.name,
+      })),
+    }));
+
+    await t.commit();
+    return {
+      success: true,
+      message: "Lấy danh sách triệu chứng thành công",
+      data: formattedSymptoms,
+    };
+  } catch (error) {
+    await t.rollback();
+    console.error("Error in getAllSymptoms service:", error);
+    throw new InternalServerError(
+      "Có lỗi xảy ra khi lấy danh sách triệu chứng"
+    );
   }
 };
