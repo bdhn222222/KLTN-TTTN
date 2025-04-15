@@ -92,8 +92,18 @@ export const getAllSpecializationsController = asyncHandler(
 );
 
 export const getAllDoctorsController = asyncHandler(async (req, res) => {
-  const result = await getAllDoctors();
-  res.status(200).json(result);
+  try {
+    const { specialization_id } = req.query;
+    const result = await getAllDoctors(
+      specialization_id ? parseInt(specialization_id) : null
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Lỗi khi lấy danh sách bác sĩ",
+    });
+  }
 });
 
 export const getDoctorProfileController = asyncHandler(async (req, res) => {

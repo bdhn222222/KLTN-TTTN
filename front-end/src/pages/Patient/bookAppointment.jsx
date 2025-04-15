@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import dayjs from "dayjs";
@@ -27,6 +27,9 @@ import {
   Badge,
   notification,
   Empty,
+  Spin,
+  message,
+  Rate,
 } from "antd";
 import {
   PlusOutlined,
@@ -48,6 +51,94 @@ dayjs.extend(timezone);
 const { Step } = Steps;
 const { Option } = Select;
 
+const styles = `
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+
+  .specialization-card {
+    height: 100%;
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+
+  .specialization-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .specialization-card.selected {
+    border: 2px solid #1890ff;
+  }
+
+  .specialization-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 16px;
+  }
+
+  .specialization-info {
+    margin-top: 16px;
+  }
+
+  .specialization-info h3 {
+    margin-bottom: 8px;
+    color: #1890ff;
+  }
+
+  .doctor-card {
+    height: 100%;
+    transition: all 0.3s;
+  }
+
+  .doctor-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .doctor-card.selected {
+    border: 2px solid #1890ff;
+  }
+
+  .doctor-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 16px;
+  }
+
+  .doctor-info {
+    margin-top: 16px;
+  }
+
+  .doctor-info h3 {
+    margin-bottom: 8px;
+    color: #1890ff;
+  }
+`;
+
+const styleSheet = document.createElement("style");
+styleSheet.innerText = styles;
+document.head.appendChild(styleSheet);
+
 const BookAppointment = () => {
   const navigate = useNavigate();
   const { url1 } = useContext(AppContext);
@@ -63,7 +154,7 @@ const BookAppointment = () => {
   const [selectedTime, setSelectedTime] = useState("");
   const [selectedMember, setSelectedMember] = useState("self");
   const [selectedDoctor, setSelectedDoctor] = useState("");
-  const [selectedSpecialization, setSelectedSpecialization] = useState("");
+  const [selectedSpecialization, setSelectedSpecialization] = useState(null);
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -79,6 +170,10 @@ const BookAppointment = () => {
   const [selectedSession, setSelectedSession] = useState(""); // "morning" hoặc "afternoon"
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(6); // Số lượng bác sĩ hiển thị trên mỗi trang
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [loadingSpecializations, setLoadingSpecializations] = useState(false);
+  const [loadingDoctorsBySpecialization, setLoadingDoctorsBySpecialization] =
+    useState(false);
 
   // Form data cho bệnh nhân hoặc người thân
   const [patientData, setPatientData] = useState({
@@ -425,12 +520,12 @@ const BookAppointment = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      console.log("Symptoms API response:", response.data);
+      // console.log("Symptoms API response:", response.data);
 
       if (response.data.success && response.data.data) {
         const symptomsData = response.data.data.data || [];
         setSymptoms(symptomsData);
-        console.log("Set symptoms:", symptomsData);
+        // console.log("Set symptoms:", symptomsData);
       } else {
         setSymptoms([]);
         notification.warning({
@@ -469,29 +564,92 @@ const BookAppointment = () => {
 
   // Log symptoms state khi nó thay đổi
   useEffect(() => {
-    console.log("Current symptoms state:", symptoms);
+    // console.log("Current symptoms state:", symptoms);
   }, [symptoms]);
 
   // Lấy danh sách chuyên khoa
-  const fetchSpecializations = async () => {
+  const fetchSpecializations = useCallback(async () => {
     try {
-      const response = await axios.get(`${url1}/patient/specializations`);
-      setSpecializations(response.data.data);
+      setLoadingSpecializations(true);
+      const response = await axios.get(`${url1}/patient/specializations`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (response.data.success) {
+        setSpecializations(response.data.data);
+      } else {
+        message.error(
+          response.data.message || "Không thể tải danh sách chuyên khoa"
+        );
+      }
     } catch (error) {
       console.error("Error fetching specializations:", error);
-      // Dữ liệu mẫu nếu API không hoạt động
-      setSpecializations([
-        { specialization_id: 1, name: "Nhi" },
-        { specialization_id: 2, name: "Tim mạch" },
-        { specialization_id: 3, name: "Tổng hợp" },
-        { specialization_id: 4, name: "Da liễu" },
-      ]);
-      notification.error({
-        message: "Lỗi kết nối",
-        description: "Sử dụng dữ liệu mẫu cho chuyên khoa",
-      });
+      message.error("Có lỗi xảy ra khi tải danh sách chuyên khoa");
+    } finally {
+      setLoadingSpecializations(false);
     }
-  };
+  }, []);
+
+  // Fetch doctors by specialization
+  const fetchDoctorsBySpecialization = useCallback(
+    async (specializationId) => {
+      try {
+        setLoadingDoctorsBySpecialization(true);
+        const token = localStorage.getItem("token");
+        if (!token) {
+          message.error("Vui lòng đăng nhập lại");
+          navigate("/login");
+          return;
+        }
+
+        console.log("Fetching doctors for specialization:", specializationId);
+        const response = await axios.get(
+          `${url1}/patient/doctors?specialization_id=${specializationId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        console.log("Doctors API response:", response.data);
+
+        if (response.data.success) {
+          const doctorsData = response.data.data || [];
+          console.log("Doctors data:", doctorsData);
+          setDoctors(doctorsData);
+          setShowDoctorModal(true);
+
+          if (doctorsData.length === 0) {
+            message.info("Không có bác sĩ nào trong chuyên khoa này");
+          }
+        } else {
+          message.error(
+            response.data.message || "Không thể tải danh sách bác sĩ"
+          );
+        }
+      } catch (error) {
+        console.error("Error fetching doctors:", error);
+        if (error.response?.status === 401) {
+          message.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+          navigate("/login");
+        } else {
+          message.error("Có lỗi xảy ra khi tải danh sách bác sĩ");
+        }
+      } finally {
+        setLoadingDoctorsBySpecialization(false);
+      }
+    },
+    [url1, navigate]
+  );
+
+  // Handle specialization selection
+  const handleSpecializationSelect = useCallback(
+    (specialization) => {
+      console.log("Selected specialization:", specialization);
+      setSelectedSpecialization(specialization);
+      setShowDoctorModal(true);
+      fetchDoctorsBySpecialization(specialization.specialization_id);
+    },
+    [fetchDoctorsBySpecialization]
+  );
 
   useEffect(() => {
     fetchCurrentUser();
@@ -717,14 +875,6 @@ const BookAppointment = () => {
     setSelectedSymptoms(checkedValues);
   };
 
-  // Xử lý khi chọn chuyên khoa
-  const handleSpecializationSelect = (specializationId) => {
-    setSelectedSpecialization(specializationId);
-    setShowSpecializationModal(false);
-    setShowDoctorModal(true);
-    setCurrentPage(1); // Reset lại trang khi chọn chuyên khoa mới
-  };
-
   // Xử lý khi chọn bác sĩ
   const handleDoctorSelect = (doctorId) => {
     setSelectedDoctor(doctorId);
@@ -929,6 +1079,167 @@ const BookAppointment = () => {
     );
   };
 
+  // Update the doctor modal content
+  const renderDoctorModal = () => (
+    <Modal
+      title="Chọn bác sĩ"
+      open={showDoctorModal}
+      onCancel={() => setShowDoctorModal(false)}
+      footer={null}
+      width={800}
+    >
+      <Spin spinning={loadingDoctors}>
+        {doctorsBySpecialization[selectedSpecialization?.specialization_id]
+          ?.length > 0 ? (
+          <div className="doctors-list">
+            {doctorsBySpecialization[
+              selectedSpecialization?.specialization_id
+            ].map((doctor) => (
+              <Card
+                key={doctor.doctor_id}
+                hoverable
+                className={`doctor-card ${
+                  selectedDoctor?.doctor_id === doctor.doctor_id
+                    ? "selected"
+                    : ""
+                }`}
+                onClick={() => handleDoctorSelect(doctor)}
+                style={{
+                  marginBottom: "16px",
+                  borderColor:
+                    selectedDoctor?.doctor_id === doctor.doctor_id
+                      ? "#1890ff"
+                      : "#d9d9d9",
+                  backgroundColor:
+                    selectedDoctor?.doctor_id === doctor.doctor_id
+                      ? "#e6f7ff"
+                      : "white",
+                }}
+              >
+                <div style={{ display: "flex", gap: "20px" }}>
+                  <Avatar
+                    size={100}
+                    src={doctor.user?.avatar}
+                    icon={<UserOutlined />}
+                    style={{ flexShrink: 0 }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ marginBottom: "8px" }}>
+                      <h3
+                        style={{
+                          margin: 0,
+                          color:
+                            selectedDoctor?.doctor_id === doctor.doctor_id
+                              ? "#1890ff"
+                              : "#000",
+                          fontSize: "18px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {doctor.user?.username}
+                      </h3>
+                      <Tag color="blue" style={{ marginTop: "4px" }}>
+                        {doctor.Specialization?.name}
+                      </Tag>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "24px",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      <div>
+                        <strong>Học vị:</strong>{" "}
+                        {doctor.degree || "Chưa cập nhật"}
+                      </div>
+                      <div>
+                        <strong>Kinh nghiệm:</strong> {doctor.experience_years}{" "}
+                        năm
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: "8px" }}>
+                      <strong>Đánh giá:</strong>{" "}
+                      <Rate
+                        disabled
+                        defaultValue={doctor.rating || 0}
+                        style={{ fontSize: "14px" }}
+                      />
+                      <span style={{ marginLeft: "8px" }}>
+                        ({doctor.rating || 0})
+                      </span>
+                    </div>
+
+                    <div style={{ color: "#666" }}>
+                      <strong>Mô tả:</strong>
+                      <br />
+                      {doctor.description || "Chưa có mô tả"}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Empty
+            description="Không có bác sĩ nào trong chuyên khoa này"
+            style={{ margin: "20px 0" }}
+          />
+        )}
+      </Spin>
+    </Modal>
+  );
+
+  // Update the specialization card section
+  const renderSpecializationCards = () => (
+    <Card
+      title={
+        <div className="text-blue-600">
+          <MedicineBoxOutlined /> Chọn chuyên khoa
+        </div>
+      }
+      className="symptoms-card"
+      style={{ marginBottom: "20px" }}
+    >
+      {specializations && specializations.length > 0 ? (
+        <Row gutter={[12, 12]}>
+          {specializations.map((specialization) => (
+            <Col xs={12} sm={8} md={6} key={specialization.specialization_id}>
+              <Card
+                hoverable
+                bodyStyle={{ padding: "12px", textAlign: "center" }}
+                className={`specialization-card ${
+                  selectedSpecialization?.specialization_id ===
+                  specialization.specialization_id
+                    ? "selected"
+                    : ""
+                }`}
+                onClick={() => handleSpecializationSelect(specialization)}
+                style={{
+                  height: "50px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border:
+                    selectedSpecialization?.specialization_id ===
+                    specialization.specialization_id
+                      ? "2px solid #1890ff"
+                      : "1px solid #d9d9d9",
+                }}
+              >
+                {specialization.name}
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      ) : (
+        <Empty description="Không có chuyên khoa nào" />
+      )}
+    </Card>
+  );
+
   // Thêm items cho Tabs
   const tabItems = [
     {
@@ -936,86 +1247,8 @@ const BookAppointment = () => {
       label: "Đặt lịch theo bác sĩ",
       children: (
         <div className="mb-6">
-          <Button
-            type="primary"
-            size="large"
-            icon={<MedicineBoxOutlined />}
-            onClick={() => setShowSpecializationModal(true)}
-            className="mb-4"
-          >
-            Chọn chuyên khoa và bác sĩ
-          </Button>
-
-          {selectedDoctor && (
-            <Card
-              className="mt-4"
-              title={
-                <div className="text-blue-600">
-                  <MedicineBoxOutlined /> Bác sĩ đã chọn
-                </div>
-              }
-            >
-              <div className="flex items-center">
-                {doctors &&
-                doctors.length > 0 &&
-                doctors.find(
-                  (d) => d.doctor_id.toString() === selectedDoctor.toString()
-                )?.user?.avatar_url ? (
-                  <Avatar
-                    size={64}
-                    src={
-                      doctors.find(
-                        (d) =>
-                          d.doctor_id.toString() === selectedDoctor.toString()
-                      )?.user?.avatar_url
-                    }
-                  />
-                ) : (
-                  <Avatar
-                    size={64}
-                    icon={<UserOutlined />}
-                    style={{ backgroundColor: "#1890ff" }}
-                  />
-                )}
-                <div className="ml-4">
-                  <h3 className="text-lg font-medium">
-                    {(doctors &&
-                      doctors.length > 0 &&
-                      doctors.find(
-                        (d) =>
-                          d.doctor_id.toString() === selectedDoctor.toString()
-                      )?.user?.username) ||
-                      "Bác sĩ đã chọn"}
-                  </h3>
-                  <p className="text-gray-500">
-                    {(doctors &&
-                      doctors.length > 0 &&
-                      doctors.find(
-                        (d) =>
-                          d.doctor_id.toString() === selectedDoctor.toString()
-                      )?.Specialization?.name) ||
-                      ""}{" "}
-                    {(doctors &&
-                      doctors.length > 0 &&
-                      doctors.find(
-                        (d) =>
-                          d.doctor_id.toString() === selectedDoctor.toString()
-                      )?.degree) ||
-                      ""}
-                  </p>
-                  <p className="text-sm">
-                    {(doctors &&
-                      doctors.length > 0 &&
-                      doctors.find(
-                        (d) =>
-                          d.doctor_id.toString() === selectedDoctor.toString()
-                      )?.description) ||
-                      ""}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          )}
+          {renderSpecializationCards()}
+          {renderDoctorModal()}
         </div>
       ),
     },
@@ -1030,26 +1263,106 @@ const BookAppointment = () => {
                 <CheckCircleOutlined /> Chọn triệu chứng
               </div>
             }
+            className="symptoms-card"
           >
             {symptoms && symptoms.length > 0 ? (
-              <Checkbox.Group
-                onChange={handleSymptomToggle}
-                value={selectedSymptoms}
+              <div
+                style={{
+                  height: "300px",
+                  overflow: "auto",
+                  padding: "8px",
+                  "&::-webkit-scrollbar": {
+                    width: "6px",
+                    height: "6px",
+                  },
+                  "&::-webkit-scrollbar-track": {
+                    background: "#f1f1f1",
+                    borderRadius: "10px",
+                  },
+                  "&::-webkit-scrollbar-thumb": {
+                    background: "#888",
+                    borderRadius: "10px",
+                  },
+                  "&::-webkit-scrollbar-thumb:hover": {
+                    background: "#555",
+                  },
+                  scrollbarWidth: "thin",
+                  scrollbarColor: "#888 #f1f1f1",
+                }}
+                className="custom-scrollbar"
               >
-                <Row gutter={[16, 16]}>
-                  {symptoms.map((symptom) => (
-                    <Col span={8} key={symptom.symptom_id}>
-                      <Card hoverable size="small">
-                        <Checkbox value={symptom.symptom_id}>
-                          {symptom.name}
-                        </Checkbox>
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
-              </Checkbox.Group>
+                <Checkbox.Group
+                  onChange={handleSymptomToggle}
+                  value={selectedSymptoms}
+                  style={{ width: "100%" }}
+                >
+                  <Row gutter={[16, 16]}>
+                    {symptoms.map((symptom) => (
+                      <Col span={8} key={symptom.symptom_id}>
+                        <Card
+                          hoverable
+                          className="symptom-item"
+                          style={{
+                            height: "80px",
+                            borderRadius: "8px",
+                            border: selectedSymptoms.includes(
+                              symptom.symptom_id
+                            )
+                              ? "2px solid #1890ff"
+                              : "1px solid #d9d9d9",
+                            backgroundColor: selectedSymptoms.includes(
+                              symptom.symptom_id
+                            )
+                              ? "#e6f7ff"
+                              : "white",
+                            transition: "all 0.3s",
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              padding: "8px",
+                            }}
+                          >
+                            <Checkbox
+                              value={symptom.symptom_id}
+                              style={{ marginRight: "8px" }}
+                            />
+                            <div
+                              style={{
+                                flex: 1,
+                                fontSize: "14px",
+                                fontWeight: selectedSymptoms.includes(
+                                  symptom.symptom_id
+                                )
+                                  ? "500"
+                                  : "normal",
+                                lineHeight: "1.4",
+                                overflow: "hidden",
+                                display: "-webkit-box",
+                                WebkitLineClamp: "3",
+                                WebkitBoxOrient: "vertical",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {symptom.name}
+                            </div>
+                          </div>
+                        </Card>
+                      </Col>
+                    ))}
+                  </Row>
+                </Checkbox.Group>
+              </div>
             ) : (
-              <Empty description="Không có triệu chứng nào" />
+              <Empty
+                description="Không có triệu chứng nào"
+                style={{ margin: "20px 0" }}
+              />
             )}
           </Card>
         </div>
@@ -1386,15 +1699,13 @@ const BookAppointment = () => {
         width={700}
       >
         <List
-          grid={{ gutter: 16, column: 3 }}
+          grid={{ gutter: 8, column: 3 }}
           dataSource={specializations || []}
           renderItem={(spec) => (
             <List.Item>
               <Card
                 hoverable
-                onClick={() =>
-                  handleSpecializationSelect(spec?.specialization_id)
-                }
+                onClick={() => handleSpecializationSelect(spec)}
                 className="text-center"
               >
                 <div className="p-2">
@@ -1407,60 +1718,115 @@ const BookAppointment = () => {
       </Modal>
 
       <Modal
-        title={`Chọn bác sĩ ${
-          specializations &&
-          specializations.length > 0 &&
-          selectedSpecialization
-            ? specializations.find(
-                (s) => s.specialization_id === selectedSpecialization
-              )?.name || ""
-            : ""
+        title={`Chọn bác sĩ Khoa ${
+          selectedSpecialization ? selectedSpecialization.name : ""
         }`}
         open={showDoctorModal}
         onCancel={() => setShowDoctorModal(false)}
         footer={null}
         width={800}
       >
-        <List
-          dataSource={doctorsBySpecialization[selectedSpecialization] || []}
-          renderItem={(doctor) => (
-            <List.Item>
-              <Card
-                hoverable
-                onClick={() => handleDoctorSelect(doctor.doctor_id)}
-                className="w-full"
-              >
-                <div className="flex">
-                  <Avatar
-                    size={64}
-                    src={doctor?.user?.avatar_url || undefined}
-                  />
-                  <div className="ml-4">
-                    <h3 className="font-medium">
-                      {doctor?.user?.username || "Bác sĩ"}
-                    </h3>
-                    <p>{doctor?.degree || ""}</p>
-                    <p className="text-sm text-gray-500">
-                      {doctor?.description || ""}
-                    </p>
-                    <div className="mt-1">
-                      <Tag color="blue">
-                        Kinh nghiệm: {doctor?.experience || ""}
-                      </Tag>
+        <Spin spinning={loadingDoctors}>
+          {doctorsBySpecialization[selectedSpecialization?.specialization_id]
+            ?.length > 0 ? (
+            <div className="doctors-list">
+              {doctorsBySpecialization[
+                selectedSpecialization?.specialization_id
+              ].map((doctor) => (
+                <Card
+                  key={doctor.doctor_id}
+                  hoverable
+                  className={`doctor-card ${
+                    selectedDoctor?.doctor_id === doctor.doctor_id
+                      ? "selected"
+                      : ""
+                  }`}
+                  onClick={() => handleDoctorSelect(doctor)}
+                  style={{
+                    marginBottom: "16px",
+                    borderColor:
+                      selectedDoctor?.doctor_id === doctor.doctor_id
+                        ? "#1890ff"
+                        : "#d9d9d9",
+                    backgroundColor:
+                      selectedDoctor?.doctor_id === doctor.doctor_id
+                        ? "#e6f7ff"
+                        : "white",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: "20px" }}>
+                    <Avatar
+                      size={100}
+                      src={doctor.user?.avatar}
+                      icon={<UserOutlined />}
+                      style={{ flexShrink: 0 }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ marginBottom: "8px" }}>
+                        <h3
+                          style={{
+                            margin: 0,
+                            color:
+                              selectedDoctor?.doctor_id === doctor.doctor_id
+                                ? "#1890ff"
+                                : "#000",
+                            fontSize: "18px",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {doctor.user?.username}
+                        </h3>
+                        <Tag color="blue" style={{ marginTop: "4px" }}>
+                          {doctor.Specialization?.name}
+                        </Tag>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "24px",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        <div>
+                          <strong>Học vị:</strong>{" "}
+                          {doctor.degree || "Chưa cập nhật"}
+                        </div>
+                        <div>
+                          <strong>Kinh nghiệm:</strong>{" "}
+                          {doctor.experience_years} năm
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: "8px" }}>
+                        <strong>Đánh giá:</strong>{" "}
+                        <Rate
+                          disabled
+                          defaultValue={doctor.rating || 0}
+                          style={{ fontSize: "14px" }}
+                        />
+                        <span style={{ marginLeft: "8px" }}>
+                          ({doctor.rating || 0})
+                        </span>
+                      </div>
+
+                      <div style={{ color: "#666" }}>
+                        <strong>Mô tả:</strong>
+                        <br />
+                        {doctor.description || "Chưa có mô tả"}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-            </List.Item>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Empty
+              description="Không có bác sĩ nào trong chuyên khoa này"
+              style={{ margin: "20px 0" }}
+            />
           )}
-          pagination={{
-            onChange: (page) => handlePageChange(page),
-            pageSize: 4,
-            current: currentPage,
-            total: (doctorsBySpecialization[selectedSpecialization] || [])
-              .length,
-          }}
-        />
+        </Spin>
       </Modal>
 
       {/* Modal Chi tiết người thân */}
