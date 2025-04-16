@@ -755,22 +755,22 @@ export const getAllAppointments = async (user_id, family_member_id = null) => {
       ),
       status: appointment.status,
       fees: appointment.fees,
-      doctor: appointment.doctor
+      doctor: appointment.Doctor
         ? {
-            doctor_id: appointment.doctor.doctor_id,
-            name: appointment.doctor.user
-              ? appointment.doctor.user.username
+            doctor_id: appointment.Doctor.doctor_id,
+            name: appointment.Doctor.user
+              ? appointment.Doctor.user.username
               : "Unknown",
-            specialization: appointment.doctor.Specialization
-              ? appointment.doctor.Specialization.name
+            specialization: appointment.Doctor.Specialization
+              ? appointment.Doctor.Specialization.name
               : "Unknown",
           }
         : null,
-      family_member: appointment.familyMember
+      family_member: appointment.FamilyMember
         ? {
-            family_member_id: appointment.familyMember.family_member_id,
-            name: appointment.familyMember.name,
-            relationship: appointment.familyMember.relationship,
+            family_member_id: appointment.FamilyMember.family_member_id,
+            name: appointment.FamilyMember.username,
+            relationship: appointment.FamilyMember.relationship,
           }
         : null,
     }));

@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { AppContext } from "../../context/AppContext";
+import { toast } from "react-toastify";
 import {
   Steps,
   Form,
@@ -2473,17 +2474,27 @@ const BookAppointment = () => {
       );
 
       if (response.data.success) {
-        notification.success({
-          message: "Thành công",
-          description: "Đặt lịch hẹn thành công",
+        toast.success("Đặt lịch hẹn thành công", {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
         });
-        navigate("/my-appointments");
+        setTimeout(() => {
+          navigate("/my-appointments");
+        }, 1000);
       }
     } catch (error) {
       console.error("Error booking appointment:", error);
-      notification.error({
-        message: "Lỗi",
-        description: error.response?.data?.message || "Đặt lịch hẹn thất bại",
+      toast.error(error.response?.data?.message || "Đặt lịch hẹn thất bại", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
       });
     } finally {
       setLoading(false);
