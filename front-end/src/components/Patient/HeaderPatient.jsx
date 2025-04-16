@@ -1,6 +1,10 @@
+import { useNavigate } from "react-router-dom";
 import { assets } from "../../assets/assets";
+import { AppContext } from "../../context/AppContext";
+import { useContext } from "react";
 
 const Header = () => {
+  const { navigate } = useContext(AppContext);
   return (
     <div className="flex flex-col md:flex-row flex-wrap bg-primary rounded-lg px-6 md:px-10 lg:px-20">
       {/* ---- Left Side */}
@@ -15,9 +19,12 @@ const Header = () => {
             <br className="sm:block" /> schedule your appointment hassle-free.
           </p>
         </div>
-        <a href="#speciality" className="flex items-center gap-2 bg-white px-8 py-3 rounded-full text-gray-600 text-sm m-auto md:m-0 hover:scale-105 transition-all duration-300">
+        <button
+          onClick={() => navigate("/book-appointment")}
+          className="flex items-center gap-2 bg-white px-8 py-3 rounded-full text-gray-600 text-sm m-auto md:m-0 hover:scale-105 transition-all duration-300"
+        >
           Book appointment <img className="3" src={assets.arrow_icon} alt="" />
-        </a>
+        </button>
       </div>
 
       {/* ---- Right Side */}

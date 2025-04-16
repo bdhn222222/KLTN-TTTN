@@ -4,7 +4,7 @@ import {
   getAllSpecializations,
   getAllDoctors,
   getDoctorProfile,
-  bookDoctorAppointment,
+  bookAppointment,
   verifyEmail,
   changePassword,
   addFamilyMember,
@@ -13,7 +13,8 @@ import {
   updateFamilyMember,
   deleteFamilyMember,
   getAllAppointments,
-  bookSymptomsAppointment,
+  //  bookSymptomsAppointment,
+  getDoctorBySymptoms,
   getAllSymptoms,
   getDoctorDayOff,
 } from "../services/patientService.js";
@@ -113,7 +114,7 @@ export const getDoctorProfileController = asyncHandler(async (req, res) => {
   res.status(200).json(result);
 });
 
-export const bookDoctorAppointmentController = async (req, res) => {
+export const bookAppointmentController = async (req, res) => {
   try {
     const user_id = req.user.user_id;
     const {
@@ -141,7 +142,7 @@ export const bookDoctorAppointmentController = async (req, res) => {
       }
     }
 
-    const result = await bookDoctorAppointment(
+    const result = await bookAppointment(
       user_id,
       doctor_id,
       appointment_datetime,
@@ -301,78 +302,78 @@ export const getAllAppointmentsController = async (req, res, next) => {
   }
 };
 
-export const bookSymptomsAppointmentController = async (req, res) => {
-  try {
-    const user_id = req.user.user_id;
-    const {
-      symptoms,
-      appointment_datetime,
-      family_member_id,
-      family_member_data,
-    } = req.body;
+// export const bookSymptomsAppointmentController = async (req, res) => {
+//   try {
+//     const user_id = req.user.user_id;
+//     const {
+//       symptoms,
+//       appointment_datetime,
+//       family_member_id,
+//       family_member_data,
+//     } = req.body;
 
-    // Validate input
-    if (!symptoms || !Array.isArray(symptoms) || symptoms.length === 0) {
-      throw new Error("Danh sách triệu chứng không hợp lệ");
-    }
+//     // Validate input
+//     if (!symptoms || !Array.isArray(symptoms) || symptoms.length === 0) {
+//       throw new Error("Danh sách triệu chứng không hợp lệ");
+//     }
 
-    if (!appointment_datetime) {
-      throw new Error("Thời gian hẹn không được để trống");
-    }
+//     if (!appointment_datetime) {
+//       throw new Error("Thời gian hẹn không được để trống");
+//     }
 
-    if (!family_member_id) {
-      throw new Error("ID thành viên gia đình không được để trống");
-    }
+//     if (!family_member_id) {
+//       throw new Error("ID thành viên gia đình không được để trống");
+//     }
 
-    if (!family_member_data) {
-      throw new Error("Thông tin thành viên gia đình không được để trống");
-    }
+//     if (!family_member_data) {
+//       throw new Error("Thông tin thành viên gia đình không được để trống");
+//     }
 
-    // Validate family member data
-    const requiredFields = [
-      "username",
-      "dob",
-      "gender",
-      "phone_number",
-      //"address",
-      //"relationship",
-    ];
-    const missingFields = requiredFields.filter(
-      (field) => !family_member_data[field]
-    );
-    if (missingFields.length > 0) {
-      throw new Error(`Thiếu thông tin bắt buộc: ${missingFields.join(", ")}`);
-    }
+//     // Validate family member data
+//     const requiredFields = [
+//       "username",
+//       "dob",
+//       "gender",
+//       "phone_number",
+//       //"address",
+//       //"relationship",
+//     ];
+//     const missingFields = requiredFields.filter(
+//       (field) => !family_member_data[field]
+//     );
+//     if (missingFields.length > 0) {
+//       throw new Error(`Thiếu thông tin bắt buộc: ${missingFields.join(", ")}`);
+//     }
 
-    // Call service to book appointment
-    const appointment = await bookSymptomsAppointment(
-      user_id,
-      symptoms,
-      appointment_datetime,
-      family_member_id,
-      family_member_data
-    );
+//     // Call service to book appointment
+//     const appointment = await bookSymptomsAppointment(
+//       user_id,
+//       symptoms,
+//       appointment_datetime,
+//       family_member_id,
+//       family_member_data
+//     );
 
-    res.status(201).json({
-      success: true,
-      message: "Đặt lịch hẹn thành công",
-      data: appointment,
-    });
-  } catch (error) {
-    console.error("Error in bookSymptomsAppointmentController:", error);
-    if (error instanceof NotFoundError) {
-      res.status(404).json({
-        success: false,
-        message: error.message,
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: error.message || "Có lỗi xảy ra khi đặt lịch hẹn",
-      });
-    }
-  }
-};
+//     res.status(201).json({
+//       success: true,
+//       message: "Đặt lịch hẹn thành công",
+//       data: appointment,
+//     });
+//   } catch (error) {
+//     console.error("Error in bookSymptomsAppointmentController:", error);
+//     if (error instanceof NotFoundError) {
+//       res.status(404).json({
+//         success: false,
+//         message: error.message,
+//       });
+//     } else {
+//       res.status(400).json({
+//         success: false,
+//         message: error.message || "Có lỗi xảy ra khi đặt lịch hẹn",
+//       });
+//     }
+//   }
+// };
 
 export const getFamilyMemberByIdController = async (req, res, next) => {
   const { user_id } = req.user; // Lấy user_id từ token
@@ -425,6 +426,55 @@ export const getDoctorDayOffController = async (req, res, next) => {
 
     const result = await getDoctorDayOff(doctor_id);
     return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getDoctorBySymptomsController = async (req, res, next) => {
+  try {
+    const {
+      symptoms,
+      appointment_datetime,
+      family_member_id,
+      family_member_data,
+    } = req.body;
+
+    const user_id = req.user.user_id;
+
+    if (!symptoms || !Array.isArray(symptoms) || symptoms.length === 0) {
+      throw new BadRequestError("Vui lòng cung cấp ít nhất một triệu chứng");
+    }
+
+    if (!appointment_datetime) {
+      throw new BadRequestError("Vui lòng cung cấp thời gian đặt lịch");
+    }
+
+    if (family_member_id && !family_member_data) {
+      throw new BadRequestError("Vui lòng cung cấp thông tin người thân");
+    }
+
+    if (family_member_data) {
+      const requiredFields = ["username", "dob", "phone_number", "gender"];
+      const missingFields = requiredFields.filter(
+        (field) => !family_member_data[field]
+      );
+      if (missingFields.length > 0) {
+        throw new BadRequestError(
+          `Thiếu thông tin bắt buộc: ${missingFields.join(", ")}`
+        );
+      }
+    }
+
+    const result = await getDoctorBySymptoms(
+      user_id,
+      symptoms,
+      appointment_datetime,
+      family_member_id,
+      family_member_data
+    );
+
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }

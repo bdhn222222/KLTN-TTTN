@@ -6,16 +6,17 @@ import {
   getAllDoctorsController,
   getDoctorProfileController,
   verifyEmailController,
-  bookDoctorAppointmentController,
+  bookAppointmentController,
   changePasswordController,
   addFamilyMemberController,
   getFamilyMembersController,
   updateFamilyMemberController,
   getAllAppointmentsController,
-  bookSymptomsAppointmentController,
+  //bookSymptomsAppointmentController,
   getFamilyMemberByIdController,
   getAllSymptomsController,
   getDoctorDayOffController,
+  getDoctorBySymptomsController,
 } from "../controllers/patientController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
@@ -61,7 +62,7 @@ router.post(
       .isISO8601()
       .withMessage("Thời gian hẹn không hợp lệ"),
   ]),
-  bookDoctorAppointmentController
+  bookAppointmentController
 );
 router.get(
   "/appointments",
@@ -102,50 +103,50 @@ router.patch(
   updateFamilyMemberController
 );
 
-router.post(
-  "/book-symptoms-appointment",
-  authenticateUser,
-  authorize(["patient"]),
-  validate([
-    body("symptoms")
-      .isArray()
-      .withMessage("Danh sách triệu chứng phải là mảng")
-      .notEmpty()
-      .withMessage("Danh sách triệu chứng không được để trống"),
-    body("appointment_datetime")
-      .notEmpty()
-      .withMessage("Thời gian hẹn không được để trống")
-      .isISO8601()
-      .withMessage("Thời gian hẹn không hợp lệ"),
-    body("family_member_id")
-      .notEmpty()
-      .withMessage("ID người thân không được để trống")
-      .isInt()
-      .withMessage("ID người thân phải là số"),
-    body("family_member_data")
-      .notEmpty()
-      .withMessage("Thông tin người thân không được để trống")
-      .isObject()
-      .withMessage("Thông tin người thân không hợp lệ"),
-    body("family_member_data.username")
-      .notEmpty()
-      .withMessage("Tên người thân không được để trống"),
-    body("family_member_data.dob")
-      .notEmpty()
-      .withMessage("Ngày sinh người thân không được để trống")
-      .isISO8601()
-      .withMessage("Ngày sinh không hợp lệ"),
-    body("family_member_data.phone_number")
-      .notEmpty()
-      .withMessage("Số điện thoại người thân không được để trống"),
-    body("family_member_data.gender")
-      .notEmpty()
-      .withMessage("Giới tính người thân không được để trống")
-      .isIn(["male", "female"])
-      .withMessage("Giới tính không hợp lệ"),
-  ]),
-  bookSymptomsAppointmentController
-);
+// router.post(
+//   "/book-symptoms-appointment",
+//   authenticateUser,
+//   authorize(["patient"]),
+//   validate([
+//     body("symptoms")
+//       .isArray()
+//       .withMessage("Danh sách triệu chứng phải là mảng")
+//       .notEmpty()
+//       .withMessage("Danh sách triệu chứng không được để trống"),
+//     body("appointment_datetime")
+//       .notEmpty()
+//       .withMessage("Thời gian hẹn không được để trống")
+//       .isISO8601()
+//       .withMessage("Thời gian hẹn không hợp lệ"),
+//     body("family_member_id")
+//       .notEmpty()
+//       .withMessage("ID người thân không được để trống")
+//       .isInt()
+//       .withMessage("ID người thân phải là số"),
+//     body("family_member_data")
+//       .notEmpty()
+//       .withMessage("Thông tin người thân không được để trống")
+//       .isObject()
+//       .withMessage("Thông tin người thân không hợp lệ"),
+//     body("family_member_data.username")
+//       .notEmpty()
+//       .withMessage("Tên người thân không được để trống"),
+//     body("family_member_data.dob")
+//       .notEmpty()
+//       .withMessage("Ngày sinh người thân không được để trống")
+//       .isISO8601()
+//       .withMessage("Ngày sinh không hợp lệ"),
+//     body("family_member_data.phone_number")
+//       .notEmpty()
+//       .withMessage("Số điện thoại người thân không được để trống"),
+//     body("family_member_data.gender")
+//       .notEmpty()
+//       .withMessage("Giới tính người thân không được để trống")
+//       .isIn(["male", "female"])
+//       .withMessage("Giới tính không hợp lệ"),
+//   ]),
+//   bookSymptomsAppointmentController
+// );
 
 // Route để lấy danh sách triệu chứng
 router.get(
@@ -157,6 +158,13 @@ router.get(
 
 // Get doctor's day off information
 router.get("/doctor/:doctor_id/day-off", getDoctorDayOffController);
+
+router.post(
+  "/doctor-by-symptoms",
+  authenticateUser,
+  authorize(["patient"]),
+  getDoctorBySymptomsController
+);
 
 export default router;
 

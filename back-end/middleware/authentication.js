@@ -4,6 +4,7 @@ import UnauthorizedError from "../errors/unauthorized.js";
 
 export const authenticateUser = (req, res, next) => {
   const authHeader = req.headers.authorization;
+
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     throw new UnauthorizedError("Không tìm thấy token");
   }
