@@ -29,6 +29,8 @@ import PatientDoctor from "./pages/Doctor/PatientDoctor";
 import ProfileDoctor from "./pages/Doctor/ProfileDoctor";
 import PrescriptionPrepare from "./pages/Pharmacists/PrescriptionPrepare";
 import BookAppointment from "./pages/Patient/bookAppointment";
+import AppointmentDetail from "./pages/Patient/AppointmentDetail";
+import PaymentAppointment from "./pages/Patient/PaymentAppointment";
 
 // Layout cho Patient Portal
 const PatientLayout = () => {
@@ -77,6 +79,13 @@ const App = () => {
           <Route path="appointment/:docId" element={<Appointment />} />
           <Route path="book-appointment" element={<BookAppointment />} />
         </Route>
+
+        {/* Specific Patient Route */}
+        <Route
+          path="/patient/appointment/:id"
+          element={<AppointmentDetail />}
+        />
+        <Route path="/patient/payment/:id" element={<PaymentAppointment />} />
 
         {/* Doctor Routes */}
         <Route path="/doctor" element={<DoctorLayout />}>
@@ -145,6 +154,13 @@ const App = () => {
 
         {/* Redirect unknown routes to login */}
         <Route path="*" element={<Navigate to="/login" />} />
+
+        <Route path="/patient" element={<PatientLayout />}>
+          <Route path="my-appointments" element={<MyAppointments />} />
+          <Route path="appointment/:id" element={<AppointmentDetail />} />
+          <Route path="book-appointment" element={<BookAppointment />} />
+          <Route path="payment/:id" element={<PaymentAppointment />} />
+        </Route>
       </Routes>
       <ToastContainer />
     </AppContextProvider>

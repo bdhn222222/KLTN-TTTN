@@ -4,7 +4,7 @@ import BadRequestError from "../errors/bad_request.js";
 import cloudinary from "../config/cloudinary.js";
 import jwt from "jsonwebtoken";
 import axios from "axios";
-const { User, Admin } = db;
+const { User, Admin, Doctor, Appointment, FamilyMember, Specialization } = db;
 export const registerAdmin = async ({ username, email, password }) => {
   const existingUser = await User.findOne({ where: { email } });
   if (existingUser) throw new BadRequestError("Email is already registered");
@@ -394,17 +394,57 @@ export const deleteSpecialization = async (specialization_id) => {
   }
 };
 
-export const updateDoctorProfileWithAxios = async (user_id, updateData) => {
+// export const updateDoctorProfileWithAxios = async (user_id, updateData) => {
+//   try {
+//     const response = await axios.post(`${url1}/doctor/profile`, updateData, {
+//       headers: {
+//         Authorization: `Bearer ${localStorage.getItem("token")}`,
+//         "Content-Type": "application/json",
+//       },
+//     });
+
+//     return { message: "Success" };
+//   } catch (error) {
+//     throw new Error(error.message);
+//   }
+// };
+
+export const getAppointments = async () => {
+  const transaction = await db.sequelize.transaction();
   try {
-    const response = await axios.post(`${url1}/doctor/profile`, updateData, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      }
+    const appointments = await Appointment.findAll({
+      include: [
+        {
+          model: FamilyMember,
+          as: "FamilyMember",
+          include: [
+            {
+              model: Patient,
+              as: "patient",
+              include: [
+                {
+                  model: User,
+                  as: "user",
+                },
+              ],
+            },
+          ],
+        },
+        {
+          model: Doctor,
+          as: "doctor",
+        },
+        {
+          model: Specialization,
+          as: "specialization",
+        },
+      ],
     });
 
-    return { message: "Success" };
+    await transaction.commit();
+    return { message: "Success", appointments };
   } catch (error) {
+    await transaction.rollback();
     throw new Error(error.message);
   }
 };

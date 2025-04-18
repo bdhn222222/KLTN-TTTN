@@ -80,17 +80,51 @@ export const registerPatient = async ({
 
     const newPatient = await Patient.create(patientData, { transaction });
 
-    const link = `${process.env.URL}/patient/verify?email=${email}&otp_code=${otp_code}`;
-    await sendVerifyLink(email, link);
+    console.log("Created patient with ID:", newPatient.patient_id);
+    console.log("Created user with username:", username);
+
+    try {
+      // Tạo mới một bản ghi family member cho chính bệnh nhân với relationship = "me"
+      await db.FamilyMember.create(
+        {
+          patient_id: newPatient.patient_id,
+          username: username,
+          phone_number,
+          email,
+          gender,
+          date_of_birth,
+          relationship: "me",
+        },
+        { transaction }
+      );
+
+      console.log("Created family member for patient");
+    } catch (familyMemberError) {
+      console.error("Error creating family member:", familyMemberError);
+      throw familyMemberError;
+    }
+
+    // Skip email sending if in dev environment to test registration
+    try {
+      const link = `${process.env.URL}/patient/verify?email=${email}&otp_code=${otp_code}`;
+      await sendVerifyLink(email, link);
+      console.log("Verification email sent to:", email);
+    } catch (emailError) {
+      console.error("Error sending verification email:", emailError);
+      // Continue the registration process even if email sending fails
+    }
 
     await transaction.commit();
+    console.log("Transaction committed successfully");
 
     return {
       message: "Đăng ký account bệnh nhân thành công",
       patient: newPatient,
     };
   } catch (error) {
+    console.error("Error in registerPatient:", error);
     await transaction.rollback();
+    console.log("Transaction rolled back due to error");
 
     if (error instanceof BadRequestError) {
       throw error;
@@ -724,16 +758,17 @@ export const getAllAppointments = async (user_id, family_member_id = null) => {
         {
           model: db.Doctor,
           as: "Doctor",
+          attributes: ["doctor_id", "specialization_id"],
           include: [
+            {
+              model: db.User,
+              as: "user",
+              attributes: ["user_id", "username", "email", "avatar"],
+            },
             {
               model: db.Specialization,
               as: "Specialization",
               attributes: ["name", "fees"],
-            },
-            {
-              model: db.User,
-              as: "user",
-              attributes: ["username"],
             },
           ],
         },
@@ -1246,7 +1281,7 @@ export const addFamilyMember = async (
     const familyMember = await FamilyMember.create(
       {
         patient_id: patient.patient_id,
-        username,
+        username: username,
         phone_number,
         email,
         gender,
@@ -1377,6 +1412,270 @@ export const updateFamilyMember = async (
   } catch (error) {
     // Rollback transaction nếu có lỗi
     await t.rollback();
+    throw error;
+  }
+};
+
+export const cancelAppointment = async (user_id, appointment_id, reason) => {
+  const transaction = await db.sequelize.transaction();
+
+  try {
+    // Lấy thông tin bệnh nhân
+    const patient = await db.Patient.findOne({
+      where: { user_id },
+      include: [
+        {
+          model: db.User,
+          as: "user",
+          attributes: ["username", "email"],
+        },
+      ],
+      transaction,
+    });
+
+    if (!patient) {
+      throw new NotFoundError("Không tìm thấy thông tin bệnh nhân");
+    }
+
+    // Lấy thông tin cuộc hẹn
+    const appointment = await db.Appointment.findOne({
+      where: {
+        appointment_id,
+        family_member_id: {
+          [db.Sequelize.Op.in]: [
+            // Lấy tất cả family_member_id thuộc về patient này
+            ...(await db.FamilyMember.findAll({
+              where: { patient_id: patient.patient_id },
+              attributes: ["family_member_id"],
+              transaction,
+            }).then((members) => members.map((m) => m.family_member_id))),
+          ],
+        },
+      },
+      include: [
+        {
+          model: db.Doctor,
+          as: "Doctor",
+          include: [
+            {
+              model: db.User,
+              as: "user",
+              attributes: ["username", "email"],
+            },
+          ],
+        },
+        {
+          model: db.FamilyMember,
+          as: "FamilyMember",
+        },
+      ],
+      transaction,
+    });
+
+    if (!appointment) {
+      throw new NotFoundError(
+        "Không tìm thấy lịch hẹn hoặc lịch hẹn không thuộc về bạn"
+      );
+    }
+
+    // Kiểm tra trạng thái cuộc hẹn có thể hủy hay không
+    const invalidStatuses = [
+      "cancelled",
+      "completed",
+      "doctor_day_off",
+      "patient_not_coming",
+    ];
+    if (invalidStatuses.includes(appointment.status)) {
+      throw new BadRequestError(
+        `Không thể hủy lịch hẹn đã ${
+          appointment.status === "cancelled"
+            ? "bị hủy"
+            : appointment.status === "completed"
+            ? "hoàn thành"
+            : appointment.status === "doctor_day_off"
+            ? "bị nghỉ"
+            : "được đánh dấu bệnh nhân không đến"
+        }`
+      );
+    }
+
+    // Kiểm tra thời gian hủy
+    const now = dayjs().tz("Asia/Ho_Chi_Minh");
+    const appointmentTime = dayjs(appointment.appointment_datetime).tz(
+      "Asia/Ho_Chi_Minh"
+    );
+    const timeDiff = appointmentTime.diff(now, "hour");
+
+    if (timeDiff < 24) {
+      throw new BadRequestError(
+        "Không thể hủy lịch hẹn trước thời điểm diễn ra ít hơn 24 giờ"
+      );
+    }
+
+    // Cập nhật trạng thái cuộc hẹn
+    appointment.status = "cancelled";
+    appointment.cancelled_at = now.toDate();
+    appointment.cancelled_by = "Bệnh nhân";
+    appointment.cancel_reason = reason;
+    await appointment.save({ transaction });
+
+    // TODO: Gửi email thông báo cho bác sĩ về việc hủy lịch
+
+    await transaction.commit();
+
+    return {
+      success: true,
+      message: "Hủy lịch hẹn thành công",
+      data: {
+        appointment_id: appointment.appointment_id,
+        status: appointment.status,
+        appointment_datetime: appointmentTime.format("YYYY-MM-DDTHH:mm:ss"),
+        patient: {
+          name: patient.user.username,
+          email: patient.user.email,
+        },
+        doctor: {
+          name: appointment.Doctor.user.username,
+          email: appointment.Doctor.user.email,
+        },
+        cancelled_at: now.format("YYYY-MM-DDTHH:mm:ss"),
+        cancelled_by: "Patient - bệnh nhân",
+        cancel_reason: reason,
+      },
+    };
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+};
+
+export const getAppointmentById = async (appointmentId, userId) => {
+  try {
+    // 1. Lấy patient_id của user đang login
+    const patientRecord = await db.Patient.findOne({
+      where: { user_id: userId },
+      attributes: ["patient_id"],
+      include: [
+        {
+          model: db.FamilyMember,
+          as: "familyMembers",
+          attributes: ["family_member_id"],
+        },
+      ],
+    });
+
+    if (!patientRecord) {
+      throw new NotFoundError("Không tìm thấy thông tin bệnh nhân");
+    }
+
+    // 2. Build danh sách family_member_id
+    const familyIds = (patientRecord.familyMembers || []).map(
+      (fm) => fm.family_member_id
+    );
+
+    // 3. Tìm appointment chỉ dựa trên family_member_id và appointment_id
+    const appointment = await db.Appointment.findOne({
+      where: {
+        appointment_id: appointmentId,
+        family_member_id: { [Op.in]: familyIds },
+      },
+      attributes: [
+        "appointment_id",
+        "family_member_id",
+        "doctor_id",
+        "appointment_datetime",
+        "status",
+        "fees",
+        "cancelled_at",
+        "cancelled_by",
+        "cancel_reason",
+        "createdAt",
+        "updatedAt",
+      ],
+      include: [
+        {
+          model: db.Doctor,
+          as: "Doctor",
+          attributes: ["doctor_id", "specialization_id"],
+          include: [
+            {
+              model: db.User,
+              as: "user",
+              attributes: ["user_id", "username", "email", "avatar"],
+            },
+            {
+              model: db.Specialization,
+              as: "Specialization",
+              attributes: ["name", "fees"],
+            },
+          ],
+        },
+        {
+          model: db.MedicalRecord,
+          as: "MedicalRecord",
+        },
+        {
+          model: db.Prescription,
+          as: "Prescription",
+          include: [
+            {
+              model: db.PrescriptionMedicine,
+              as: "prescriptionMedicines",
+              include: [
+                {
+                  model: db.Medicine,
+                  as: "Medicine",
+                  attributes: ["name", "unit", "price"],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          model: db.Payment,
+          as: "Payments",
+          attributes: [
+            "payment_id",
+            "amount",
+            "payment_method",
+            "status",
+            "createdAt",
+          ],
+        },
+        {
+          model: db.FamilyMember,
+          as: "FamilyMember",
+          attributes: [
+            "family_member_id",
+            "username",
+            "date_of_birth",
+            "phone_number",
+            "gender",
+            "relationship",
+          ],
+          include: [
+            {
+              model: db.Patient,
+              as: "patient",
+              attributes: ["patient_id"],
+              where: { patient_id: patientRecord.patient_id },
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!appointment) {
+      throw new NotFoundError("Không tìm thấy thông tin lịch hẹn");
+    }
+
+    return {
+      success: true,
+      message: "Lấy thông tin lịch hẹn thành công",
+      data: appointment,
+    };
+  } catch (error) {
+    console.error("Error in getAppointmentById service:", error);
     throw error;
   }
 };

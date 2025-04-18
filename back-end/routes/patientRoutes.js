@@ -17,6 +17,10 @@ import {
   getAllSymptomsController,
   getDoctorDayOffController,
   getDoctorBySymptomsController,
+  cancelAppointmentController,
+  getAppointmentByIdController,
+  processPaymentController,
+  verifyPaymentController,
 } from "../controllers/patientController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
@@ -69,6 +73,12 @@ router.get(
   authenticateUser,
   authorize(["patient"]),
   getAllAppointmentsController
+);
+router.get(
+  "/appointments/:id",
+  authenticateUser,
+  authorize(["patient"]),
+  getAppointmentByIdController
 );
 router.post(
   "/add-family-member",
@@ -164,6 +174,42 @@ router.post(
   authenticateUser,
   authorize(["patient"]),
   getDoctorBySymptomsController
+);
+
+router.post(
+  "/appointments/:id/cancel",
+  authenticateUser,
+  authorize(["patient"]),
+  validate([
+    body("reason")
+      .notEmpty()
+      .withMessage("Lý do hủy lịch không được để trống")
+      .isLength({ min: 3, max: 200 })
+      .withMessage("Lý do phải từ 3 đến 200 ký tự"),
+  ]),
+  cancelAppointmentController
+);
+
+// Payment routes
+router.post(
+  "/appointments/:id/payment",
+  authenticateUser,
+  authorize(["patient"]),
+  processPaymentController
+);
+
+router.post(
+  "/appointments/:id/payment/verify",
+  authenticateUser,
+  authorize(["patient"]),
+  verifyPaymentController
+);
+
+router.post(
+  "/book-appointment",
+  authenticateUser,
+  authorize(["patient"]),
+  bookAppointmentController
 );
 
 export default router;

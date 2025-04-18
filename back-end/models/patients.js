@@ -118,21 +118,21 @@ export default (sequelize) => {
         },
       ],
       hooks: {
-        afterCreate: async (patient) => {
-          // Tự động tạo FamilyMember "me" khi tạo Patient mới
-          const { FamilyMember } = sequelize.models;
-          const user = await patient.getUser();
-
-          await FamilyMember.create({
-            patient_id: patient.patient_id,
-            username: user.username,
-            phone_number: patient.phone_number,
-            email: user.email,
-            gender: patient.gender,
-            date_of_birth: patient.date_of_birth,
-            relationship: "me",
-          });
-        },
+        // Comment out this hook since we handle family member creation in the service
+        // afterCreate: async (patient) => {
+        //   // Tự động tạo FamilyMember "me" khi tạo Patient mới
+        //   const { FamilyMember } = sequelize.models;
+        //   const user = await patient.getUser();
+        //   await FamilyMember.create({
+        //     patient_id: patient.patient_id,
+        //     username: user.username,
+        //     phone_number: patient.phone_number,
+        //     email: user.email,
+        //     gender: patient.gender,
+        //     date_of_birth: patient.date_of_birth,
+        //     relationship: "me",
+        //   });
+        // },
       },
     }
   );
