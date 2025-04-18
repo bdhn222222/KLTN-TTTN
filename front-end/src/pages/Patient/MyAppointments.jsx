@@ -248,24 +248,26 @@ const MyAppointments = () => {
       "HH:mm"
     );
 
+    console.log("Rendering appointment data:", appointment);
+    console.log("Doctor info:", appointment.doctor);
+
+    // Get doctor info from the flattened structure
+    const doctorName = appointment.doctor?.name || "Chưa có bác sĩ";
+    const specialization =
+      appointment.doctor?.specialization || "Chưa có chuyên khoa";
+
     return (
       <Card className="mb-4" key={appointment.appointment_id}>
         <div className="flex flex-col md:flex-row md:justify-between md:items-start">
           <div className="flex flex-col gap-3 md:flex-row md:items-start mb-4 md:mb-0">
             <Avatar
               size={64}
-              src={appointment.Doctor?.user?.avatar}
               icon={<UserOutlined />}
               className="mb-4 md:mb-0 md:mr-4"
             />
             <div>
-              <div className="font-medium text-lg mb-1">
-                {appointment.Doctor?.user?.username || "Chưa có bác sĩ"}
-              </div>
-              <div className="text-gray-500 mb-1">
-                {appointment.Doctor?.Specialization?.name ||
-                  "Chưa có chuyên khoa"}
-              </div>
+              <div className="font-medium text-lg mb-1">{doctorName}</div>
+              <div className="text-gray-500 mb-1">{specialization}</div>
               <div className="mb-1">
                 <CalendarOutlined className="mr-2 text-blue-500" />
                 {appointmentDate} - {appointmentTime}
