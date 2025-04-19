@@ -158,8 +158,11 @@ const App = () => {
         <Route path="/patient" element={<PatientLayout />}>
           <Route path="my-appointments" element={<MyAppointments />} />
           <Route path="appointment/:id" element={<AppointmentDetail />} />
+          <Route
+            path="appointments/:id/payment"
+            element={<PaymentAppointment />}
+          />
           <Route path="book-appointment" element={<BookAppointment />} />
-          <Route path="payment/:id" element={<PaymentAppointment />} />
         </Route>
       </Routes>
       <ToastContainer />

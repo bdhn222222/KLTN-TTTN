@@ -4,7 +4,10 @@ export default (sequelize) => {
   class Payment extends Model {
     static associate(models) {
       // Liên kết với bảng Appointments
-      Payment.belongsTo(models.Appointment, { foreignKey: "appointment_id", as: "Appointment" });
+      Payment.belongsTo(models.Appointment, {
+        foreignKey: "appointment_id",
+        as: "Appointment",
+      });
     }
   }
 
@@ -31,7 +34,7 @@ export default (sequelize) => {
         allowNull: false,
       },
       payment_method: {
-        type: DataTypes.ENUM("cash", "ZaloPay"),
+        type: DataTypes.ENUM("cash", "MoMo"),
         allowNull: false,
       },
       status: {

@@ -81,8 +81,8 @@ const PaymentAppointment = () => {
         },
       });
 
-      if (response.data.success && response.data.data.success) {
-        const appointmentData = response.data.data.data;
+      if (response.data.success) {
+        const appointmentData = response.data.data;
         console.log("Appointment Data:", appointmentData);
 
         // Kiểm tra nếu đã thanh toán
@@ -129,25 +129,32 @@ const PaymentAppointment = () => {
         setPaymentSuccess(true);
         notification.success({
           message: "Thanh toán thành công",
-          description: "Thanh toán lịch hẹn của bạn đã được xác nhận.",
+          description:
+            "Thanh toán đã được xác nhận. Bạn có thể xem hồ sơ bệnh án và đơn thuốc.",
           placement: "top",
         });
 
         // Cập nhật lại thông tin lịch hẹn
-        fetchAppointmentDetail();
+        await fetchAppointmentDetail();
+
+        // Chuyển hướng về trang chi tiết lịch hẹn sau 2 giây
+        setTimeout(() => {
+          navigate(`/patient/appointment/${id}`);
+        }, 2000);
       } else {
         notification.error({
           message: "Lỗi xác nhận thanh toán",
-          description:
-            response.data.message || "Không thể xác nhận thanh toán.",
+          description: response.data.message || "Không thể xác nhận thanh toán",
           placement: "top",
         });
       }
     } catch (error) {
-      console.error("Error updating payment status:", error);
+      console.error("Error in updatePaymentStatus:", error);
       notification.error({
         message: "Lỗi xác nhận thanh toán",
-        description: "Có lỗi xảy ra khi xác nhận thanh toán.",
+        description:
+          error.response?.data?.message ||
+          "Có lỗi xảy ra khi xác nhận thanh toán",
         placement: "top",
       });
     }
@@ -159,12 +166,22 @@ const PaymentAppointment = () => {
       setProcessingPayment(true);
       const token = localStorage.getItem("token");
 
+      if (!appointment || !appointment.fees) {
+        notification.error({
+          message: "Lỗi thanh toán",
+          description: "Không tìm thấy thông tin phí thanh toán",
+          placement: "top",
+        });
+        setProcessingPayment(false);
+        return;
+      }
+
       const response = await axios.post(
         `${url1}/patient/appointments/${id}/payment`,
         {
-          payment_method: paymentMethod,
+          appointment_id: parseInt(id),
           amount: appointment.fees,
-          appointment_id: id,
+          payment_method: paymentMethod,
         },
         {
           headers: {
@@ -179,18 +196,19 @@ const PaymentAppointment = () => {
       } else {
         notification.error({
           message: "Lỗi thanh toán",
-          description: "Không thể kết nối đến cổng thanh toán.",
+          description: "Không thể kết nối đến cổng thanh toán",
           placement: "top",
         });
-        setProcessingPayment(false);
       }
     } catch (error) {
-      console.error("Error processing payment:", error);
+      console.error("Error in handlePayment:", error);
       notification.error({
         message: "Lỗi thanh toán",
-        description: "Có lỗi xảy ra khi xử lý thanh toán.",
+        description:
+          error.response?.data?.message || "Có lỗi xảy ra khi xử lý thanh toán",
         placement: "top",
       });
+    } finally {
       setProcessingPayment(false);
     }
   };
@@ -361,8 +379,8 @@ const PaymentAppointment = () => {
                 className="w-full"
               >
                 <Space direction="vertical" className="w-full">
-                  <Radio value="momo" className="p-3 border rounded w-full">
-                    <div className="flex items-center">
+                  <Radio value="momo" className="p-3  rounded w-full">
+                    <div className="flex items-center gap-2">
                       <img
                         src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png"
                         alt="MoMo"

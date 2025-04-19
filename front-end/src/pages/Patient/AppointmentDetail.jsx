@@ -37,6 +37,7 @@ import {
   MailOutlined,
   EnvironmentOutlined,
   ExclamationCircleOutlined,
+  InfoCircleOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
@@ -81,9 +82,6 @@ const AppointmentDetail = () => {
         return;
       }
 
-      console.log("Making API request to get appointment with ID:", id);
-
-      // Ensure id is a valid number
       const numericId = parseInt(id, 10);
       if (isNaN(numericId)) {
         console.error("ID is not a valid number:", id);
@@ -104,18 +102,28 @@ const AppointmentDetail = () => {
       console.log("Full API Response:", response.data);
 
       if (response.data.success) {
-        const appointmentData = response.data.data;
-        console.log("Appointment Data:", appointmentData);
+        const innerResponse = response.data.data;
 
-        if (!appointmentData) {
-          message.error("Không tìm thấy thông tin lịch hẹn");
+        if (innerResponse.success) {
+          const appointmentData = innerResponse.data;
+          console.log("Appointment Data:", appointmentData);
+
+          if (!appointmentData) {
+            message.error("Không tìm thấy thông tin lịch hẹn");
+            navigate("/my-appointments");
+            return;
+          }
+
+          setAppointment(appointmentData);
+        } else {
+          console.error("Inner API response error:", innerResponse);
+          message.error(
+            innerResponse.message || "Không thể lấy thông tin lịch hẹn"
+          );
           navigate("/my-appointments");
-          return;
         }
-
-        setAppointment(appointmentData);
       } else {
-        console.error("API returned error:", response.data);
+        console.error("Outer API response error:", response.data);
         message.error(
           response.data.message || "Không thể lấy thông tin lịch hẹn"
         );
@@ -183,7 +191,6 @@ const AppointmentDetail = () => {
         setCancelModalVisible(false);
         setCancelReason("");
 
-        // Thêm delay để đảm bảo dữ liệu được cập nhật trong database
         setTimeout(() => {
           console.log(
             "Fetching updated appointment details after cancellation"
@@ -191,7 +198,6 @@ const AppointmentDetail = () => {
           fetchAppointmentDetail();
         }, 2000);
       } else {
-        // Xử lý trường hợp API trả về success: false
         notification.error({
           message: "Không thể hủy lịch hẹn",
           description: response.data.message,
@@ -202,7 +208,6 @@ const AppointmentDetail = () => {
     } catch (error) {
       console.error("Cancel appointment error:", error.response?.data);
 
-      // Xử lý error từ API hoặc lỗi network
       const errorMessage =
         error.response?.data?.message || "Có lỗi xảy ra khi hủy lịch hẹn";
 
@@ -225,67 +230,53 @@ const AppointmentDetail = () => {
     navigate(`/patient/payment/${id}`);
   };
 
-  const getStatusTag = (status, payments) => {
-    if (status === "completed") {
-      const isPaid =
-        payments && payments.length > 0 && payments[0].status === "paid";
-      return isPaid ? (
-        <Tag icon={<CheckCircleOutlined />} color="blue" className="text-base">
-          Đã hoàn tất
-        </Tag>
-      ) : (
-        <Tag icon={<WalletOutlined />} color="gold" className="text-base">
-          Cần thanh toán
-        </Tag>
-      );
-    }
+  const getStatusTag = (status) => {
+    if (!status) return null;
 
-    switch (status) {
-      case "waiting_for_confirmation":
-        return (
-          <Tag
-            icon={<ClockCircleOutlined />}
-            color="orange"
-            className="text-base"
-          >
-            Đang chờ xác nhận
-          </Tag>
-        );
-      case "accepted":
-        return (
-          <Tag
-            icon={<CheckCircleOutlined />}
-            color="green"
-            className="text-base"
-          >
-            Đã xác nhận
-          </Tag>
-        );
-      case "cancelled":
-        return (
-          <Tag icon={<CloseCircleOutlined />} color="red" className="text-base">
-            Đã hủy
-          </Tag>
-        );
-      case "doctor_day_off":
-        return (
-          <Tag color="volcano" className="text-base">
-            Bác sĩ nghỉ
-          </Tag>
-        );
-      case "patient_not_coming":
-        return (
-          <Tag color="magenta" className="text-base">
-            Không đến khám
-          </Tag>
-        );
-      default:
-        return (
-          <Tag color="default" className="text-base">
-            {status}
-          </Tag>
-        );
-    }
+    const statusConfig = {
+      completed: {
+        icon: <CheckCircleOutlined />,
+        color: "blue",
+        text: "Đã hoàn tất",
+      },
+      waiting_for_confirmation: {
+        icon: <ClockCircleOutlined />,
+        color: "orange",
+        text: "Đang chờ xác nhận",
+      },
+      accepted: {
+        icon: <CheckCircleOutlined />,
+        color: "green",
+        text: "Đã xác nhận",
+      },
+      cancelled: {
+        icon: <CloseCircleOutlined />,
+        color: "red",
+        text: "Đã hủy",
+      },
+      doctor_day_off: {
+        icon: <CloseCircleOutlined />,
+        color: "red",
+        text: "Đã hủy",
+      },
+      patient_not_coming: {
+        icon: <CloseCircleOutlined />,
+        color: "magenta",
+        text: "Không đến khám",
+      },
+    };
+
+    const config = statusConfig[status] || {
+      icon: <InfoCircleOutlined />,
+      color: "default",
+      text: status,
+    };
+
+    return (
+      <Tag icon={config.icon} color={config.color} className="text-base">
+        {config.text}
+      </Tag>
+    );
   };
 
   const canCancel =
@@ -335,6 +326,97 @@ const AppointmentDetail = () => {
     ? dayjs(appointment.created_at).format("DD/MM/YYYY HH:mm")
     : "N/A";
 
+  const renderDoctorInfo = () => {
+    if (!appointment?.Doctor) {
+      return <Empty description="Không có thông tin bác sĩ" />;
+    }
+
+    const { Doctor } = appointment;
+    const { user, Specialization } = Doctor;
+
+    return (
+      <div className="text-center">
+        <Avatar
+          size={80}
+          icon={<UserOutlined />}
+          src={user?.avatar}
+          className="mb-3"
+        />
+        <Text strong className="block text-lg mb-1">
+          {user?.username || "Chưa cập nhật"}
+        </Text>
+        <div className="space-y-2 mt-4">
+          <div className="flex items-center justify-center text-gray-500">
+            <MailOutlined className="mr-2" />
+            <Text>{user?.email || "Chưa cập nhật"}</Text>
+          </div>
+          <div className="flex items-center justify-center text-gray-500">
+            <MedicineBoxOutlined className="mr-2" />
+            <Text>{Specialization?.name || "Chưa cập nhật khoa"}</Text>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPatientInfo = () => {
+    if (!appointment?.FamilyMember) {
+      return <Empty description="Không có thông tin người khám" />;
+    }
+
+    const { FamilyMember } = appointment;
+
+    const getRelationshipText = (relationship) => {
+      const relationshipMap = {
+        self: "Bản thân",
+        father: "Cha",
+        mother: "Mẹ",
+        spouse: "Vợ/Chồng",
+        child: "Con",
+        other: "Khác",
+      };
+      return relationshipMap[relationship] || "Khác";
+    };
+
+    return (
+      <div className="space-y-3">
+        <div className="flex justify-between">
+          <Text type="secondary">Họ tên:</Text>
+          <Text strong>{FamilyMember.username}</Text>
+        </div>
+        <div className="flex justify-between">
+          <Text type="secondary">Quan hệ:</Text>
+          <Text strong>{getRelationshipText(FamilyMember.relationship)}</Text>
+        </div>
+        <div className="flex justify-between">
+          <Text type="secondary">Ngày sinh:</Text>
+          <Text strong>
+            {dayjs(FamilyMember.date_of_birth).format("DD/MM/YYYY")}
+          </Text>
+        </div>
+        <div className="flex justify-between">
+          <Text type="secondary">Số điện thoại:</Text>
+          <Text strong>{FamilyMember.phone_number}</Text>
+        </div>
+        <div className="flex justify-between">
+          <Text type="secondary">Giới tính:</Text>
+          <Text strong>{FamilyMember.gender === "male" ? "Nam" : "Nữ"}</Text>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFees = () => {
+    return (
+      <div className="flex items-center">
+        <DollarOutlined className="mr-2 text-green-500" />
+        <Text strong className="text-lg">
+          {(appointment?.fees || 0).toLocaleString("vi-VN")} VNĐ
+        </Text>
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto p-6">
       <Button
@@ -354,7 +436,7 @@ const AppointmentDetail = () => {
               <Title level={3} className="mb-0">
                 Chi tiết lịch hẹn
               </Title>
-              {getStatusTag(appointment.status, appointment.Payments)}
+              {getStatusTag(appointment?.status)}
             </div>
 
             <div className="grid grid-cols-2 gap-6 mb-6">
@@ -365,7 +447,9 @@ const AppointmentDetail = () => {
                 <div className="flex items-center">
                   <ClockCircleOutlined className="mr-2 text-blue-500" />
                   <Text strong className="text-lg">
-                    {appointmentDate} {appointmentTime}
+                    {dayjs(appointment?.appointment_datetime).format(
+                      "DD/MM/YYYY HH:mm"
+                    )}
                   </Text>
                 </div>
               </div>
@@ -373,17 +457,12 @@ const AppointmentDetail = () => {
                 <Text type="secondary" className="block mb-1">
                   Chi phí khám
                 </Text>
-                <div className="flex items-center">
-                  <DollarOutlined className="mr-2 text-green-500" />
-                  <Text strong className="text-lg">
-                    {(appointment.fees || 0).toLocaleString("vi-VN")} VNĐ
-                  </Text>
-                </div>
+                {renderFees()}
               </div>
             </div>
 
             {/* Hiển thị thông tin hủy lịch khi status là cancelled */}
-            {appointment && appointment.status === "cancelled" && (
+            {appointment?.status === "cancelled" && (
               <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <Text type="secondary" strong className="block mb-2">
                   Thông tin hủy lịch
@@ -526,84 +605,14 @@ const AppointmentDetail = () => {
             <Title level={4} className="mb-4">
               Thông tin bác sĩ
             </Title>
-            {appointment.Doctor && appointment.Doctor.user ? (
-              <div className="text-center">
-                <Avatar
-                  size={80}
-                  icon={<UserOutlined />}
-                  src={appointment.Doctor.user.avatar}
-                  className="mb-3"
-                />
-                <Text strong className="block text-lg mb-1">
-                  {appointment.Doctor.user.username}
-                </Text>
-                <div className="space-y-2 mt-4">
-                  <div className="flex items-center justify-center text-gray-500">
-                    <MailOutlined className="mr-2" />
-                    <Text>{appointment.Doctor.user.email}</Text>
-                  </div>
-                  <div className="flex items-center justify-center text-gray-500">
-                    <MedicineBoxOutlined className="mr-2" />
-                    <Text>
-                      {appointment.Doctor?.Specialization?.name ||
-                        "Chưa cập nhật khoa"}
-                    </Text>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <Empty description="Không có thông tin bác sĩ" />
-            )}
+            {renderDoctorInfo()}
           </Card>
 
           <Card className="shadow-sm">
             <Title level={4} className="mb-4">
               Thông tin người khám
             </Title>
-            {appointment.FamilyMember ? (
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <Text type="secondary">Họ tên:</Text>
-                  <Text strong>{appointment.FamilyMember.username}</Text>
-                </div>
-                <div className="flex justify-between">
-                  <Text type="secondary">Quan hệ:</Text>
-                  <Text strong>
-                    {appointment.FamilyMember.relationship === "self"
-                      ? "Bản thân"
-                      : appointment.FamilyMember.relationship === "father"
-                      ? "Cha"
-                      : appointment.FamilyMember.relationship === "mother"
-                      ? "Mẹ"
-                      : appointment.FamilyMember.relationship === "spouse"
-                      ? "Vợ/Chồng"
-                      : appointment.FamilyMember.relationship === "child"
-                      ? "Con"
-                      : "Khác"}
-                  </Text>
-                </div>
-                <div className="flex justify-between">
-                  <Text type="secondary">Ngày sinh:</Text>
-                  <Text strong>
-                    {dayjs(appointment.FamilyMember.date_of_birth).format(
-                      "DD/MM/YYYY"
-                    )}
-                  </Text>
-                </div>
-                <div className="flex justify-between">
-                  <Text type="secondary">Số điện thoại:</Text>
-                  <Text strong>{appointment.FamilyMember.phone_number}</Text>
-                </div>
-                <div className="flex justify-between">
-                  <Text type="secondary">Giới tính:</Text>
-                  <Text strong>
-                    {appointment.FamilyMember.gender === "male" ? "Nam" : "Nữ"}
-                  </Text>
-                </div>
-              </div>
-            ) : (
-              <Empty description="Không có thông tin người khám" />
-            )}
+            {renderPatientInfo()}
           </Card>
         </Col>
       </Row>

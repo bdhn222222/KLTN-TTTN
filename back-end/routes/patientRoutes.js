@@ -19,8 +19,9 @@ import {
   getDoctorBySymptomsController,
   cancelAppointmentController,
   getAppointmentByIdController,
-  processPaymentController,
+  createMomoPaymentController,
   verifyPaymentController,
+  handleCallbackController,
 } from "../controllers/patientController.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
@@ -29,6 +30,7 @@ import authorize from "../middleware/authorization.js";
 import { query } from "express-validator";
 const router = express.Router();
 import { loginLimiter, registerLimiter } from "../middleware/rateLimiter.js";
+
 router.post(
   "/register",
   // registerLimiter,
@@ -192,25 +194,45 @@ router.post(
 
 // Payment routes
 router.post(
-  "/appointments/:id/payment",
+  "/appointments/:appointment_id/payment/create",
   authenticateUser,
   authorize(["patient"]),
-  processPaymentController
+  validate([
+    body("amount")
+      .notEmpty()
+      .withMessage("Số tiền không được để trống")
+      .isNumeric()
+      .withMessage("Số tiền phải là số"),
+    body("payment_method")
+      .notEmpty()
+      .withMessage("Phương thức thanh toán không được để trống")
+      .equals("momo")
+      .withMessage("Phương thức thanh toán phải là momo"),
+  ]),
+  createMomoPaymentController
 );
 
 router.post(
-  "/appointments/:id/payment/verify",
+  "/appointments/:appointment_id/payment/verify",
   authenticateUser,
   authorize(["patient"]),
+  validate([
+    body("order_id").notEmpty().withMessage("Mã đơn hàng không được để trống"),
+  ]),
   verifyPaymentController
 );
 
 router.post(
-  "/book-appointment",
-  authenticateUser,
-  authorize(["patient"]),
-  bookAppointmentController
+  "/appointments/:appointment_id/payment/callback",
+  handleCallbackController
 );
+
+// router.post(
+//   "/book-appointment",
+//   authenticateUser,
+//   authorize(["patient"]),
+//   bookAppointmentController
+// );
 
 export default router;
 

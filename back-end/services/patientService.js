@@ -14,7 +14,7 @@ import CompensationCode from "../models/compensationCode.js";
 import { Model, DataTypes } from "sequelize";
 import ForbiddenError from "../errors/forbidden.js";
 import InternalServerError from "../errors/internalServerError.js";
-
+import * as paymentService from "./paymentService.js";
 // Kích hoạt các plugin
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -1677,5 +1677,138 @@ export const getAppointmentById = async (appointmentId, userId) => {
   } catch (error) {
     console.error("Error in getAppointmentById service:", error);
     throw error;
+  }
+};
+export const createMomoPayment = async (req, res) => {
+  try {
+    const { appointment_id, amount } = req.body;
+    if (!appointment_id || !amount) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Thiếu appointment_id hoặc amount" });
+    }
+
+    // Lấy payment pending đã tạo khi bác sĩ completeAppointment
+    const pending = await paymentService.getPendingPaymentByAppointment(
+      appointment_id
+    );
+    if (!pending.success) {
+      return res.status(404).json({ success: false, message: pending.message });
+    }
+
+    const orderId = `${appointment_id}_${Date.now()}`;
+    const requestId = orderId;
+    const extraData = String(appointment_id);
+    const orderInfo = `Thanh toán lịch hẹn #${appointment_id}`;
+    const requestType = "payWithMethod";
+    const ipnUrl = `${BACKEND_URL}/patient/appointments/${appointment_id}/payment/callback`;
+    const redirectUrl = `${FRONTEND_URL}/patient/appointments/${appointment_id}/payment`;
+
+    // Tạo chữ ký
+    const rawSignature = [
+      `accessKey=${MOMO_ACCESS_KEY}`,
+      `amount=${amount}`,
+      `extraData=${extraData}`,
+      `ipnUrl=${ipnUrl}`,
+      `orderId=${orderId}`,
+      `orderInfo=${orderInfo}`,
+      `partnerCode=${MOMO_PARTNER_CODE}`,
+      `redirectUrl=${redirectUrl}`,
+      `requestId=${requestId}`,
+      `requestType=${requestType}`,
+    ].join("&");
+
+    const signature = crypto
+      .createHmac("sha256", MOMO_SECRET_KEY)
+      .update(rawSignature)
+      .digest("hex");
+
+    // Gọi MoMo create
+    const momoReq = {
+      partnerCode: MOMO_PARTNER_CODE,
+      partnerName: "Test",
+      storeId: "MomoTestStore",
+      requestId,
+      amount: String(amount),
+      orderId,
+      orderInfo,
+      redirectUrl,
+      ipnUrl,
+      lang: "vi",
+      requestType,
+      autoCapture: true,
+      extraData,
+      orderGroupId: "",
+      signature,
+    };
+
+    const momoRes = await axios.post(
+      "https://test-payment.momo.vn/v2/gateway/api/create",
+      momoReq,
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+    return res.status(200).json(momoRes.data);
+  } catch (err) {
+    console.error("createMomoPayment error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Lỗi khi tạo thanh toán",
+      error: err.message,
+    });
+  }
+};
+
+export const verifyPayment = async (req, res) => {
+  try {
+    const { appointment_id } = req.params;
+    const { order_id, transaction_id } = req.body;
+
+    // Đánh dấu paid
+    await paymentService.markPaymentPaid({
+      appointment_id,
+      order_id,
+      transaction_id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Cập nhật trạng thái thanh toán thành công",
+    });
+  } catch (err) {
+    console.error("verifyPayment error:", err);
+    if (err instanceof NotFoundError) {
+      return res.status(404).json({ success: false, message: err.message });
+    }
+    return res.status(500).json({
+      success: false,
+      message: "Lỗi khi xác thực thanh toán",
+      error: err.message,
+    });
+  }
+};
+
+export const handleCallback = async (req, res) => {
+  try {
+    const { resultCode, orderId, transId, extraData } = req.body;
+    console.log("MoMo IPN callback:", req.body);
+
+    if (resultCode === 0) {
+      const appointment_id = parseInt(extraData, 10);
+      await paymentService.markPaymentPaid({
+        appointment_id,
+        order_id: orderId,
+        transaction_id: transId,
+      });
+      console.log(`✅ Payment success for appointment ${appointment_id}`);
+    } else {
+      console.log(`❌ Payment failed, resultCode=${resultCode}`);
+    }
+
+    // luôn trả 200 để MoMo không retry
+    return res.status(200).json({ message: "Processed" });
+  } catch (err) {
+    console.error("handleCallback error:", err);
+    return res.status(200).json({ message: "Processed with error" });
   }
 };
