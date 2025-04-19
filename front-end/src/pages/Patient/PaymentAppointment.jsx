@@ -81,30 +81,43 @@ const PaymentAppointment = () => {
         },
       });
 
+      console.log("API Response:", response.data);
+
+      // Kiểm tra success ở cấp ngoài cùng
       if (response.data.success) {
-        const appointmentData = response.data.data;
-        console.log("Appointment Data:", appointmentData);
+        // Lấy data từ cấp trong
+        const innerResponse = response.data.data;
 
-        // Kiểm tra nếu đã thanh toán
-        const isPaid =
-          appointmentData.Payments &&
-          appointmentData.Payments.length > 0 &&
-          appointmentData.Payments[0].status === "paid";
+        if (innerResponse.success) {
+          const appointmentData = innerResponse.data;
+          console.log("Appointment Data:", appointmentData);
 
-        if (isPaid) {
-          setPaymentSuccess(true);
+          // Kiểm tra nếu đã thanh toán
+          const isPaid = appointmentData.Payments?.status === "paid";
+
+          if (isPaid) {
+            setPaymentSuccess(true);
+          }
+
+          setAppointment(appointmentData);
+        } else {
+          message.error(
+            innerResponse.message || "Không thể lấy thông tin lịch hẹn"
+          );
+          navigate("/my-appointments");
         }
-
-        setAppointment(appointmentData);
       } else {
         message.error(
-          response.data.data.message || "Không thể lấy thông tin lịch hẹn"
+          response.data.message || "Không thể lấy thông tin lịch hẹn"
         );
         navigate("/my-appointments");
       }
     } catch (error) {
       console.error("Error fetching appointment detail:", error);
-      message.error("Có lỗi xảy ra khi lấy thông tin lịch hẹn");
+      message.error(
+        error.response?.data?.message ||
+          "Có lỗi xảy ra khi lấy thông tin lịch hẹn"
+      );
       navigate("/my-appointments");
     } finally {
       setLoading(false);

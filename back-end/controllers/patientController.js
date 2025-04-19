@@ -293,11 +293,21 @@ export const deleteFamilyMemberController = async (req, res, next) => {
 export const getAllAppointmentsController = async (req, res, next) => {
   try {
     const { user_id } = req.user;
-    const { family_member_id } = req.query;
+    const { family_member_id, appointmentStatus, paymentStatus } = req.query;
+
+    // Xây dựng object filters
+    const filters = {};
+    if (appointmentStatus) {
+      filters.appointmentStatus = appointmentStatus;
+    }
+    if (paymentStatus) {
+      filters.paymentStatus = paymentStatus;
+    }
 
     const result = await getAllAppointments(
       user_id,
-      family_member_id ? parseInt(family_member_id) : null
+      family_member_id ? parseInt(family_member_id) : null,
+      filters
     );
 
     return res.status(200).json(result);
@@ -558,136 +568,33 @@ export const cancelAppointmentController = async (req, res, next) => {
     });
   }
 };
-export const createMomoPaymentController = async (req, res, next) => {
+export async function createMomoPaymentController(req, res) {
   try {
-    const { appointment_id, amount } = req.body;
-    if (!appointment_id || !amount) {
-      throw new BadRequestError("Thiếu appointment_id hoặc amount");
-    }
-
-    // Lấy payment pending đã có (do completeAppointment tạo)
-    const pending = await paymentService.getPendingPaymentByAppointment(
-      appointment_id
-    );
-    if (!pending.success) {
-      return res.status(404).json({ success: false, message: pending.message });
-    }
-
-    // Build MoMo payload
-    const orderId = `${appointment_id}_${Date.now()}`;
-    const requestId = orderId;
-    const extraData = String(appointment_id);
-    const orderInfo = `Thanh toán lịch hẹn #${appointment_id}`;
-    const requestType = "payWithMethod";
-    const ipnUrl = `${BACKEND_URL}/patient/appointments/${appointment_id}/payment/callback`;
-    const redirectUrl = `${FRONTEND_URL}/patient/appointments/${appointment_id}/payment`;
-
-    const rawSignature = [
-      `accessKey=${MOMO_ACCESS_KEY}`,
-      `amount=${amount}`,
-      `extraData=${extraData}`,
-      `ipnUrl=${ipnUrl}`,
-      `orderId=${orderId}`,
-      `orderInfo=${orderInfo}`,
-      `partnerCode=${MOMO_PARTNER_CODE}`,
-      `redirectUrl=${redirectUrl}`,
-      `requestId=${requestId}`,
-      `requestType=${requestType}`,
-    ].join("&");
-
-    const signature = crypto
-      .createHmac("sha256", MOMO_SECRET_KEY)
-      .update(rawSignature)
-      .digest("hex");
-
-    // Call MoMo
-    const momoReq = {
-      partnerCode: MOMO_PARTNER_CODE,
-      partnerName: "Test",
-      storeId: "MomoTestStore",
-      requestId,
-      amount: String(amount),
-      orderId,
-      orderInfo,
-      redirectUrl,
-      ipnUrl,
-      lang: "vi",
-      requestType,
-      autoCapture: true,
-      extraData,
-      orderGroupId: "",
-      signature,
-    };
-
-    const { data } = await axios.post(
-      "https://test-payment.momo.vn/v2/gateway/api/create",
-      momoReq,
-      { headers: { "Content-Type": "application/json" } }
-    );
-
-    return res.status(200).json(data);
+    const appointment_id = +req.params.appointment_id;
+    const result = await paymentService.createMomoPayment(appointment_id);
+    return res.json({ success: true, data: result });
   } catch (err) {
-    if (err instanceof BadRequestError) {
-      return res.status(400).json({ success: false, message: err.message });
-    }
-    console.error(err);
-    return res.status(500).json({
-      success: false,
-      message: "Lỗi khi tạo thanh toán",
-      error: err.message,
-    });
+    const status =
+      err instanceof BadRequestError
+        ? 400
+        : err instanceof NotFoundError
+        ? 404
+        : 500;
+    return res.status(status).json({ success: false, message: err.message });
   }
-};
+}
 
-export const verifyPaymentController = async (req, res, next) => {
+export async function handleCallbackController(req, res) {
   try {
-    const { appointment_id } = req.params;
-    const { order_id, transaction_id } = req.body;
-
-    await paymentService.markPaymentPaid({
+    const appointment_id = +req.params.appointment_id;
+    const result = await paymentService.verifyMomoPayment(
       appointment_id,
-      order_id,
-      transaction_id,
-    });
-    return res.status(200).json({
-      success: true,
-      message: "Cập nhật trạng thái thanh toán thành công",
-    });
+      req.body
+    );
+    // luôn 200 để MoMo không retry
+    return res.json(result);
   } catch (err) {
-    if (err instanceof NotFoundError) {
-      return res.status(404).json({ success: false, message: err.message });
-    }
-    console.error(err);
-    return res.status(500).json({
-      success: false,
-      message: "Lỗi khi xác thực thanh toán",
-      error: err.message,
-    });
+    console.error("MoMo callback error:", err);
+    return res.json({ success: false, message: err.message });
   }
-};
-
-export const handleCallbackController = async (req, res, next) => {
-  try {
-    const { resultCode, orderId, transId, extraData } = req.body;
-    console.log("MoMo IPN callback:", req.body);
-
-    if (resultCode === 0) {
-      const appointment_id = parseInt(extraData, 10);
-      await paymentService.markPaymentPaid({
-        appointment_id,
-        order_id: orderId,
-        transaction_id: transId,
-      });
-      console.log(`✅ Payment success for appointment ${appointment_id}`);
-    } else {
-      console.log(`❌ Payment failed, resultCode=${resultCode}`);
-    }
-
-    // luôn trả 200 để MoMo không retry
-    return res.status(200).json({ message: "Processed" });
-  } catch (err) {
-    console.error("handleCallback error:", err);
-    // vẫn trả 200 cho MoMo
-    return res.status(200).json({ message: "Processed with error" });
-  }
-};
+}

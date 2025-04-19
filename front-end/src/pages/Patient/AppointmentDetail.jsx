@@ -226,8 +226,93 @@ const AppointmentDetail = () => {
     setCancelModalVisible(true);
   };
 
-  const handlePayment = () => {
-    navigate(`/patient/payment/${id}`);
+  const handlePayment = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        notification.error({
+          message: "Lỗi xác thực",
+          description: "Vui lòng đăng nhập lại",
+          placement: "top",
+        });
+        return;
+      }
+
+      if (!appointment || !appointment.fees) {
+        notification.error({
+          message: "Lỗi thanh toán",
+          description: "Không tìm thấy thông tin phí thanh toán",
+          placement: "top",
+        });
+        return;
+      }
+
+      // Navigate to payment page with appointment ID
+      navigate(`/patient/payment/${appointment.appointment_id}`);
+    } catch (error) {
+      console.error("Error in handlePayment:", error);
+      notification.error({
+        message: "Lỗi thanh toán",
+        description:
+          error.response?.data?.message || "Có lỗi xảy ra khi xử lý thanh toán",
+        placement: "top",
+      });
+    }
+  };
+
+  // Thêm useEffect để kiểm tra kết quả thanh toán từ URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get("status");
+    const orderId = urlParams.get("orderId");
+
+    if (status === "success" && orderId) {
+      verifyPayment(orderId);
+    }
+  }, []);
+
+  // Hàm xác thực thanh toán
+  const verifyPayment = async (orderId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.post(
+        `${url1}/patient/appointments/${id}/payment/verify`,
+        { order_id: orderId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        notification.success({
+          message: "Thanh toán thành công",
+          description:
+            "Thanh toán đã được xác nhận. Bạn có thể xem hồ sơ bệnh án và đơn thuốc.",
+          placement: "top",
+          duration: 5,
+        });
+
+        // Cập nhật lại thông tin lịch hẹn
+        fetchAppointmentDetail();
+      } else {
+        notification.error({
+          message: "Lỗi xác nhận thanh toán",
+          description: response.data.message || "Không thể xác nhận thanh toán",
+          placement: "top",
+        });
+      }
+    } catch (error) {
+      console.error("Error in verifyPayment:", error);
+      notification.error({
+        message: "Lỗi xác nhận thanh toán",
+        description:
+          error.response?.data?.message ||
+          "Có lỗi xảy ra khi xác nhận thanh toán",
+        placement: "top",
+      });
+    }
   };
 
   const getStatusTag = (status) => {
@@ -288,8 +373,10 @@ const AppointmentDetail = () => {
     appointment &&
     appointment.status === "completed" &&
     (!appointment.Payments ||
-      !appointment.Payments.length ||
-      appointment.Payments[0].status === "pending");
+      !Array.isArray(appointment.Payments) ||
+      appointment.Payments.length === 0 ||
+      appointment.Payments[appointment.Payments.length - 1]?.status ===
+        "pending");
 
   if (loading) {
     return (
@@ -491,26 +578,24 @@ const AppointmentDetail = () => {
             )}
 
             {/* Hiển thị button thanh toán khi status completed và payment pending */}
-            {appointment.status === "completed" &&
-              (!appointment.Payments ||
-                !appointment.Payments.length ||
-                appointment.Payments[0].status === "pending") && (
-                <div className="flex justify-end mt-4">
-                  <Button
-                    type="primary"
-                    icon={<WalletOutlined />}
-                    onClick={handlePayment}
-                  >
-                    Thanh toán
-                  </Button>
-                </div>
-              )}
+            {needsPayment && (
+              <div className="flex justify-end mt-4">
+                <Button
+                  type="primary"
+                  icon={<WalletOutlined />}
+                  onClick={handlePayment}
+                >
+                  Thanh toán
+                </Button>
+              </div>
+            )}
 
             {/* Hiển thị thông tin khám khi status completed và đã thanh toán */}
             {appointment.status === "completed" &&
-              appointment.Payments &&
+              Array.isArray(appointment.Payments) &&
               appointment.Payments.length > 0 &&
-              appointment.Payments[0].status === "paid" && (
+              appointment.Payments[appointment.Payments.length - 1]?.status ===
+                "paid" && (
                 <div className="mt-6">
                   {/* Medical Record Section */}
                   {appointment.MedicalRecord && (

@@ -58,6 +58,8 @@ const MyAppointments = () => {
         },
       });
 
+      console.log("API Response:", response.data);
+
       if (response.data.success) {
         setAppointments(response.data.data);
       } else {
@@ -123,16 +125,19 @@ const MyAppointments = () => {
         );
         break;
       case "completed_pending":
-        filtered = appointments.filter(
-          (app) =>
-            app.status === "completed" &&
-            (!app.payment || app.payment.status === "pending")
-        );
+        filtered = appointments.filter((app) => {
+          const isCompleted = app.status === "completed";
+          const needsPayment =
+            !app.Payments || app.Payments.status === "pending";
+          return isCompleted && needsPayment;
+        });
         break;
       case "completed_paid":
-        filtered = appointments.filter(
-          (app) => app.status === "completed" && app.payment?.status === "paid"
-        );
+        filtered = appointments.filter((app) => {
+          const isCompleted = app.status === "completed";
+          const hasPaidPayment = app.Payments?.status === "paid";
+          return isCompleted && hasPaidPayment;
+        });
         break;
       case "cancelled":
         filtered = appointments.filter((app) => app.status === "cancelled");
@@ -154,14 +159,16 @@ const MyAppointments = () => {
           ["waiting_for_confirmation", "accepted"].includes(app.status) &&
           dayjs(app.appointment_datetime).isAfter(now)
       ).length,
-      completed_pending: appointments.filter(
-        (app) =>
-          app.status === "completed" &&
-          (!app.payment || app.payment.status === "pending")
-      ).length,
-      completed_paid: appointments.filter(
-        (app) => app.status === "completed" && app.payment?.status === "paid"
-      ).length,
+      completed_pending: appointments.filter((app) => {
+        const isCompleted = app.status === "completed";
+        const needsPayment = !app.Payments || app.Payments.status === "pending";
+        return isCompleted && needsPayment;
+      }).length,
+      completed_paid: appointments.filter((app) => {
+        const isCompleted = app.status === "completed";
+        const hasPaidPayment = app.Payments?.status === "paid";
+        return isCompleted && hasPaidPayment;
+      }).length,
       cancelled: appointments.filter((app) => app.status === "cancelled")
         .length,
     };
@@ -250,6 +257,7 @@ const MyAppointments = () => {
 
     console.log("Rendering appointment data:", appointment);
     console.log("Doctor info:", appointment.doctor);
+    console.log("Payment info:", appointment.Payments);
 
     // Get doctor info from the flattened structure
     const doctorName = appointment.doctor?.name || "Chưa có bác sĩ";

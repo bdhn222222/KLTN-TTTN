@@ -20,7 +20,6 @@ import {
   cancelAppointmentController,
   getAppointmentByIdController,
   createMomoPaymentController,
-  verifyPaymentController,
   handleCallbackController,
 } from "../controllers/patientController.js";
 import validate from "../middleware/validate.js";
@@ -30,6 +29,7 @@ import authorize from "../middleware/authorization.js";
 import { query } from "express-validator";
 const router = express.Router();
 import { loginLimiter, registerLimiter } from "../middleware/rateLimiter.js";
+import * as paymentController from "../controllers/paymentController.js";
 
 router.post(
   "/register",
@@ -74,6 +74,27 @@ router.get(
   "/appointments",
   authenticateUser,
   authorize(["patient"]),
+  validate([
+    query("family_member_id")
+      .optional()
+      .isInt()
+      .withMessage("ID thành viên gia đình phải là số"),
+    query("appointmentStatus")
+      .optional()
+      .isIn([
+        "waiting_for_confirmation",
+        "accepted",
+        "completed",
+        "cancelled",
+        "doctor_day_off",
+        "patient_not_coming",
+      ])
+      .withMessage("Trạng thái lịch hẹn không hợp lệ"),
+    query("paymentStatus")
+      .optional()
+      .isIn(["pending", "paid", "failed"])
+      .withMessage("Trạng thái thanh toán không hợp lệ"),
+  ]),
   getAllAppointmentsController
 );
 router.get(
@@ -197,42 +218,20 @@ router.post(
   "/appointments/:appointment_id/payment/create",
   authenticateUser,
   authorize(["patient"]),
-  validate([
-    body("amount")
-      .notEmpty()
-      .withMessage("Số tiền không được để trống")
-      .isNumeric()
-      .withMessage("Số tiền phải là số"),
-    body("payment_method")
-      .notEmpty()
-      .withMessage("Phương thức thanh toán không được để trống")
-      .equals("momo")
-      .withMessage("Phương thức thanh toán phải là momo"),
-  ]),
-  createMomoPaymentController
-);
-
-router.post(
-  "/appointments/:appointment_id/payment/verify",
-  authenticateUser,
-  authorize(["patient"]),
-  validate([
-    body("order_id").notEmpty().withMessage("Mã đơn hàng không được để trống"),
-  ]),
-  verifyPaymentController
+  paymentController.createMomoPayment
 );
 
 router.post(
   "/appointments/:appointment_id/payment/callback",
-  handleCallbackController
+  paymentController.handleMomoCallback
 );
 
-// router.post(
-//   "/book-appointment",
-//   authenticateUser,
-//   authorize(["patient"]),
-//   bookAppointmentController
-// );
+router.get(
+  "/appointments/:appointment_id/payment/verify",
+  authenticateUser,
+  authorize(["patient"]),
+  paymentController.verifyPayment
+);
 
 export default router;
 

@@ -704,7 +704,11 @@ export const getDoctorBySymptoms = async (
   }
 };
 
-export const getAllAppointments = async (user_id, family_member_id = null) => {
+export const getAllAppointments = async (
+  user_id,
+  family_member_id = null,
+  filters = {}
+) => {
   const transaction = await db.sequelize.transaction();
 
   try {
@@ -746,14 +750,43 @@ export const getAllAppointments = async (user_id, family_member_id = null) => {
       (member) => member.family_member_id
     );
 
+    // Xây dựng điều kiện where cho appointment
+    const whereCondition = {
+      [Op.or]: [
+        { family_member_id: family_member_id || null },
+        { family_member_id: { [Op.in]: familyMemberIds } },
+      ],
+    };
+
+    // Thêm điều kiện lọc theo status của appointment nếu có
+    if (filters.appointmentStatus) {
+      whereCondition.status = filters.appointmentStatus;
+    }
+
+    // Xây dựng điều kiện include cho payment
+    const paymentInclude = {
+      model: db.Payment,
+      as: "Payments",
+      attributes: [
+        "payment_id",
+        "amount",
+        "payment_method",
+        "status",
+        "createdAt",
+      ],
+      required: filters.paymentStatus ? true : false,
+    };
+
+    // Thêm điều kiện lọc theo status của payment nếu có
+    if (filters.paymentStatus) {
+      paymentInclude.where = {
+        status: filters.paymentStatus,
+      };
+    }
+
     // Lấy danh sách lịch hẹn
     const appointments = await db.Appointment.findAll({
-      where: {
-        [Op.or]: [
-          { family_member_id: family_member_id || null },
-          { family_member_id: { [Op.in]: familyMemberIds } },
-        ],
-      },
+      where: whereCondition,
       include: [
         {
           model: db.Doctor,
@@ -777,6 +810,7 @@ export const getAllAppointments = async (user_id, family_member_id = null) => {
           as: "FamilyMember",
           attributes: ["username", "relationship"],
         },
+        paymentInclude,
       ],
       order: [["appointment_datetime", "DESC"]],
       transaction,
@@ -808,6 +842,18 @@ export const getAllAppointments = async (user_id, family_member_id = null) => {
             relationship: appointment.FamilyMember.relationship,
           }
         : null,
+      Payments:
+        appointment.Payments && appointment.Payments[0]
+          ? {
+              payment_id: appointment.Payments[0].payment_id,
+              amount: appointment.Payments[0].amount,
+              payment_method: appointment.Payments[0].payment_method,
+              status: appointment.Payments[0].status,
+              createdAt: dayjs(appointment.Payments[0].createdAt).format(
+                "YYYY-MM-DDTHH:mm:ssZ"
+              ),
+            }
+          : null,
     }));
 
     await transaction.commit();
@@ -1679,136 +1725,136 @@ export const getAppointmentById = async (appointmentId, userId) => {
     throw error;
   }
 };
-export const createMomoPayment = async (req, res) => {
-  try {
-    const { appointment_id, amount } = req.body;
-    if (!appointment_id || !amount) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Thiếu appointment_id hoặc amount" });
-    }
+// export const createMomoPayment = async (req, res) => {
+//   try {
+//     const { appointment_id, amount } = req.body;
+//     if (!appointment_id || !amount) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Thiếu appointment_id hoặc amount" });
+//     }
 
-    // Lấy payment pending đã tạo khi bác sĩ completeAppointment
-    const pending = await paymentService.getPendingPaymentByAppointment(
-      appointment_id
-    );
-    if (!pending.success) {
-      return res.status(404).json({ success: false, message: pending.message });
-    }
+//     // Lấy payment pending đã tạo khi bác sĩ completeAppointment
+//     const pending = await paymentService.getPendingPaymentByAppointment(
+//       appointment_id
+//     );
+//     if (!pending.success) {
+//       return res.status(404).json({ success: false, message: pending.message });
+//     }
 
-    const orderId = `${appointment_id}_${Date.now()}`;
-    const requestId = orderId;
-    const extraData = String(appointment_id);
-    const orderInfo = `Thanh toán lịch hẹn #${appointment_id}`;
-    const requestType = "payWithMethod";
-    const ipnUrl = `${BACKEND_URL}/patient/appointments/${appointment_id}/payment/callback`;
-    const redirectUrl = `${FRONTEND_URL}/patient/appointments/${appointment_id}/payment`;
+//     const orderId = `${appointment_id}_${Date.now()}`;
+//     const requestId = orderId;
+//     const extraData = String(appointment_id);
+//     const orderInfo = `Thanh toán lịch hẹn #${appointment_id}`;
+//     const requestType = "payWithMethod";
+//     const ipnUrl = `${BACKEND_URL}/patient/appointments/${appointment_id}/payment/callback`;
+//     const redirectUrl = `${FRONTEND_URL}/patient/appointments/${appointment_id}/payment`;
 
-    // Tạo chữ ký
-    const rawSignature = [
-      `accessKey=${MOMO_ACCESS_KEY}`,
-      `amount=${amount}`,
-      `extraData=${extraData}`,
-      `ipnUrl=${ipnUrl}`,
-      `orderId=${orderId}`,
-      `orderInfo=${orderInfo}`,
-      `partnerCode=${MOMO_PARTNER_CODE}`,
-      `redirectUrl=${redirectUrl}`,
-      `requestId=${requestId}`,
-      `requestType=${requestType}`,
-    ].join("&");
+//     // Tạo chữ ký
+//     const rawSignature = [
+//       `accessKey=${MOMO_ACCESS_KEY}`,
+//       `amount=${amount}`,
+//       `extraData=${extraData}`,
+//       `ipnUrl=${ipnUrl}`,
+//       `orderId=${orderId}`,
+//       `orderInfo=${orderInfo}`,
+//       `partnerCode=${MOMO_PARTNER_CODE}`,
+//       `redirectUrl=${redirectUrl}`,
+//       `requestId=${requestId}`,
+//       `requestType=${requestType}`,
+//     ].join("&");
 
-    const signature = crypto
-      .createHmac("sha256", MOMO_SECRET_KEY)
-      .update(rawSignature)
-      .digest("hex");
+//     const signature = crypto
+//       .createHmac("sha256", MOMO_SECRET_KEY)
+//       .update(rawSignature)
+//       .digest("hex");
 
-    // Gọi MoMo create
-    const momoReq = {
-      partnerCode: MOMO_PARTNER_CODE,
-      partnerName: "Test",
-      storeId: "MomoTestStore",
-      requestId,
-      amount: String(amount),
-      orderId,
-      orderInfo,
-      redirectUrl,
-      ipnUrl,
-      lang: "vi",
-      requestType,
-      autoCapture: true,
-      extraData,
-      orderGroupId: "",
-      signature,
-    };
+//     // Gọi MoMo create
+//     const momoReq = {
+//       partnerCode: MOMO_PARTNER_CODE,
+//       partnerName: "Test",
+//       storeId: "MomoTestStore",
+//       requestId,
+//       amount: String(amount),
+//       orderId,
+//       orderInfo,
+//       redirectUrl,
+//       ipnUrl,
+//       lang: "vi",
+//       requestType,
+//       autoCapture: true,
+//       extraData,
+//       orderGroupId: "",
+//       signature,
+//     };
 
-    const momoRes = await axios.post(
-      "https://test-payment.momo.vn/v2/gateway/api/create",
-      momoReq,
-      { headers: { "Content-Type": "application/json" } }
-    );
+//     const momoRes = await axios.post(
+//       "https://test-payment.momo.vn/v2/gateway/api/create",
+//       momoReq,
+//       { headers: { "Content-Type": "application/json" } }
+//     );
 
-    return res.status(200).json(momoRes.data);
-  } catch (err) {
-    console.error("createMomoPayment error:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Lỗi khi tạo thanh toán",
-      error: err.message,
-    });
-  }
-};
+//     return res.status(200).json(momoRes.data);
+//   } catch (err) {
+//     console.error("createMomoPayment error:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Lỗi khi tạo thanh toán",
+//       error: err.message,
+//     });
+//   }
+// };
 
-export const verifyPayment = async (req, res) => {
-  try {
-    const { appointment_id } = req.params;
-    const { order_id, transaction_id } = req.body;
+// export const verifyPayment = async (req, res) => {
+//   try {
+//     const { appointment_id } = req.params;
+//     const { order_id, transaction_id } = req.body;
 
-    // Đánh dấu paid
-    await paymentService.markPaymentPaid({
-      appointment_id,
-      order_id,
-      transaction_id,
-    });
+//     // Đánh dấu paid
+//     await paymentService.markPaymentPaid({
+//       appointment_id,
+//       order_id,
+//       transaction_id,
+//     });
 
-    return res.status(200).json({
-      success: true,
-      message: "Cập nhật trạng thái thanh toán thành công",
-    });
-  } catch (err) {
-    console.error("verifyPayment error:", err);
-    if (err instanceof NotFoundError) {
-      return res.status(404).json({ success: false, message: err.message });
-    }
-    return res.status(500).json({
-      success: false,
-      message: "Lỗi khi xác thực thanh toán",
-      error: err.message,
-    });
-  }
-};
+//     return res.status(200).json({
+//       success: true,
+//       message: "Cập nhật trạng thái thanh toán thành công",
+//     });
+//   } catch (err) {
+//     console.error("verifyPayment error:", err);
+//     if (err instanceof NotFoundError) {
+//       return res.status(404).json({ success: false, message: err.message });
+//     }
+//     return res.status(500).json({
+//       success: false,
+//       message: "Lỗi khi xác thực thanh toán",
+//       error: err.message,
+//     });
+//   }
+// };
 
-export const handleCallback = async (req, res) => {
-  try {
-    const { resultCode, orderId, transId, extraData } = req.body;
-    console.log("MoMo IPN callback:", req.body);
+// export const handleCallback = async (req, res) => {
+//   try {
+//     const { resultCode, orderId, transId, extraData } = req.body;
+//     console.log("MoMo IPN callback:", req.body);
 
-    if (resultCode === 0) {
-      const appointment_id = parseInt(extraData, 10);
-      await paymentService.markPaymentPaid({
-        appointment_id,
-        order_id: orderId,
-        transaction_id: transId,
-      });
-      console.log(`✅ Payment success for appointment ${appointment_id}`);
-    } else {
-      console.log(`❌ Payment failed, resultCode=${resultCode}`);
-    }
+//     if (resultCode === 0) {
+//       const appointment_id = parseInt(extraData, 10);
+//       await paymentService.markPaymentPaid({
+//         appointment_id,
+//         order_id: orderId,
+//         transaction_id: transId,
+//       });
+//       console.log(`✅ Payment success for appointment ${appointment_id}`);
+//     } else {
+//       console.log(`❌ Payment failed, resultCode=${resultCode}`);
+//     }
 
-    // luôn trả 200 để MoMo không retry
-    return res.status(200).json({ message: "Processed" });
-  } catch (err) {
-    console.error("handleCallback error:", err);
-    return res.status(200).json({ message: "Processed with error" });
-  }
-};
+//     // luôn trả 200 để MoMo không retry
+//     return res.status(200).json({ message: "Processed" });
+//   } catch (err) {
+//     console.error("handleCallback error:", err);
+//     return res.status(200).json({ message: "Processed with error" });
+//   }
+// };

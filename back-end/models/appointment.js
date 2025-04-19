@@ -23,7 +23,11 @@ export default (sequelize) => {
         foreignKey: "appointment_id",
         as: "MedicalRecord",
       });
-      Appointment.hasOne(models.Payment, {
+      // Appointment.hasOne(models.Payment, {
+      //   foreignKey: "appointment_id",
+      //   as: "Payments",
+      // });
+      Appointment.hasMany(models.Payment, {
         foreignKey: "appointment_id",
         as: "Payments",
       });
