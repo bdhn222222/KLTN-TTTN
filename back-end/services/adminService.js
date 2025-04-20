@@ -134,62 +134,62 @@ export const addDoctor = async (doctorData) => {
     throw new Error(error.message);
   }
 };
-export const updateDoctorProfile = async (user_id, updateData) => {
-  const transaction = await db.sequelize.transaction();
-  try {
-    const user = await User.findByPk(user_id, {
-      attributes: { exclude: ["password"] },
-      include: [{ model: Doctor, as: "doctor" }],
-      transaction,
-    });
+// export const updateDoctorProfile = async (user_id, updateData) => {
+//   const transaction = await db.sequelize.transaction();
+//   try {
+//     const user = await User.findByPk(user_id, {
+//       attributes: { exclude: ["password"] },
+//       include: [{ model: Doctor, as: "doctor" }],
+//       transaction,
+//     });
 
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
+//     if (!user) {
+//       throw new NotFoundError("User not found");
+//     }
 
-    const { doctor } = user;
-    if (!doctor) {
-      throw new NotFoundError("Doctor not found");
-    }
+//     const { doctor } = user;
+//     if (!doctor) {
+//       throw new NotFoundError("Doctor not found");
+//     }
 
-    const userFields = ["username", "email"];
-    userFields.forEach((field) => {
-      if (updateData[field] !== undefined) {
-        user[field] = updateData[field];
-      }
-    });
+//     const userFields = ["username", "email"];
+//     userFields.forEach((field) => {
+//       if (updateData[field] !== undefined) {
+//         user[field] = updateData[field];
+//       }
+//     });
 
-    if (updateData.avatar) {
-      const uploadResult = await cloudinary.uploader.upload(updateData.avatar, {
-        folder: "avatars",
-        use_filename: true,
-        unique_filename: false,
-      });
-      user.avatar = uploadResult.secure_url;
-    }
+//     if (updateData.avatar) {
+//       const uploadResult = await cloudinary.uploader.upload(updateData.avatar, {
+//         folder: "avatars",
+//         use_filename: true,
+//         unique_filename: false,
+//       });
+//       user.avatar = uploadResult.secure_url;
+//     }
 
-    const doctorFields = [
-      "degree",
-      "experience_years",
-      "description",
-      "specialization_id",
-    ];
-    doctorFields.forEach((field) => {
-      if (updateData[field] !== undefined) {
-        doctor[field] = updateData[field];
-      }
-    });
+//     const doctorFields = [
+//       "degree",
+//       "experience_years",
+//       "description",
+//       "specialization_id",
+//     ];
+//     doctorFields.forEach((field) => {
+//       if (updateData[field] !== undefined) {
+//         doctor[field] = updateData[field];
+//       }
+//     });
 
-    await user.save({ transaction });
-    await doctor.save({ transaction });
+//     await user.save({ transaction });
+//     await doctor.save({ transaction });
 
-    await transaction.commit();
-    return { message: "Success" };
-  } catch (error) {
-    await transaction.rollback();
-    throw new Error(error.message);
-  }
-};
+//     await transaction.commit();
+//     return { message: "Success" };
+//   } catch (error) {
+//     await transaction.rollback();
+//     throw new Error(error.message);
+//   }
+// };
 export const deleteDoctor = async (user_id) => {
   const transaction = await db.sequelize.transaction();
   try {
