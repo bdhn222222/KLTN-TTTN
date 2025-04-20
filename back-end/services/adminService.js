@@ -448,3 +448,36 @@ export const getAllAllAppointments = async () => {
     throw new Error(error.message);
   }
 };
+const getSpecializationDetails = async (specialization_id) => {
+  try {
+    const specialization = await Specialization.findByPk(specialization_id, {});
+    if (!specialization) {
+      throw new NotFoundError("Specialization not found");
+    }
+    return specialization;
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};
+const getDoctorDetails = async (doctor_id) => {
+  try {
+    const doctor = await Doctor.findByPk(doctor_id, {});
+    if (!doctor) {
+      throw new NotFoundError("Doctor not found");
+    }
+    return doctor;
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};
+// const getPatientDetails = async (patient_id) => {
+//   try {
+//     const patient = await FamilyMember.findByPk(patient_id, {});
+//     if (!patient) {
+//       throw new NotFoundError("Patient not found");
+//     }
+//     return patient;
+//   } catch (error) {
+//     throw new Error(error.message);
+//   }
+// };
