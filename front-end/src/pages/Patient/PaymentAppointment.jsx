@@ -190,7 +190,7 @@ const PaymentAppointment = () => {
       }
 
       const response = await axios.post(
-        `${url1}/patient/appointments/${id}/payment`,
+        `${url1}/patient/appointments/${id}/payment/create`,
         {
           appointment_id: parseInt(id),
           amount: appointment.fees,
@@ -203,9 +203,14 @@ const PaymentAppointment = () => {
         }
       );
 
-      if (response.data.payUrl) {
+      console.log("API Response:", response.data);
+
+      if (response.data?.data?.payUrl) {
         // Chuyển hướng đến trang thanh toán MoMo
-        window.location.href = response.data.payUrl;
+        console.log("Redirecting to payment URL:", response.data.data.payUrl);
+        setTimeout(() => {
+          window.location.href = response.data.data.payUrl;
+        }, 100);
       } else {
         notification.error({
           message: "Lỗi thanh toán",

@@ -317,16 +317,44 @@ const AppointmentDetail = () => {
 
   const getStatusTag = (status) => {
     if (!status) return null;
+    // Check appointment payment status
+    const hasPayment = appointment?.Payments && appointment.Payments.length > 0;
+    const paymentStatus = hasPayment ? appointment.Payments[0].status : null;
+
+    // Special case for completed appointments
+    if (status === "completed") {
+      if (paymentStatus === "paid") {
+        return (
+          <Tag
+            icon={<CheckCircleOutlined />}
+            color="blue"
+            className="text-base"
+          >
+            Đã hoàn tất
+          </Tag>
+        );
+      } else {
+        return (
+          <Tag
+            icon={<ClockCircleOutlined />}
+            color="orange"
+            className="text-base"
+          >
+            Chờ thanh toán
+          </Tag>
+        );
+      }
+    }
 
     const statusConfig = {
-      completed: {
-        icon: <CheckCircleOutlined />,
-        color: "blue",
-        text: "Đã hoàn tất",
-      },
+      // completed: {
+      //   icon: <CheckCircleOutlined />,
+      //   color: "blue",
+      //   text: "Đã hoàn tất",
+      // },
       waiting_for_confirmation: {
         icon: <ClockCircleOutlined />,
-        color: "orange",
+        color: "yellow",
         text: "Đang chờ xác nhận",
       },
       accepted: {

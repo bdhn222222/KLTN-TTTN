@@ -3,6 +3,7 @@ import BadRequestError from "../errors/bad_request.js";
 import NotFoundError from "../errors/not_found.js";
 import crypto from "crypto";
 import axios from "axios";
+import { Op } from "sequelize";
 
 const {
   MOMO_PARTNER_CODE,
@@ -76,16 +77,16 @@ export async function createMomoPayment(appointment_id) {
     .digest("hex");
 
   // 5. Tạo/ cập nhật bản ghi Payment pending
-  await db.Payment.upsert(
-    {
-      appointment_id,
-      amount,
-      payment_method: "MoMo",
-      status: "pending",
-      order_id: orderId,
-    },
-    { returning: true }
-  );
+  // await db.Payment.upsert(
+  //   {
+  //     appointment_id,
+  //     amount,
+  //     payment_method: "MoMo",
+  //     status: "pending",
+  //     order_id: orderId,
+  //   },
+  //   { returning: true }
+  // );
 
   // 6. Gửi request tới MoMo
   const resp = await axios.post(
@@ -154,14 +155,18 @@ export async function verifyMomoPayment(appointment_id, momoPayload) {
     const payment = await db.Payment.findOne({
       where: {
         appointment_id,
-        status: "pending",
+        status: {
+          [Op.or]: ["pending", "cancelled"],
+        },
       },
-      order: [["createdAt", "DESC"]], // Lấy payment pending mới nhất
+      // order: [["createdAt", "DESC"]], // Lấy payment pending mới nhất
     });
 
     if (!payment) {
-      console.error("❌ Không tìm thấy payment pending:", { appointment_id });
-      throw new NotFoundError("Không tìm thấy thanh toán đang chờ");
+      console.error("❌ Không tìm thấy payment pending hoặc cancelled:", {
+        appointment_id,
+      });
+      throw new NotFoundError("Không tìm thấy thanh toán đang chờ hoặc đã hủy");
     }
 
     console.log(`📋 Tìm thấy payment pending: #${payment.payment_id}`);
@@ -188,20 +193,21 @@ export async function verifyMomoPayment(appointment_id, momoPayload) {
         await payment.update(
           {
             status: "paid",
-            transaction_id: transId,
-            paid_at: new Date(),
+            method: "MoMo",
+            // transaction_id: transId,
+            // paid_at: new Date(),
           },
           { transaction }
         );
 
         // Cập nhật appointment
-        await db.Appointment.update(
-          { payment_status: "paid" },
-          {
-            where: { appointment_id },
-            transaction,
-          }
-        );
+        // await db.Appointment.update(
+        //   { payment_status: "paid" },
+        //   {
+        //     where: { appointment_id },
+        //     transaction,
+        //   }
+        // );
 
         await transaction.commit();
         console.log(
@@ -224,7 +230,7 @@ export async function verifyMomoPayment(appointment_id, momoPayload) {
         await payment.update(
           {
             status: "cancelled",
-            error_message: message,
+            // error_message: message,
           },
           { transaction }
         );
@@ -264,8 +270,6 @@ export async function getAppointmentWithPayment(appointment_id) {
             "amount",
             "payment_method",
             "status",
-            "transaction_id",
-            "paid_at",
             "createdAt",
           ],
           order: [["createdAt", "DESC"]],

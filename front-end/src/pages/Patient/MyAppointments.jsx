@@ -75,34 +75,48 @@ const MyAppointments = () => {
     }
   };
 
-  const getStatusTag = (status) => {
-    switch (status) {
-      case "waiting_for_confirmation":
-        return (
-          <Tag icon={<ClockCircleOutlined />} color="orange">
-            Đang chờ xác nhận
-          </Tag>
-        );
-      case "accepted":
-        return (
-          <Tag icon={<CheckCircleOutlined />} color="green">
-            Đã xác nhận
-          </Tag>
-        );
-      case "completed":
-        return (
-          <Tag icon={<CheckCircleOutlined />} color="blue">
-            Đã hoàn tất
-          </Tag>
-        );
-      case "cancelled":
-        return (
-          <Tag icon={<CloseCircleOutlined />} color="red">
-            Đã hủy
-          </Tag>
-        );
-      default:
-        return <Tag color="default">{status}</Tag>;
+  const getStatusTag = (status, paymentStatus = null) => {
+    if (paymentStatus === null) {
+      switch (status) {
+        case "waiting_for_confirmation":
+          return (
+            <Tag icon={<ClockCircleOutlined />} color="yellow">
+              Đang chờ xác nhận
+            </Tag>
+          );
+        case "accepted":
+          return (
+            <Tag icon={<CheckCircleOutlined />} color="green">
+              Đã xác nhận
+            </Tag>
+          );
+        // case "completed":
+        //   return (
+        //     <Tag icon={<CheckCircleOutlined />} color="blue">
+        //       Đã hoàn tất
+        //     </Tag>
+        //   );
+        case "cancelled":
+          return (
+            <Tag icon={<CloseCircleOutlined />} color="red">
+              Đã hủy
+            </Tag>
+          );
+        default:
+          return <Tag color="default">{status}</Tag>;
+      }
+    } else if (paymentStatus === "pending") {
+      return (
+        <Tag icon={<ClockCircleOutlined />} color="orange">
+          Đang chờ thanh toán
+        </Tag>
+      );
+    } else if (paymentStatus === "paid") {
+      return (
+        <Tag icon={<CheckCircleOutlined />} color="blue">
+          Đã thanh toán
+        </Tag>
+      );
     }
   };
 
@@ -284,7 +298,7 @@ const MyAppointments = () => {
                 <DollarOutlined className="mr-2 text-green-500" />
                 {appointment.fees?.toLocaleString("vi-VN") || 0} VNĐ
               </div>
-              {getStatusTag(appointment.status)}
+              {getStatusTag(appointment.status, appointment.Payments?.status)}
             </div>
           </div>
           <div className="flex justify-end mt-4 md:mt-0">
