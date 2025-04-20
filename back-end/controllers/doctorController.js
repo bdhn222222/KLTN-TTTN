@@ -6,7 +6,7 @@ import {
   createDoctorDayOff,
   createPrescriptions,
   cancelDoctorDayOff,
-  getDoctorAppointments,
+  getAllAppointments,
   getDoctorSummary,
   getDoctorAppointmentStats,
   getAppointmentDetails,
@@ -18,7 +18,7 @@ import {
   createMedicalRecord,
   getAppointmentPayments,
   updatePaymentStatus,
-  getAllPatient,
+  getAllPatient_FamilyMember,
   getPatientAppointment,
   getDoctorProfile,
 } from "../services/doctorService.js";
@@ -55,31 +55,62 @@ export const loginDoctorController = async (req, res, next) => {
   }
 };
 
-export const getDoctorAppointmentsController = asyncHandler(
-  async (req, res) => {
-    const doctor_id = req.user.user_id;
-    const { filter_date, status, start_date, end_date } = req.query;
+export const getAllAppointmentsController = asyncHandler(async (req, res) => {
+  const user_id = req.user.user_id;
 
-    // Gọi service với các tham số đã được xử lý
-    const result = await getDoctorAppointments({
-      doctor_id,
-      filter_date,
-      status,
-      start_date,
-      end_date,
-    });
+  const doctor = await db.Doctor.findOne({
+    where: { user_id: user_id },
+    attributes: ["doctor_id"],
+  });
 
-    res.status(200).json(result);
+  if (!doctor) {
+    throw new NotFoundError("Không tìm thấy bác sĩ");
   }
-);
+
+  const doctor_id = doctor.doctor_id;
+  const { filter_date, status, start_date, end_date } = req.query;
+
+  // Gọi service với các tham số đã được xử lý
+  const result = await getAllAppointments({
+    doctor_id,
+    filter_date,
+    status,
+    start_date,
+    end_date,
+  });
+
+  res.status(200).json(result);
+});
 export const getDoctorSummaryController = asyncHandler(async (req, res) => {
-  const doctor_id = req.user.user_id;
+  const user_id = req.user.user_id;
+
+  const doctor = await db.Doctor.findOne({
+    where: { user_id: user_id },
+    attributes: ["doctor_id"],
+  });
+
+  if (!doctor) {
+    throw new NotFoundError("Không tìm thấy bác sĩ");
+  }
+
+  const doctor_id = doctor.doctor_id;
   const result = await getDoctorSummary(doctor_id);
   res.status(200).json(result);
 });
 export const getDoctorAppointmentStatsController = asyncHandler(
   async (req, res) => {
-    const doctor_id = req.user.user_id;
+    const user_id = req.user.user_id;
+
+    const doctor = await db.Doctor.findOne({
+      where: { user_id: user_id },
+      attributes: ["doctor_id"],
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy bác sĩ");
+    }
+
+    const doctor_id = doctor.doctor_id;
     const { start, end } = req.query;
 
     const result = await getDoctorAppointmentStats(doctor_id, start, end);
@@ -89,7 +120,18 @@ export const getDoctorAppointmentStatsController = asyncHandler(
 export const getAppointmentDetailsController = async (req, res, next) => {
   try {
     const { appointment_id } = req.params;
-    const doctor_id = req.user.user_id;
+    const user_id = req.user.user_id;
+
+    const doctor = await db.Doctor.findOne({
+      where: { user_id: user_id },
+      attributes: ["doctor_id"],
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy bác sĩ");
+    }
+
+    const doctor_id = doctor.doctor_id;
 
     console.log("Params:", { appointment_id, doctor_id });
 
@@ -109,7 +151,18 @@ export const getAppointmentDetailsController = async (req, res, next) => {
   }
 };
 export const acceptAppointmentController = asyncHandler(async (req, res) => {
-  const doctor_id = req.user.user_id;
+  const user_id = req.user.user_id;
+
+  const doctor = await db.Doctor.findOne({
+    where: { user_id: user_id },
+    attributes: ["doctor_id"],
+  });
+
+  if (!doctor) {
+    throw new NotFoundError("Không tìm thấy bác sĩ");
+  }
+
+  const doctor_id = doctor.doctor_id;
   const { appointment_id } = req.params;
 
   if (!appointment_id) {
@@ -121,7 +174,18 @@ export const acceptAppointmentController = asyncHandler(async (req, res) => {
 });
 
 export const markPatientNotComingController = asyncHandler(async (req, res) => {
-  const doctor_id = req.user.user_id;
+  const user_id = req.user.user_id;
+
+  const doctor = await db.Doctor.findOne({
+    where: { user_id: user_id },
+    attributes: ["doctor_id"],
+  });
+
+  if (!doctor) {
+    throw new NotFoundError("Không tìm thấy bác sĩ");
+  }
+
+  const doctor_id = doctor.doctor_id;
   const appointment_id = req.params.id;
 
   const result = await markPatientNotComing(appointment_id, doctor_id);
@@ -193,7 +257,18 @@ export const createDoctorDayOffController = async (req, res) => {
 };
 export const cancelDoctorDayOffController = async (req, res) => {
   try {
-    const doctor_id = req.user.user_id; // Lấy từ token
+    const user_id = req.user.user_id; // Lấy từ token
+
+    const doctor = await db.Doctor.findOne({
+      where: { user_id: user_id },
+      attributes: ["doctor_id"],
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy bác sĩ");
+    }
+
+    const doctor_id = doctor.doctor_id;
     const day_off_id = req.params.id;
     const { time_off } = req.body;
 
@@ -230,7 +305,18 @@ export const cancelDoctorDayOffController = async (req, res) => {
 };
 export const cancelAppointmentController = async (req, res) => {
   try {
-    const doctor_id = req.user.user_id;
+    const user_id = req.user.user_id;
+
+    const doctor = await db.Doctor.findOne({
+      where: { user_id: user_id },
+      attributes: ["doctor_id"],
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy bác sĩ");
+    }
+
+    const doctor_id = doctor.doctor_id;
     const appointment_id = parseInt(req.params.id);
     const { reason } = req.body;
 
@@ -355,7 +441,18 @@ function generateCompensationCode() {
 
 export const createMedicalRecordController = async (req, res) => {
   try {
-    const doctor_id = req.user.user_id;
+    const user_id = req.user.user_id;
+
+    const doctor = await db.Doctor.findOne({
+      where: { user_id: user_id },
+      attributes: ["doctor_id"],
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy bác sĩ");
+    }
+
+    const doctor_id = doctor.doctor_id;
     const { appointment_id, diagnosis, treatment, notes } = req.body;
 
     if (!appointment_id) {
@@ -385,7 +482,18 @@ export const createMedicalRecordController = async (req, res) => {
 export const completeAppointmentController = async (req, res) => {
   try {
     const { appointment_id } = req.body;
-    const doctor_id = req.user.user_id;
+    const user_id = req.user.user_id;
+
+    const doctor = await db.Doctor.findOne({
+      where: { user_id: user_id },
+      attributes: ["doctor_id"],
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy bác sĩ");
+    }
+
+    const doctor_id = doctor.doctor_id;
 
     if (!appointment_id) {
       throw new BadRequestError("Thiếu mã cuộc hẹn");
@@ -412,7 +520,18 @@ export const completeAppointmentController = async (req, res) => {
 
 export const createPrescriptionsController = asyncHandler(async (req, res) => {
   const { appointment_id, note, medicines, use_hospital_pharmacy } = req.body;
-  const doctor_id = req.user.user_id;
+  const user_id = req.user.user_id;
+
+  const doctor = await db.Doctor.findOne({
+    where: { user_id: user_id },
+    attributes: ["doctor_id"],
+  });
+
+  if (!doctor) {
+    throw new NotFoundError("Không tìm thấy bác sĩ");
+  }
+
+  const doctor_id = doctor.doctor_id;
 
   if (use_hospital_pharmacy === undefined) {
     throw new BadRequestError(
@@ -436,7 +555,18 @@ export const createPrescriptionsController = asyncHandler(async (req, res) => {
  */
 export const getAppointmentPaymentsController = async (req, res) => {
   try {
-    const doctor_id = req.user.user_id;
+    const user_id = req.user.user_id;
+
+    const doctor = await db.Doctor.findOne({
+      where: { user_id: user_id },
+      attributes: ["doctor_id"],
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy bác sĩ");
+    }
+
+    const doctor_id = doctor.doctor_id;
     const {
       page = 1,
       limit = 10,
@@ -505,7 +635,18 @@ export const getAppointmentPaymentsController = async (req, res) => {
  */
 export const updatePaymentStatusController = async (req, res) => {
   try {
-    const doctor_id = req.user.user_id;
+    const user_id = req.user.user_id;
+
+    const doctor = await db.Doctor.findOne({
+      where: { user_id: user_id },
+      attributes: ["doctor_id"],
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy bác sĩ");
+    }
+
+    const doctor_id = doctor.doctor_id;
     const { payment_id } = req.params;
     const { status, note } = req.body;
 
@@ -548,9 +689,20 @@ export const getAllMedicinesController = asyncHandler(async (req, res) => {
 /**
  * Lấy danh sách tất cả bệnh nhân
  */
-export const getAllPatientsController = async (req, res) => {
+export const getAllPatient_FamilyMemberController = async (req, res) => {
   try {
-    const doctor_id = req.user.user_id;
+    const user_id = req.user.user_id;
+
+    const doctor = await db.Doctor.findOne({
+      where: { user_id: user_id },
+      attributes: ["doctor_id"],
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy bác sĩ");
+    }
+
+    const doctor_id = doctor.doctor_id;
     const { search, page = 1, limit = 10 } = req.query;
 
     // Validate parameters
@@ -568,7 +720,7 @@ export const getAllPatientsController = async (req, res) => {
       });
     }
 
-    const result = await getAllPatient(doctor_id, {
+    const result = await getAllPatient_FamilyMember(doctor_id, {
       search,
       page: parseInt(page),
       limit: parseInt(limit),
@@ -589,7 +741,18 @@ export const getAllPatientsController = async (req, res) => {
  */
 export const getPatientAppointmentsController = async (req, res) => {
   try {
-    const doctor_id = req.user.user_id;
+    const user_id = req.user.user_id;
+
+    const doctor = await db.Doctor.findOne({
+      where: { user_id: user_id },
+      attributes: ["doctor_id"],
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy bác sĩ");
+    }
+
+    const doctor_id = doctor.doctor_id;
     const { patient_id } = req.params;
     const { status, start_date, end_date, page = 1, limit = 10 } = req.query;
 

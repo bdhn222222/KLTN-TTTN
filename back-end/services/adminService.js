@@ -409,7 +409,7 @@ export const deleteSpecialization = async (specialization_id) => {
 //   }
 // };
 
-export const getAppointments = async () => {
+export const getAllAllAppointments = async () => {
   const transaction = await db.sequelize.transaction();
   try {
     const appointments = await Appointment.findAll({

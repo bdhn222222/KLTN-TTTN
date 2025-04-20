@@ -6,7 +6,7 @@ import UnauthorizedError from "../errors/unauthorized.js";
 import NotFoundError from "../errors/not_found.js";
 import ForbiddenError from "../errors/forbidden.js";
 import InternalServerError from "../errors/internalServerError.js";
-import { Op, Sequelize } from "sequelize";
+import { Op, fn, col, literal } from "sequelize";
 import cloudinary from "../config/cloudinary.js";
 
 const {
@@ -16,6 +16,8 @@ const {
   Appointment,
   Patient,
   CompensationCode,
+  Prescription,
+  FamilyMember,
   Medicine,
   Specialization,
   Schedule,
@@ -24,6 +26,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js"; // Sử dụng phần mở rộng .js
 import timezone from "dayjs/plugin/timezone.js"; // Sử dụng phần mở rộng .js
 import { v4 as uuidv4 } from "uuid";
+import familyMember from "../models/familyMember.js";
 
 dayjs.extend(timezone);
 dayjs.extend(utc);
@@ -156,7 +159,7 @@ export const updateDoctorProfile = async (user_id, updateData) => {
   }
 };
 
-export const getDoctorAppointments = async ({
+export const getAllAppointments = async ({
   doctor_id,
   filter_date,
   status,
@@ -202,8 +205,21 @@ export const getDoctorAppointments = async ({
     where: whereClause,
     include: [
       {
-        model: Patient,
-        as: "Patient",
+        model: FamilyMember,
+        as: "FamilyMember",
+        include: {
+          model: Patient,
+          as: "patient",
+          include: {
+            model: User,
+            as: "user",
+            attributes: ["user_id", "username", "email"],
+          },
+        },
+      },
+      {
+        model: Doctor,
+        as: "Doctor",
         include: {
           model: User,
           as: "user",
@@ -220,8 +236,10 @@ export const getDoctorAppointments = async ({
     message: "Lấy danh sách lịch hẹn thành công",
     data: appointments.map((appointment) => ({
       appointment_id: appointment.appointment_id,
-      patient_name: appointment.Patient.user.username,
-      patient_email: appointment.Patient.user.email,
+      family_name: appointment.FamilyMember.username,
+      family_email: appointment.FamilyMember.email,
+      family_dob: appointment.FamilyMember.date_of_birth,
+      family_gender: appointment.FamilyMember.gender,
       appointment_datetime: dayjs(appointment.appointment_datetime)
         .tz("Asia/Ho_Chi_Minh")
         .format("YYYY-MM-DDTHH:mm:ss"),
@@ -335,14 +353,51 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
     where: { appointment_id, doctor_id },
     include: [
       {
-        model: db.Patient,
-        as: "Patient",
+        model: db.FamilyMember,
+        as: "FamilyMember",
         include: {
-          model: db.User,
-          as: "user",
-          attributes: ["user_id", "username", "email"],
+          model: db.Patient,
+          as: "patient",
+          include: {
+            model: db.User,
+            as: "user",
+            attributes: ["user_id", "username", "email"],
+          },
         },
       },
+      {
+        model: db.Doctor,
+        as: "Doctor",
+        include: [
+          {
+            model: db.User,
+            as: "user",
+            attributes: ["user_id", "username", "email"],
+          },
+          {
+            model: db.Specialization,
+            as: "Specialization",
+            include: {
+              model: db.SymptomSpecializationMapping,
+              as: "mappings",
+              include: {
+                model: db.Symptom,
+                as: "symptom",
+                attributes: ["symptom_id", "name"],
+              },
+            },
+          },
+        ],
+      },
+      // {
+      //   model: db.Patient,
+      //   as: "Patient",
+      //   include: {
+      //     model: db.User,
+      //     as: "user",
+      //     attributes: ["user_id", "username", "email"],
+      //   },
+      // },
       {
         model: db.MedicalRecord,
         as: "MedicalRecord",
@@ -399,12 +454,26 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
         createdAt: appointment.createdAt,
         updatedAt: appointment.updatedAt,
       },
-      patient: {
-        id: appointment.Patient.patient_id,
-        user_id: appointment.Patient.user.user_id,
-        name: appointment.Patient.user.username,
-        email: appointment.Patient.user.email,
+      // patient: {
+      //   id: appointment.FamilyMember?.Patient.patient_id,
+      //   user_id: appointment.FamilyMember?.Patient.user.user_id,
+      //   name: appointment.FamilyMember?.Patient.user.username,
+      //   email: appointment.FamilyMember?.Patient.user.email,
+      // },
+      familyMember: {
+        id: appointment.FamilyMember?.family_member_id,
+        name: appointment.FamilyMember.username,
+        gender: appointment.FamilyMember.gender,
+        email: appointment.FamilyMember.email,
+        dob: appointment.FamilyMember.date_of_birth,
       },
+      symptoms: appointment.Doctor.Specialization?.mappings.symptom
+        ? {
+            name: appointment.appointment.Doctor.Specialization?.mappings.symptom.map(
+              (symptom) => symptom.name
+            ),
+          }
+        : null,
       medical_record: appointment.MedicalRecord
         ? {
             id: appointment.MedicalRecord.record_id,
@@ -465,15 +534,17 @@ export const cancelAppointment = async (
       where: { appointment_id, doctor_id },
       include: [
         {
-          model: db.Patient,
-          as: "Patient",
-          include: [
-            {
-              model: db.User,
-              as: "user",
-              attributes: ["email", "username"],
-            },
-          ],
+          model: db.FamilyMember,
+          as: "FamilyMember",
+          // include: {
+          //   model: db.Patient,
+          //   as: "patient",
+          //   include: {
+          //     model: db.User,
+          //     as: "user",
+          //     attributes: ["user_id", "username", "email"],
+          //   },
+          // },
         },
         {
           model: db.Doctor,
@@ -535,9 +606,10 @@ export const cancelAppointment = async (
       data: {
         appointment_id: appointment.appointment_id,
         status: appointment.status,
-        patient: {
-          name: appointment.Patient.user.username,
-          email: appointment.Patient.user.email,
+        family_member: {
+          name: appointment.FamilyMember.username,
+          email: appointment.FamilyMember.email,
+          dob: appointment.FamilyMember.date_of_birth,
         },
         doctor: {
           name: appointment.Doctor.user.username,
@@ -1325,15 +1397,15 @@ export const acceptAppointment = async (appointment_id, doctor_id) => {
     },
     include: [
       {
-        model: db.Patient,
-        as: "Patient",
-        include: [
-          {
-            model: db.User,
-            as: "user",
-            attributes: ["email", "username"],
-          },
-        ],
+        model: db.FamilyMember,
+        as: "FamilyMember",
+        // include: [
+        //   {
+        //     model: db.User,
+        //     as: "user",
+        //     attributes: ["email", "username"],
+        //   },
+        // ],
       },
     ],
   });
@@ -1409,15 +1481,15 @@ export const acceptAppointment = async (appointment_id, doctor_id) => {
     },
     include: [
       {
-        model: db.Patient,
-        as: "Patient",
-        include: [
-          {
-            model: db.User,
-            as: "user",
-            attributes: ["email", "username"],
-          },
-        ],
+        model: db.FamilyMember,
+        as: "FamilyMember",
+        // include: [
+        //   {
+        //     model: db.User,
+        //     as: "user",
+        //     attributes: ["email", "username"],
+        //   },
+        // ],
       },
     ],
   });
@@ -1435,13 +1507,13 @@ export const acceptAppointment = async (appointment_id, doctor_id) => {
         });
 
         // TODO: Gửi email thông báo cho bệnh nhân bị hủy lịch
-        const emailInfo = {
-          to: conflictAppointment.Patient.user.email,
-          subject: "Thông báo hủy lịch hẹn",
-          patientName: conflictAppointment.Patient.user.username,
-          appointmentDate: appointmentTime.format("DD/MM/YYYY HH:mm"),
-          reason: "Bác sĩ đã chấp nhận một lịch hẹn khác trong cùng khung giờ",
-        };
+        // const emailInfo = {
+        //   to: conflictAppointment.Patient.user.email,
+        //   subject: "Thông báo hủy lịch hẹn",
+        //   patientName: conflictAppointment.Patient.user.username,
+        //   appointmentDate: appointmentTime.format("DD/MM/YYYY HH:mm"),
+        //   reason: "Bác sĩ đã chấp nhận một lịch hẹn khác trong cùng khung giờ",
+        // };
         // await sendEmailNotification(emailInfo);
       })
     );
@@ -1453,12 +1525,12 @@ export const acceptAppointment = async (appointment_id, doctor_id) => {
   });
 
   // Gửi email thông báo cho bệnh nhân được chấp nhận
-  const emailInfo = {
-    to: appointment.Patient.user.email,
-    subject: "Thông báo chấp nhận lịch hẹn",
-    patientName: appointment.Patient.user.username,
-    appointmentDate: appointmentTime.format("DD/MM/YYYY HH:mm"),
-  };
+  // const emailInfo = {
+  //   to: appointment.Patient.user.email,
+  //   subject: "Thông báo chấp nhận lịch hẹn",
+  //   patientName: appointment.Patient.user.username,
+  //   appointmentDate: appointmentTime.format("DD/MM/YYYY HH:mm"),
+  // };
   // await sendEmailNotification(emailInfo);
 
   return {
@@ -1466,14 +1538,14 @@ export const acceptAppointment = async (appointment_id, doctor_id) => {
     message: "Đã chấp nhận lịch hẹn thành công",
     data: {
       appointment_id: appointment.appointment_id,
-      patient_name: appointment.Patient.user.username,
-      patient_email: appointment.Patient.user.email,
+      family_member_name: appointment.FamilyMember.username,
+      family_member_email: appointment.FamilyMember.email,
       appointment_datetime: appointmentTime.format("YYYY-MM-DDTHH:mm:ssZ"),
       status: "accepted",
       cancelled_appointments: conflictingAppointments.map((app) => ({
         appointment_id: app.appointment_id,
-        patient_name: app.Patient.user.username,
-        patient_email: app.Patient.user.email,
+        family_member_name: app.FamilyMember.username,
+        family_member_email: app.FamilyMember.email,
         status: "cancelled",
       })),
     },
@@ -1489,8 +1561,8 @@ export const createMedicalRecord = async (
   const appointment = await db.Appointment.findOne({
     where: { appointment_id },
     include: {
-      model: db.Patient,
-      as: "Patient",
+      model: db.FamilyMember,
+      as: "FamilyMember",
     },
   });
 
@@ -1535,7 +1607,7 @@ export const createMedicalRecord = async (
   // Tạo hồ sơ bệnh án
   const medicalRecord = await db.MedicalRecord.create({
     appointment_id,
-    patient_id: appointment.patient_id,
+    family_member_id: appointment.family_member_id,
     doctor_id,
     diagnosis,
     treatment,
@@ -1560,75 +1632,75 @@ export const createMedicalRecord = async (
   };
 };
 
-/**
- * Tạo file PDF cho đơn thuốc
- * @param {number} prescription_id - ID của đơn thuốc
- * @returns {Promise<string>} - URL của file PDF
- */
-const generatePrescriptionPDF = async (prescription_id) => {
-  // Lấy thông tin đơn thuốc
-  const prescription = await db.Prescription.findOne({
-    where: { prescription_id },
-    include: [
-      {
-        model: db.Appointment,
-        as: "Appointment",
-        include: [
-          {
-            model: db.Patient,
-            as: "Patient",
-            include: [
-              {
-                model: db.User,
-                as: "user",
-                attributes: ["username", "email"],
-              },
-            ],
-          },
-          {
-            model: db.Doctor,
-            as: "Doctor",
-            include: [
-              {
-                model: db.Specialization,
-                as: "Specialization",
-                attributes: ["name"],
-              },
-              {
-                model: db.User,
-                as: "user",
-                attributes: ["username"],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        model: db.PrescriptionMedicine,
-        as: "prescriptionMedicines",
-        include: [
-          {
-            model: db.Medicine,
-            as: "Medicine",
-            attributes: ["name", "unit"],
-          },
-        ],
-      },
-    ],
-  });
+// /**
+//  * Tạo file PDF cho đơn thuốc
+//  * @param {number} prescription_id - ID của đơn thuốc
+//  * @returns {Promise<string>} - URL của file PDF
+//  */
+// const generatePrescriptionPDF = async (prescription_id) => {
+//   // Lấy thông tin đơn thuốc
+//   const prescription = await db.Prescription.findOne({
+//     where: { prescription_id },
+//     include: [
+//       {
+//         model: db.Appointment,
+//         as: "Appointment",
+//         include: [
+//           {
+//             model: db.FamilyMember,
+//             as: "FamilyMember",
+//             include: [
+//               {
+//                 model: db.User,
+//                 as: "user",
+//                 attributes: ["username", "email"],
+//               },
+//             ],
+//           },
+//           {
+//             model: db.Doctor,
+//             as: "Doctor",
+//             include: [
+//               {
+//                 model: db.Specialization,
+//                 as: "Specialization",
+//                 attributes: ["name"],
+//               },
+//               {
+//                 model: db.User,
+//                 as: "user",
+//                 attributes: ["username"],
+//               },
+//             ],
+//           },
+//         ],
+//       },
+//       {
+//         model: db.PrescriptionMedicine,
+//         as: "prescriptionMedicines",
+//         include: [
+//           {
+//             model: db.Medicine,
+//             as: "Medicine",
+//             attributes: ["name", "unit"],
+//           },
+//         ],
+//       },
+//     ],
+//   });
 
-  if (!prescription) {
-    throw new NotFoundError("Không tìm thấy đơn thuốc");
-  }
+//   if (!prescription) {
+//     throw new NotFoundError("Không tìm thấy đơn thuốc");
+//   }
 
-  // Tạo tên file PDF
-  const fileName = `prescription_${prescription_id}_${Date.now()}.pdf`;
-  const filePath = `uploads/prescriptions/${fileName}`;
+//   // Tạo tên file PDF
+//   const fileName = `prescription_${prescription_id}_${Date.now()}.pdf`;
+//   const filePath = `uploads/prescriptions/${fileName}`;
 
-  // TODO: Implement PDF generation logic here
-  // For now, return a dummy URL
-  return `/prescriptions/${fileName}`;
-};
+//   // TODO: Implement PDF generation logic here
+//   // For now, return a dummy URL
+//   return `/prescriptions/${fileName}`;
+// };
 
 export const createPrescriptions = async (
   appointment_id,
@@ -1637,6 +1709,7 @@ export const createPrescriptions = async (
   medicines,
   use_hospital_pharmacy
 ) => {
+  console.log(appointment_id, doctor_id);
   // Kiểm tra cuộc hẹn
   const appointment = await db.Appointment.findOne({
     where: {
@@ -1653,8 +1726,8 @@ export const createPrescriptions = async (
         },
       },
       {
-        model: db.Patient, // Ensure the patient is included
-        as: "Patient",
+        model: db.FamilyMember, // Ensure the patient is included
+        as: "FamilyMember",
       },
     ],
   });
@@ -1697,7 +1770,7 @@ export const createPrescriptions = async (
   // Tạo đơn thuốc
   const prescription = await db.Prescription.create({
     appointment_id,
-    patient_id: appointment.patient_id, // Ensure the patient_id is passed
+    // family_member_id: appointment.family_member_id, // Ensure the patient_id is passed
     note: note || null,
     created_by: doctor_id,
     status: "pending_prepare", // Đơn thuốc bắt đầu ở trạng thái chuẩn bị
@@ -1742,15 +1815,15 @@ export const createPrescriptions = async (
   }
 
   // Nếu không sử dụng nhà thuốc bệnh viện, tạo PDF ngay và cập nhật status thành 'completed'
-  if (!use_hospital_pharmacy) {
-    const pdfUrl = await generatePrescriptionPDF(prescription.prescription_id);
-    await prescription.update({ pdf_url: pdfUrl });
-    await prescription.update({ status: "completed" }); // Đổi trạng thái thành 'completed'
-  } else {
-    // Nếu sử dụng nhà thuốc bệnh viện, xử lý thanh toán ở đây
-    // Ví dụ: Bạn có thể tạo payment ở đây nếu cần, hoặc giữ status là 'pending_prepare' nếu không có payment.
-    // Lưu ý: Nếu có payment, không cập nhật thành 'completed' ở đây.
-  }
+  // if (!use_hospital_pharmacy) {
+  //   const pdfUrl = await generatePrescriptionPDF(prescription.prescription_id);
+  //   await prescription.update({ pdf_url: pdfUrl });
+  //   await prescription.update({ status: "completed" }); // Đổi trạng thái thành 'completed'
+  // } else {
+  //   // Nếu sử dụng nhà thuốc bệnh viện, xử lý thanh toán ở đây
+  //   // Ví dụ: Bạn có thể tạo payment ở đây nếu cần, hoặc giữ status là 'pending_prepare' nếu không có payment.
+  //   // Lưu ý: Nếu có payment, không cập nhật thành 'completed' ở đây.
+  // }
 
   // Trả về kết quả
   return {
@@ -1824,13 +1897,13 @@ export const getAppointmentPayments = async (
     },
     include: [
       {
-        model: db.Patient,
-        as: "Patient",
-        include: {
-          model: db.User,
-          as: "user",
-          attributes: ["username", "email"],
-        },
+        model: db.FamilyMember,
+        as: "FamilyMember",
+        // include: {
+        //   model: db.User,
+        //   as: "user",
+        //   attributes: ["username", "email"],
+        // },
       },
       {
         model: db.Payment,
@@ -1859,8 +1932,8 @@ export const getAppointmentPayments = async (
       .tz("Asia/Ho_Chi_Minh")
       .format("YYYY-MM-DD HH:mm:ss"),
     patient: {
-      name: appointment.Patient?.user?.username || "",
-      email: appointment.Patient?.user?.email || "",
+      name: appointment.FamilyMemberusername || "",
+      email: appointment.FamilyMember.email || "",
     },
     payment: appointment.Payments
       ? {
@@ -1998,167 +2071,114 @@ export const getAllMedicines = async ({ search, expiry_before }) => {
   };
 };
 
-export const getAllPatient = async (
+export const getAllPatient_FamilyMember = async (
   doctor_id,
   { search, page = 1, limit = 10 }
 ) => {
-  try {
-    const offset = (page - 1) * limit;
+  const offset = (page - 1) * limit;
 
-    // Tạo điều kiện tìm kiếm
-    const appointmentCondition = {
-      doctor_id,
-      status: {
-        [Op.in]: ["accepted", "completed"], // Chỉ lấy các lịch hẹn đã được xác nhận hoặc hoàn thành
+  // 1) điều kiện cho Appointment
+  const appointmentWhere = {
+    doctor_id,
+    status: { [Op.in]: ["accepted", "completed"] },
+  };
+
+  // 2) điều kiện tìm kiếm trên FamilyMember
+  const familyWhere = {};
+  if (search) {
+    familyWhere[Op.or] = [
+      { username: { [Op.like]: `%${search}%` } },
+      { email: { [Op.like]: `%${search}%` } },
+      { phone_number: { [Op.like]: `%${search}%` } },
+      { gender: { [Op.like]: `%${search}%` } },
+    ];
+  }
+
+  // 3) đếm tổng số bệnh nhân (distinct family_member_id)
+  const totalDistinct = await db.Appointment.count({
+    where: appointmentWhere,
+    include: [
+      {
+        model: db.FamilyMember,
+        as: "FamilyMember",
+        where: familyWhere,
+        attributes: [],
       },
-    };
+    ],
+    distinct: true,
+    col: "family_member_id",
+  });
 
-    let patientCondition = {};
-
-    // Thêm điều kiện tìm kiếm nếu có
-    if (search) {
-      patientCondition = {
-        [Op.or]: [
-          { "$Patient.user.username$": { [Op.like]: `%${search}%` } },
-          { "$Patient.user.email$": { [Op.like]: `%${search}%` } },
-          { "$Patient.phone_number$": { [Op.like]: `%${search}%` } },
-          { "$Patient.address$": { [Op.like]: `%${search}%` } }, // Thêm tìm kiếm theo địa chỉ
-        ],
-      };
-    }
-
-    // Đếm tổng số bệnh nhân
-    const countQuery = await db.Appointment.findAll({
-      where: { ...appointmentCondition, ...patientCondition },
-      include: [
-        {
-          model: db.Patient,
-          as: "Patient",
-          include: [
-            {
-              model: db.User,
-              as: "user",
-              attributes: ["user_id", "username", "email"],
-            },
-          ],
-        },
-      ],
-      attributes: [
-        [
-          Sequelize.fn("DISTINCT", Sequelize.col("Appointment.patient_id")),
-          "patient_id",
-        ],
-      ],
-      raw: true,
-    });
-
-    const totalPatients = countQuery.length;
-
-    // Lấy danh sách bệnh nhân với phân trang
-    const patients = await db.Appointment.findAll({
-      where: { ...appointmentCondition, ...patientCondition },
-      include: [
-        {
-          model: db.Patient,
-          as: "Patient",
-          include: [
-            {
-              model: db.User,
-              as: "user",
-              attributes: ["user_id", "username", "email", "avatar"],
-            },
-          ],
-        },
-      ],
-      attributes: [
-        [
-          Sequelize.fn(
-            "MAX",
-            Sequelize.col("Appointment.appointment_datetime")
-          ),
-          "last_appointment",
-        ],
-        [Sequelize.col("Appointment.patient_id"), "patient_id"],
-      ],
-      group: ["Appointment.patient_id"],
-      order: [
-        [
-          Sequelize.fn(
-            "MAX",
-            Sequelize.col("Appointment.appointment_datetime")
-          ),
-          "DESC",
-        ],
-      ],
-      limit: parseInt(limit),
-      offset: offset,
-    });
-
-    if (patients.length === 0) {
-      return {
-        success: true,
-        message: "Không tìm thấy bệnh nhân nào",
-        data: [],
-        pagination: {
-          total: 0,
-          current_page: parseInt(page),
-          total_pages: 0,
-          per_page: parseInt(limit),
-        },
-      };
-    }
-
-    // Thực hiện thêm truy vấn để lấy toàn bộ thông tin từ bệnh nhân
-    const patientIds = patients.map((p) => p.get("patient_id"));
-
-    const fullPatientInfo = await db.Patient.findAll({
-      where: { patient_id: { [Op.in]: patientIds } },
-      include: [
-        {
-          model: db.User,
-          as: "user",
-          attributes: ["user_id", "username", "email", "avatar"],
-        },
-      ],
-    });
-
-    // Ghép thông tin bệnh nhân với thời gian cuộc hẹn gần nhất
-    const patientList = fullPatientInfo.map((patient) => {
-      const appointmentInfo = patients.find(
-        (p) => p.get("patient_id") === patient.patient_id
-      );
-      return {
-        patient_id: patient.patient_id,
-        name: patient.user.username,
-        email: patient.user.email,
-        phone_number: patient.phone_number,
-        date_of_birth: patient.date_of_birth, // Lấy từ Patient
-        gender: patient.gender, // Lấy từ Patient
-        address: patient.address, // Lấy từ Patient
-        avatar: patient.user.avatar, // Vẫn lấy từ User
-        health_insurance: patient.health_insurance,
-        allergies: patient.allergies,
-        last_appointment: appointmentInfo
-          ? appointmentInfo.get("last_appointment")
-          : null,
-      };
-    });
-
+  // nếu không có thì trả về luôn
+  if (totalDistinct === 0) {
     return {
       success: true,
-      message: "Lấy danh sách bệnh nhân thành công",
-      data: patientList,
+      message: "Không tìm thấy bệnh nhân nào",
+      data: [],
       pagination: {
-        total: totalPatients,
-        current_page: parseInt(page),
-        total_pages: Math.ceil(totalPatients / limit),
-        per_page: parseInt(limit),
+        total: 0,
+        current_page: page,
+        total_pages: 0,
+        per_page: limit,
       },
     };
-  } catch (error) {
-    console.error("Error fetching patients:", error);
-    throw new Error("Có lỗi xảy ra khi lấy danh sách bệnh nhân");
   }
+
+  // 4) lấy danh sách family_member_id kèm last_appointment
+  const rows = await db.Appointment.findAll({
+    where: appointmentWhere,
+    include: [
+      {
+        model: db.FamilyMember,
+        as: "FamilyMember",
+        where: familyWhere,
+        attributes: [],
+      },
+    ],
+    attributes: [
+      "family_member_id",
+      [fn("MAX", col("appointment_datetime")), "last_appointment"],
+    ],
+    group: ["family_member_id"],
+    order: [[literal("last_appointment"), "DESC"]],
+    limit: parseInt(limit, 10),
+    offset: parseInt(offset, 10),
+    raw: true,
+  });
+
+  const familyIds = rows.map((r) => r.family_member_id);
+
+  // 5) lấy chi tiết tất cả family member
+  const members = await db.FamilyMember.findAll({
+    where: { family_member_id: { [Op.in]: familyIds } },
+  });
+
+  // 6) ghép last_appointment vào từng record
+  const data = members.map((m) => {
+    const info = rows.find((r) => r.family_member_id === m.family_member_id);
+    return {
+      family_member_id: m.family_member_id,
+      username: m.username,
+      email: m.email,
+      phone_number: m.phone_number,
+      gender: m.gender,
+      date_of_birth: m.date_of_birth,
+      // relationship:     m.relationship,
+      last_appointment: info?.last_appointment,
+    };
+  });
+
+  return {
+    success: true,
+    message: "Lấy danh sách bệnh nhân thành công",
+    data,
+    pagination: {
+      total: totalDistinct,
+      current_page: page,
+      total_pages: Math.ceil(totalDistinct / limit),
+      per_page: limit,
+    },
+  };
 };
 
 export const getPatientAppointment = async (

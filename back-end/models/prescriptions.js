@@ -24,10 +24,10 @@ export default (sequelize) => {
         as: "pharmacist",
       });
       // Liên kết với bảng Patient
-      Prescription.belongsTo(models.Patient, {
-        foreignKey: "patient_id",
-        as: "patient",
-      });
+      // Prescription.belongsTo(models.Patient, {
+      //   foreignKey: "patient_id",
+      //   as: "patient",
+      // });
     }
   }
 
@@ -38,19 +38,19 @@ export default (sequelize) => {
         autoIncrement: true,
         primaryKey: true,
         allowNull: false,
-        comment: "ID đơn thuốc, tự động tăng"
+        comment: "ID đơn thuốc, tự động tăng",
       },
-      patient_id: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        references: {
-          model: "Patients",
-          key: "patient_id",
-        },
-        onUpdate: "CASCADE",
-        onDelete: "CASCADE",
-        comment: "ID bệnh nhân của đơn thuốc"
-      },
+      // patient_id: {
+      //   type: DataTypes.INTEGER,
+      //   allowNull: false,
+      //   references: {
+      //     model: "Patients",
+      //     key: "patient_id",
+      //   },
+      //   onUpdate: "CASCADE",
+      //   onDelete: "CASCADE",
+      //   comment: "ID bệnh nhân của đơn thuốc"
+      // },
       pharmacist_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -60,7 +60,8 @@ export default (sequelize) => {
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
-        comment: "ID dược sĩ xác nhận phát thuốc, có thể null khi chưa phát thuốc"
+        comment:
+          "ID dược sĩ xác nhận phát thuốc, có thể null khi chưa phát thuốc",
       },
       appointment_id: {
         type: DataTypes.INTEGER,
@@ -72,71 +73,80 @@ export default (sequelize) => {
         defaultValue: null,
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
-        comment: "ID cuộc hẹn liên quan đến đơn thuốc này (null nếu là đơn bán lẻ)"
+        comment:
+          "ID cuộc hẹn liên quan đến đơn thuốc này (null nếu là đơn bán lẻ)",
       },
       status: {
-        type: DataTypes.ENUM('pending_prepare', 'waiting_payment', 'completed', 'cancelled', 'rejected'),
-        defaultValue: 'pending_prepare',
+        type: DataTypes.ENUM(
+          "pending_prepare",
+          "waiting_payment",
+          "completed",
+          "cancelled",
+          "rejected"
+        ),
+        defaultValue: "pending_prepare",
         allowNull: false,
-        comment: "Trạng thái đơn thuốc: pending_prepare - chờ chuẩn bị, waiting_payment - chờ thanh toán, completed - hoàn tất, cancelled - đã hủy, rejected - đã từ chối"
+        comment:
+          "Trạng thái đơn thuốc: pending_prepare - chờ chuẩn bị, waiting_payment - chờ thanh toán, completed - hoàn tất, cancelled - đã hủy, rejected - đã từ chối",
       },
       medicine_details: {
         type: DataTypes.TEXT,
         allowNull: true,
-        comment: "Ghi chú thêm về đơn thuốc (nếu có)"
+        comment: "Ghi chú thêm về đơn thuốc (nếu có)",
       },
       confirmed_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        comment: "Thời điểm dược sĩ xác nhận đã chuẩn bị xong"
+        comment: "Thời điểm dược sĩ xác nhận đã chuẩn bị xong",
       },
       completed_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        comment: "Thời điểm hoàn tất đơn thuốc"
+        comment: "Thời điểm hoàn tất đơn thuốc",
       },
       cancelled_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        comment: "Thời điểm hủy đơn thuốc"
+        comment: "Thời điểm hủy đơn thuốc",
       },
       cancel_reason: {
         type: DataTypes.TEXT,
         allowNull: true,
-        comment: "Lý do hủy đơn thuốc"
+        comment: "Lý do hủy đơn thuốc",
       },
       rejection_reason: {
         type: DataTypes.TEXT,
         allowNull: true,
-        comment: "Lý do từ chối đơn thuốc"
+        comment: "Lý do từ chối đơn thuốc",
       },
       rejected_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        comment: "Thời điểm từ chối đơn thuốc"
+        comment: "Thời điểm từ chối đơn thuốc",
       },
       rejected_by: {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
           model: "Pharmacists",
-          key: "pharmacist_id"
+          key: "pharmacist_id",
         },
         onUpdate: "CASCADE",
         onDelete: "SET NULL",
-        comment: "ID dược sĩ từ chối đơn thuốc"
+        comment: "ID dược sĩ từ chối đơn thuốc",
       },
       pdf_url: {
         type: DataTypes.STRING,
         allowNull: true,
-        comment: "Đường dẫn file PDF đơn thuốc"
+        comment: "Đường dẫn file PDF đơn thuốc",
       },
       use_hospital_pharmacy: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
         defaultValue: true,
-        comment: "Xác định bệnh nhân có lấy thuốc tại nhà thuốc bệnh viện hay không"
-      }
+        comment:
+          "Xác định bệnh nhân có lấy thuốc tại nhà thuốc bệnh viện hay không",
+      },
     },
     {
       sequelize,
@@ -147,22 +157,22 @@ export default (sequelize) => {
       updatedAt: "updatedAt",
       indexes: [
         {
-          name: 'idx_prescriptions_status',
-          fields: ['status']
+          name: "idx_prescriptions_status",
+          fields: ["status"],
         },
         {
-          name: 'idx_prescriptions_pharmacist',
-          fields: ['pharmacist_id']
+          name: "idx_prescriptions_pharmacist",
+          fields: ["pharmacist_id"],
         },
         {
-          name: 'idx_prescriptions_appointment',
-          fields: ['appointment_id']
+          name: "idx_prescriptions_appointment",
+          fields: ["appointment_id"],
         },
-        {
-          name: 'idx_prescriptions_patient',
-          fields: ['patient_id']
-        }
-      ]
+        // {
+        //   name: 'idx_prescriptions_patient',
+        //   fields: ['patient_id']
+        // }
+      ],
     }
   );
 

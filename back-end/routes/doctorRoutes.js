@@ -4,7 +4,7 @@ import {
   registerDoctorController,
   loginDoctorController,
   createDoctorDayOffController,
-  getDoctorAppointmentsController,
+  getAllAppointmentsController,
   getDoctorSummaryController,
   getDoctorAppointmentStatsController,
   getAppointmentDetailsController,
@@ -19,10 +19,10 @@ import {
   getAppointmentPaymentsController,
   updatePaymentStatusController,
   getAllMedicinesController,
-  getAllPatientsController,
+  getAllPatient_FamilyMemberController,
   getPatientAppointmentsController,
   getDoctorProfileController,
-  updateDoctorProfileController
+  updateDoctorProfileController,
 } from "../controllers/doctorController.js";
 import validate from "../middleware/validate.js";
 import { body, param } from "express-validator";
@@ -79,7 +79,7 @@ router.get(
   "/appointments",
   authenticateUser,
   authorize(["doctor"]),
-  getDoctorAppointmentsController
+  getAllAppointmentsController
 );
 router.get(
   "/summary",
@@ -95,14 +95,16 @@ router.get(
 );
 
 // Payment routes
-router.get('/appointments/payments', 
-  authenticateUser, 
-  authorize(['doctor']),
+router.get(
+  "/appointments/payments",
+  authenticateUser,
+  authorize(["doctor"]),
   getAppointmentPaymentsController
 );
-router.patch('/appointments/payments/:payment_id/status', 
-  authenticateUser, 
-  authorize(['doctor']), 
+router.patch(
+  "/appointments/payments/:payment_id/status",
+  authenticateUser,
+  authorize(["doctor"]),
   updatePaymentStatusController
 );
 
@@ -117,7 +119,7 @@ router.patch(
   authenticateUser,
   authorize(["doctor"]),
   validate([
-    param("appointment_id").notEmpty().withMessage("Thiếu mã cuộc hẹn")
+    param("appointment_id").notEmpty().withMessage("Thiếu mã cuộc hẹn"),
   ]),
   acceptAppointmentController
 );
@@ -148,40 +150,60 @@ router.post(
 );
 
 router.post(
-  '/appointments/:id/cancel',
+  "/appointments/:id/cancel",
   authenticateUser,
-  authorize(['doctor']),
+  authorize(["doctor"]),
   validate([
-    param('id')
+    param("id")
       .notEmpty()
-      .withMessage('Thiếu mã cuộc hẹn')
+      .withMessage("Thiếu mã cuộc hẹn")
       .isInt()
-      .withMessage('Mã cuộc hẹn phải là số'),
-    body('reason')
+      .withMessage("Mã cuộc hẹn phải là số"),
+    body("reason")
       .notEmpty()
-      .withMessage('Vui lòng nhập lý do nghỉ')
+      .withMessage("Vui lòng nhập lý do nghỉ")
       .trim()
       .isLength({ min: 3, max: 200 })
-      .withMessage('Lý do nghỉ phải từ 3 đến 200 ký tự'),
+      .withMessage("Lý do nghỉ phải từ 3 đến 200 ký tự"),
   ]),
   cancelAppointmentController
 );
-router.post('/medical-records', authenticateUser, authorize(['doctor']), createMedicalRecordController);
-router.post('/appointments/complete', authenticateUser, authorize(['doctor']), completeAppointmentController);
-router.post('/prescriptions', 
-  authenticateUser, 
-  authorize(['doctor']), 
+router.post(
+  "/medical-records",
+  authenticateUser,
+  authorize(["doctor"]),
+  createMedicalRecordController
+);
+router.post(
+  "/appointments/complete",
+  authenticateUser,
+  authorize(["doctor"]),
+  completeAppointmentController
+);
+router.post(
+  "/prescriptions",
+  authenticateUser,
+  authorize(["doctor"]),
   [
     body("appointment_id").notEmpty().withMessage("Thiếu mã cuộc hẹn"),
     body("medicines").isArray().withMessage("Danh sách thuốc không hợp lệ"),
     body("medicines.*.medicine_id").notEmpty().withMessage("Thiếu mã thuốc"),
-    body("medicines.*.quantity").isInt({ min: 1 }).withMessage("Số lượng thuốc không hợp lệ"),
+    body("medicines.*.quantity")
+      .isInt({ min: 1 })
+      .withMessage("Số lượng thuốc không hợp lệ"),
     body("medicines.*.dosage").notEmpty().withMessage("Thiếu liều dùng"),
     body("medicines.*.frequency").notEmpty().withMessage("Thiếu tần suất dùng"),
     body("medicines.*.duration").notEmpty().withMessage("Thiếu thời gian dùng"),
-    body("medicines.*.instructions").optional().isString().withMessage("Hướng dẫn sử dụng không hợp lệ"),
+    body("medicines.*.instructions")
+      .optional()
+      .isString()
+      .withMessage("Hướng dẫn sử dụng không hợp lệ"),
     body("note").optional().isString().withMessage("Ghi chú không hợp lệ"),
-    body("use_hospital_pharmacy").notEmpty().withMessage("Thiếu thông tin sử dụng nhà thuốc bệnh viện").isBoolean().withMessage("Tham số use_hospital_pharmacy không hợp lệ")
+    body("use_hospital_pharmacy")
+      .notEmpty()
+      .withMessage("Thiếu thông tin sử dụng nhà thuốc bệnh viện")
+      .isBoolean()
+      .withMessage("Tham số use_hospital_pharmacy không hợp lệ"),
   ],
   createPrescriptionsController
 );
@@ -194,16 +216,16 @@ router.get(
 
 // Patient routes for doctor
 router.get(
-  "/patients", 
-  authenticateUser, 
-  authorize(["doctor"]), 
-  getAllPatientsController
+  "/patients",
+  authenticateUser,
+  authorize(["doctor"]),
+  getAllPatient_FamilyMemberController
 );
 
 router.get(
-  "/patients/:patient_id/appointments", 
-  authenticateUser, 
-  authorize(["doctor"]), 
+  "/patients/:patient_id/appointments",
+  authenticateUser,
+  authorize(["doctor"]),
   getPatientAppointmentsController
 );
 
@@ -218,7 +240,7 @@ router.patch(
   "/profile",
   authenticateUser,
   authorize(["doctor"]),
-  upload.single('avatar'),
+  upload.single("avatar"),
   updateDoctorProfileController
 );
 
