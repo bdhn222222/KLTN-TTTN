@@ -15,6 +15,8 @@ import momoRoutes from "./routes/momoRoutes.js";
 dotenv.config();
 
 const app = express();
+app.use(cors());
+app.use(express.json());
 
 app.use("/momo", momoRoutes);
 
@@ -25,9 +27,6 @@ app.use((req, res, next) => {
   console.log("Body:", req.body);
   next();
 });
-
-app.use(cors());
-app.use(express.json());
 
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Booking Doctor API" });
