@@ -3,7 +3,7 @@ import BadRequestError from "../errors/bad_request.js";
 import InternalServerError from "../errors/internalServerError.js";
 import asyncHandler from "express-async-handler";
 import NotFoundError from "../errors/not_found.js";
-
+import { validationResult } from "express-validator";
 export const registerAdminController = async (req, res, next) => {
   try {
     const admin = await adminService.registerAdmin(req.body);
@@ -179,17 +179,38 @@ export const getSpecializationDetailsController = asyncHandler(
     res.json(result);
   }
 );
-export const getDoctorDetailsController = asyncHandler(async (req, res) => {
-  const doctor_id = parseInt(req.params.doctor_id, 10);
-  const result = await adminService.getDoctorDetails({ doctor_id });
-  res.json(result);
-});
-export const getSpecializationDetailsCotroller = async (req, res) => {
-  const specialization_id = parseInt(req.params.specialization_id, 10);
-  const { name, fees, image } = req.body;
+
+export const getDoctorDetailsController = async (req, res, next) => {
   try {
-    const result = await adminService.getSpecializationDetails({
-      specialization_id,
+    const doctorId = Number(req.params.doctor_id);
+    if (isNaN(doctorId) || doctorId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid doctor ID",
+      });
+    }
+    const doctor = await adminService.getDoctorDetails(doctorId);
+    return res.status(200).json({ success: true, data: doctor });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateSpecializationController = async (req, res, next) => {
+  // Accept either :id or :specialization_id
+  const rawId = req.params.id ?? req.params.specialization_id;
+  const specialization_id = Number(rawId);
+
+  if (Number.isNaN(specialization_id)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid specialization id" });
+  }
+
+  const { name, fees, image } = req.body;
+
+  try {
+    const result = await adminService.updateSpecialization(specialization_id, {
       name,
       fees,
       image,
@@ -205,6 +226,131 @@ export const getSpecializationDetailsCotroller = async (req, res) => {
     }
     if (err instanceof NotFoundError) {
       return res.status(404).json({ success: false, message: err.message });
+    }
+    next(err);
+  }
+};
+export const getAllDoctorsController = async (req, res, next) => {
+  try {
+    const doctors = await adminService.getAllDoctors();
+    return res.status(200).json({
+      success: true,
+      data: doctors,
+    });
+  } catch (err) {
+    if (err.name === "NotFoundError") {
+      return res.status(404).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    next(err);
+  }
+};
+export const getDoctorDayOffController = async (req, res, next) => {
+  try {
+    const doctorId = Number(req.params.doctor_id);
+    if (isNaN(doctorId) || doctorId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid doctor ID",
+      });
+    }
+
+    const schedule = await adminService.getDoctorDayOff(doctorId);
+    return res.status(200).json({
+      success: true,
+      data: schedule,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+export const createDoctorController = async (req, res, next) => {
+  try {
+    const result = await adminService.addDoctor(req.body);
+    return res.status(201).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (err) {
+    if (err.name === "BadRequestError") {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    next(err);
+  }
+};
+export const updateMedicineDetailsController = async (req, res, next) => {
+  try {
+    const medicineId = Number(req.params.medicine_id);
+    if (isNaN(medicineId) || medicineId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid medicine ID",
+      });
+    }
+
+    // Chỉ cho phép các field hợp lệ được update
+    const allowed = [
+      "name",
+      "description",
+      "quantity",
+      "price",
+      "unit",
+      "expiry_date",
+      "supplier",
+    ];
+    const payload = {};
+    for (const key of allowed) {
+      if (key in req.body) payload[key] = req.body[key];
+    }
+
+    const updatedMedicine = await adminService.updateMedicineDetails(
+      medicineId,
+      payload
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: updatedMedicine,
+    });
+  } catch (err) {
+    if (err.name === "NotFoundError") {
+      return res.status(404).json({ success: false, message: err.message });
+    }
+    next(err);
+  }
+};
+export const getMedicineDetailsController = async (req, res, next) => {
+  try {
+    const id = Number(req.params.medicine_id);
+    if (isNaN(id) || id <= 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid medicine ID" });
+    }
+    const medicine = await adminService.getMedicineDetails(id);
+    return res.status(200).json({ success: true, data: medicine });
+  } catch (err) {
+    if (err.name === "NotFoundError") {
+      return res.status(404).json({ success: false, message: err.message });
+    }
+    next(err);
+  }
+};
+
+export const createMedicineController = async (req, res, next) => {
+  // Validate body
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+  try {
+    const newMed = await adminService.createMedicine(req.body);
+    return res.status(201).json({ success: true, data: newMed });
+  } catch (err) {
+    if (err.name === "BadRequestError") {
+      return res.status(400).json({ success: false, message: err.message });
     }
     next(err);
   }

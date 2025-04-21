@@ -9,8 +9,8 @@ import medicalRecords from "../models/medicalRecords.js";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js"; // Sử dụng phần mở rộng .js
 import timezone from "dayjs/plugin/timezone.js"; // Sử dụng phần mở rộng .js
-
-import familyMember from "../models/familyMember.js";
+import NotFoundError from "../errors/not_found.js";
+import doctorDayOffs from "../models/doctor-day-offs.js";
 
 dayjs.extend(timezone);
 dayjs.extend(utc);
@@ -32,6 +32,7 @@ const {
   Prescription,
   MedicalRecord,
   Payment,
+  DoctorDayOff,
 } = db;
 export const registerAdmin = async ({ username, email, password }) => {
   const existingUser = await User.findOne({ where: { email } });
@@ -92,6 +93,7 @@ export const loginAdmin = async ({ email, password }) => {
 };
 export const addDoctor = async (doctorData) => {
   const transaction = await db.sequelize.transaction();
+
   try {
     const {
       username,
@@ -104,22 +106,24 @@ export const addDoctor = async (doctorData) => {
       description,
     } = doctorData;
 
+    // 1. Kiểm tra email đã tồn tại
     const existingUser = await User.findOne({ where: { email }, transaction });
     if (existingUser) {
       throw new BadRequestError("Email is already registered");
     }
 
-    let avatarUrl = null;
+    // 2. Upload avatar nếu có
+    let avatarUrl = avatar;
     if (avatar) {
       const uploadResult = await cloudinary.uploader.upload(avatar, {
         folder: "avatars",
         use_filename: true,
         unique_filename: false,
       });
-
       avatarUrl = uploadResult.secure_url;
     }
 
+    // 3. Tạo bản ghi User với role = doctor
     const newUser = await User.create(
       {
         username,
@@ -133,11 +137,10 @@ export const addDoctor = async (doctorData) => {
       { transaction }
     );
 
-    const user_id = newUser.user_id;
-
+    // 4. Tạo profile Doctor
     const newDoctor = await Doctor.create(
       {
-        user_id,
+        user_id: newUser.user_id,
         specialization_id,
         degree,
         experience_years,
@@ -146,78 +149,17 @@ export const addDoctor = async (doctorData) => {
       { transaction }
     );
 
-    const doctor_id = newDoctor.doctor_id;
-
-    await Schedule.create(
-      {
-        doctor_id,
-      },
-      { transaction }
-    );
+    // 5. Khởi tạo Schedule rỗng cho bác sĩ mới
+    // await Schedule.create({ doctor_id: newDoctor.doctor_id }, { transaction });
 
     await transaction.commit();
-    return { message: "Success" };
+    return { message: "Doctor created successfully" };
   } catch (error) {
     await transaction.rollback();
-    throw new Error(error.message);
+    throw error;
   }
 };
-// export const updateDoctorProfile = async (user_id, updateData) => {
-//   const transaction = await db.sequelize.transaction();
-//   try {
-//     const user = await User.findByPk(user_id, {
-//       attributes: { exclude: ["password"] },
-//       include: [{ model: Doctor, as: "doctor" }],
-//       transaction,
-//     });
 
-//     if (!user) {
-//       throw new NotFoundError("User not found");
-//     }
-
-//     const { doctor } = user;
-//     if (!doctor) {
-//       throw new NotFoundError("Doctor not found");
-//     }
-
-//     const userFields = ["username", "email"];
-//     userFields.forEach((field) => {
-//       if (updateData[field] !== undefined) {
-//         user[field] = updateData[field];
-//       }
-//     });
-
-//     if (updateData.avatar) {
-//       const uploadResult = await cloudinary.uploader.upload(updateData.avatar, {
-//         folder: "avatars",
-//         use_filename: true,
-//         unique_filename: false,
-//       });
-//       user.avatar = uploadResult.secure_url;
-//     }
-
-//     const doctorFields = [
-//       "degree",
-//       "experience_years",
-//       "description",
-//       "specialization_id",
-//     ];
-//     doctorFields.forEach((field) => {
-//       if (updateData[field] !== undefined) {
-//         doctor[field] = updateData[field];
-//       }
-//     });
-
-//     await user.save({ transaction });
-//     await doctor.save({ transaction });
-
-//     await transaction.commit();
-//     return { message: "Success" };
-//   } catch (error) {
-//     await transaction.rollback();
-//     throw new Error(error.message);
-//   }
-// };
 export const deleteDoctor = async (user_id) => {
   const transaction = await db.sequelize.transaction();
   try {
@@ -239,66 +181,63 @@ export const deleteDoctor = async (user_id) => {
     throw new Error(error.message);
   }
 };
-export const getDoctorProfile = async (user_id) => {
-  try {
-    const user = await User.findByPk(user_id, {
-      attributes: { exclude: ["password"] },
-      include: [
-        {
-          model: Doctor,
-          as: "doctor",
-          include: [
-            { model: Specialization, as: "specialization" },
-            { model: Schedule, as: "schedule" },
-          ],
-        },
-      ],
-    });
+// export const getDoctorDetails = async (doctor_id) => {
+//   try {
+//     const doctor = await Doctor.findByPk(doctor_id, {
+//       attributes: { exclude: ["password"] },
+//       include: [
+//         {
+//           model: Doctor,
+//           as: "doctor",
+//           include: [
+//             { model: Specialization, as: "specialization" },
+//             { model: Schedule, as: "schedule" },
+//           ],
+//         },
+//       ],
+//     });
 
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
+//     if (!user) {
+//       throw new NotFoundError("User not found");
+//     }
 
-    const { doctor } = user;
-    if (!doctor) {
-      throw new NotFoundError("Doctor not found");
-    }
+//     const { doctor } = user;
+//     if (!doctor) {
+//       throw new NotFoundError("Doctor not found");
+//     }
 
-    return {
-      message: "Success",
-      user,
-    };
-  } catch (error) {
-    throw new Error(error.message);
-  }
-};
+//     return {
+//       message: "Success",
+//       user,
+//     };
+//   } catch (error) {
+//     throw new Error(error.message);
+//   }
+// };
 export const getAllDoctors = async () => {
-  try {
-    const doctors = await Doctor.findAll({
-      include: [
-        {
-          model: User,
-          as: "user",
-          attributes: { exclude: ["password"] },
-        },
-        {
-          model: Specialization,
-          as: "specialization",
-        },
-      ],
-    });
+  const { Doctor, User, Specialization } = db;
 
-    if (doctors.length === 0) {
-      throw new NotFoundError("No doctors found");
-    }
+  const doctors = await Doctor.findAll({
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: { exclude: ["password"] },
+      },
+      {
+        model: Specialization,
+        as: "Specialization",
+        attributes: ["specialization_id", "name", "fees"],
+      },
+    ],
+    order: [["doctor_id", "ASC"]],
+  });
 
-    return {
-      message: "Success",
-      doctors,
-    };
-  } catch (error) {
-    throw new Error(error.message);
+  if (!doctors || doctors.length === 0) {
+    throw new NotFoundError("No doctors found");
   }
+
+  return doctors;
 };
 
 export const getAllSpecializations = async ({
@@ -1045,56 +984,100 @@ export const getAppointmentDetails = async (appointment_id) => {
     },
   };
 };
-export const getDoctorDetails = async ({ doctor_id }) => {
-  const doctor = await Doctor.findByPk(doctor_id, {
-    attributes: [
-      "doctor_id",
-      "degree",
-      "experience_years",
-      "rating",
-      "description",
-    ],
+
+export const getDoctorDetails = async (doctorId) => {
+  const doctor = await Doctor.findOne({
+    where: { doctor_id: doctorId },
     include: [
+      // Thông tin người dùng
       {
         model: User,
         as: "user",
-        attributes: ["user_id", "username", "email", "avatar"],
+        attributes: { exclude: ["password"] },
       },
+
+      // Chuyên khoa
       {
         model: Specialization,
         as: "Specialization",
         attributes: ["specialization_id", "name", "fees"],
       },
+
+      // Danh sách cuộc hẹn
       {
-        model: Schedule,
-        as: "Schedule",
-        // ví dụ: các cột monday, tuesday, ... boolean
+        model: Appointment,
+        as: "Appointments",
+        attributes: ["appointment_id", "appointment_datetime", "status"],
+      },
+
+      // Lịch nghỉ của bác sĩ
+      {
+        model: DoctorDayOff,
+        as: "DayOffs",
+        attributes: [
+          "day_off_id",
+          "off_date",
+          "off_morning",
+          "off_afternoon",
+          "reason",
+        ],
       },
     ],
   });
 
   if (!doctor) {
-    throw new NotFoundError(`Bác sĩ #${doctor_id} không tồn tại`);
+    throw new NotFoundError(`Doctor with id=${doctorId} not found`);
   }
 
-  return {
-    success: true,
-    message: "Lấy chi tiết bác sĩ thành công",
-    data: {
-      doctor_id: doctor.doctor_id,
-      username: doctor.user.username,
-      email: doctor.user.email,
-      avatar: doctor.user.avatar,
-      degree: doctor.degree,
-      experience_years: doctor.experience_years,
-      rating: doctor.rating,
-      description: doctor.description,
-      specialization: {
-        id: doctor.Specialization.specialization_id,
-        name: doctor.Specialization.name,
-        fees: `${doctor.Specialization.fees.toLocaleString("vi-VN")} VNĐ`,
+  return doctor;
+};
+export const getDoctorDayOff = async (doctorId) => {
+  const schedule = await Doctor.findOne({
+    where: { doctor_id: doctorId },
+    include: [
+      {
+        model: DoctorDayOff,
+        as: "DayOffs",
+        attributes: [
+          "day_off_id",
+          "off_date",
+          "off_morning",
+          "off_afternoon",
+          "reason",
+        ],
       },
-      schedule: doctor.Schedule, // trả nguyên object Schedule
-    },
-  };
+    ],
+  });
+};
+export const updateMedicineDetails = async (medicineId, data) => {
+  const medicine = await Medicine.findByPk(medicineId);
+  if (!medicine) {
+    throw new NotFoundError(`Medicine with id=${medicineId} not found`);
+  }
+
+  // Cập nhật các trường được gửi lên
+  const updated = await medicine.update(data);
+  return updated;
+};
+
+export const getMedicineDetails = async (medicineId) => {
+  const medicine = await Medicine.findByPk(medicineId);
+  if (!medicine) {
+    throw new NotFoundError(`Medicine with id=${medicineId} not found`);
+  }
+  return medicine;
+};
+
+export const createMedicine = async (data) => {
+  // Bạn có thể thêm check duplicate nếu cần, ví dụ:
+  const exists = await Medicine.findOne({ where: { name: data.name } });
+  if (exists) {
+    throw new BadRequestError(
+      `Medicine with name='${data.name}' already exists`
+    );
+  }
+
+  // Tạo mới
+  const created = await Medicine.create(data);
+  return created;
 };

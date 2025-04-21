@@ -12,7 +12,13 @@ import {
   getAllSpecializationsController,
   getSpecializationDetailsController,
   getDoctorDetailsController,
-  updateSpecializationDetailsController,
+  updateSpecializationController,
+  getAllDoctorsController,
+  getDoctorDayOffController,
+  createDoctorController,
+  updateMedicineDetailsController,
+  getMedicineDetailsController,
+  createMedicineController,
 } from "../controllers/adminController.js";
 import { authenticateUser } from "../middleware/authentication.js";
 import authorize from "../middleware/authorization.js";
@@ -110,7 +116,65 @@ router.patch(
   "/specializations/:specialization_id",
   authenticateUser,
   authorize(["admin"]),
-  updateSpecializationDetailsController
+  updateSpecializationController
+);
+router.get(
+  "/doctors",
+  authenticateUser,
+  authorize(["admin"]),
+  getAllDoctorsController
+);
+router.get(
+  "/doctors/:doctor_id",
+  authenticateUser,
+  authorize(["admin"]),
+  getDoctorDetailsController
+);
+router.get(
+  "/doctors/:doctor_id/day-off",
+  authenticateUser,
+  authorize(["admin"]),
+  getDoctorDayOffController
+);
+router.post(
+  "/doctors",
+  authenticateUser,
+  authorize(["admin"]),
+  createDoctorController
+);
+router.patch(
+  "/medicines/:medicine_id",
+  authenticateUser,
+  authorize(["admin"]),
+  updateMedicineDetailsController
 );
 
+router.get(
+  "/medicines/:medicine_id",
+  authenticateUser,
+  authorize(["admin"]),
+  getMedicineDetailsController
+);
+
+router.post(
+  "/medicines",
+  authenticateUser,
+  authorize(["admin"]),
+  [
+    body("name").notEmpty().withMessage("Name is required"),
+    body("quantity")
+      .isInt({ min: 0 })
+      .withMessage("Quantity must be a non-negative integer"),
+    body("price")
+      .isInt({ min: 0 })
+      .withMessage("Price must be a non-negative integer"),
+    body("unit").notEmpty().withMessage("Unit is required"),
+    body("expiry_date")
+      .isISO8601()
+      .withMessage("Expiry date must be a valid date"),
+    body("supplier").optional().isString(),
+    body("description").optional().isString(),
+  ],
+  createMedicineController
+);
 export default router;
