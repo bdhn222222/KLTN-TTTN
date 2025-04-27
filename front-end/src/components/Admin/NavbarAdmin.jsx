@@ -9,7 +9,7 @@ import {
 } from "@ant-design/icons";
 import { AppContext } from "../../context/AppContext";
 
-function NavbarDoctor() {
+function NavbarAdmin() {
   const navigate = useNavigate();
   const { user, logout } = useContext(AppContext);
 
@@ -18,7 +18,7 @@ function NavbarDoctor() {
       key: "profile",
       icon: <SettingOutlined />,
       label: "Thông tin cá nhân",
-      onClick: () => navigate("/doctor/profile"),
+      onClick: () => navigate("/admin/profile"),
     },
     {
       key: "logout",
@@ -39,11 +39,11 @@ function NavbarDoctor() {
           className="w-28 cursor-pointer"
           src={assets.logo}
           alt="Logo"
-          onClick={() => navigate("/doctor/dashboard")}
+          onClick={() => navigate("/admin")}
         />
         <div className="flex items-center gap-1 bg-blue-100 px-3 py-1 rounded-full">
           <UserOutlined className="!text-blue-900" />
-          <span className="text-blue-900 font-medium">Doctor</span>
+          <span className="text-blue-900 font-medium">Admin</span>
         </div>
       </div>
 
@@ -64,9 +64,7 @@ function NavbarDoctor() {
         </Dropdown>
       ) : (
         <Button
-          //   icon={<LogoutOutlined />}
           onClick={() => navigate("/login")}
-          //   size="medium"
           className="!bg-blue-900 !text-white px-6 py-2 rounded-full font-light hidden md:block hover:!bg-blue-800 hover:!text-white border border-blue-800 transition duration-300"
         >
           Log out
@@ -76,4 +74,4 @@ function NavbarDoctor() {
   );
 }
 
-export default NavbarDoctor;
+export default NavbarAdmin;

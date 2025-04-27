@@ -19,6 +19,12 @@ import {
   updateMedicineDetailsController,
   getMedicineDetailsController,
   createMedicineController,
+  getKpiController,
+  getTotalPatientsController,
+  getAppointmentStatsController,
+  acceptAppointmentAdminController,
+  cancelAppointmentController,
+  updateAppointmentController,
 } from "../controllers/adminController.js";
 import { authenticateUser } from "../middleware/authentication.js";
 import authorize from "../middleware/authorization.js";
@@ -56,7 +62,12 @@ router.post(
   loginLimiter,
   loginAdminController
 );
-
+router.get(
+  "/appointments/stats_by_status",
+  authenticateUser,
+  authorize(["admin"]),
+  getAppointmentStatsController
+);
 router.get(
   "/patients",
   authenticateUser,
@@ -176,5 +187,31 @@ router.post(
     body("description").optional().isString(),
   ],
   createMedicineController
+);
+
+router.get("/kpi", authenticateUser, authorize(["admin"]), getKpiController);
+router.get(
+  "/patients/total",
+  authenticateUser,
+  authorize(["admin"]),
+  getTotalPatientsController
+);
+router.patch(
+  "/appointments/:appointment_id/accept",
+  authenticateUser,
+  authorize(["admin"]),
+  acceptAppointmentAdminController
+);
+router.patch(
+  "/appointments/:appointment_id/cancel",
+  authenticateUser,
+  authorize(["admin"]),
+  cancelAppointmentController
+);
+router.patch(
+  "/appointments/:appointment_id/update",
+  authenticateUser,
+  authorize(["admin"]),
+  updateAppointmentController
 );
 export default router;

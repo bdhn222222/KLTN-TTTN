@@ -586,6 +586,7 @@ export async function createMomoPaymentController(req, res) {
 
 export async function handleCallbackController(req, res) {
   try {
+    console.log("CALLBACK");
     const appointment_id = +req.params.appointment_id;
     const result = await paymentService.verifyMomoPayment(
       appointment_id,

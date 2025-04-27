@@ -1,36 +1,14 @@
 import React, { useState, useEffect, useContext } from "react";
-import {
-  Layout,
-  Card,
-  Table,
-  Button,
-  Avatar,
-  Space,
-  Tag,
-  Flex,
-  notification,
-} from "antd";
-import {
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
-  UserOutlined,
-  EyeOutlined,
-  CheckOutlined,
-} from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
-import MenuDoctor from "../../components/Doctor/MenuDoctor";
+import { Card, Table, Button, Avatar, Space, Tag, notification } from "antd";
+import { EyeOutlined, UserOutlined } from "@ant-design/icons";
 import axios from "axios";
 import { AppContext } from "../../context/AppContext";
 import dayjs from "dayjs";
-import AppointmentDetails from "../../components/Doctor/AppointmentDetails";
+import AppointmentDetails from "../../components/Admin/AppointmentDetails";
 
-const { Sider, Content } = Layout;
-
-const AppointmentWTCDoctor = () => {
-  const [collapsed, setCollapsed] = useState(false);
+const AppointmentComAdmin = () => {
   const [loading, setLoading] = useState(false);
   const [appointments, setAppointments] = useState([]);
-  const navigate = useNavigate();
   const { url1 } = useContext(AppContext);
   const [api, contextHolder] = notification.useNotification();
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
@@ -45,53 +23,15 @@ const AppointmentWTCDoctor = () => {
     });
   };
 
-  const acceptAppointment = async (appointmentId) => {
-    try {
-      await axios.patch(
-        `${url1}/doctor/appointments/${appointmentId}/accept`,
-        null,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      showNotification(
-        "success",
-        "Xác nhận thành công",
-        "Cuộc hẹn đã được xác nhận thành công"
-      );
-
-      // Refresh appointments data
-      fetchAppointments();
-    } catch (error) {
-      console.error("Error accepting appointment:", error);
-
-      let errorMessage = "";
-      if (error.response?.status === 401) {
-        errorMessage = "Bạn không có quyền thực hiện thao tác này";
-      } else if (error.response?.status === 404) {
-        errorMessage = "Không tìm thấy cuộc hẹn";
-      } else if (error.response?.status === 400) {
-        errorMessage = "Cuộc hẹn đã được xác nhận trước đó";
-      } else {
-        errorMessage = "Có lỗi xảy ra, vui lòng thử lại sau";
-      }
-
-      showNotification("error", "Xác nhận thất bại", errorMessage);
-    }
-  };
-
   const fetchAppointments = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${url1}/doctor/appointments`, {
+      const response = await axios.get(`${url1}/admin/appointments`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         params: {
-          status: "waiting_for_confirmation",
+          appointmentStatus: "completed",
         },
       });
 
@@ -121,7 +61,7 @@ const AppointmentWTCDoctor = () => {
   const getAppointmentDetails = async (appointmentId) => {
     try {
       const response = await axios.get(
-        `${url1}/doctor/appointments/${appointmentId}`,
+        `${url1}/admin/appointments/${appointmentId}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -145,8 +85,16 @@ const AppointmentWTCDoctor = () => {
       accepted: { color: "green", text: "confirmed" },
       completed: { color: "blue", text: "completed" },
       cancelled: { color: "red", text: "cancelled" },
-      doctor_day_off: { color: "orange", text: "doctor_day_off" },
-      patient_not_coming: { color: "gray", text: "patient_not_coming" },
+    };
+
+    const config = statusConfig[status] || { color: "default", text: status };
+    return <Tag color={config.color}>{config.text}</Tag>;
+  };
+
+  const getPaymentStatusTag = (status) => {
+    const statusConfig = {
+      unpaid: { color: "red", text: "Unpaid" },
+      paid: { color: "green", text: "Paid" },
     };
 
     const config = statusConfig[status] || { color: "default", text: status };
@@ -183,6 +131,12 @@ const AppointmentWTCDoctor = () => {
       render: (status) => getStatusTag(status),
     },
     {
+      title: "Payment Status",
+      dataIndex: "payment_status",
+      key: "payment_status",
+      render: (status) => getPaymentStatusTag(status),
+    },
+    {
       title: "Fees",
       dataIndex: "fees",
       key: "fees",
@@ -200,82 +154,34 @@ const AppointmentWTCDoctor = () => {
           >
             Details
           </Button>
-          <Button
-            type="primary"
-            icon={<CheckOutlined />}
-            onClick={() => acceptAppointment(record.appointment_id)}
-            className="!bg-blue-900 !text-white px-6 py-2 rounded-full font-light hidden md:block hover:!bg-blue-800 hover:!text-white border border-blue-800 transition duration-300"
-          >
-            Confirmed
-          </Button>
         </Space>
       ),
     },
   ];
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <>
       {contextHolder}
-      <Layout>
-        <Sider
-          width={250}
-          collapsible
-          collapsed={collapsed}
-          onCollapse={setCollapsed}
-          trigger={null}
-          theme="light"
-          style={{
-            overflow: "auto",
-            height: "100vh",
-            position: "fixed",
-            left: 0,
-            top: 64,
-            bottom: 0,
+      <Card title="Completed Appointments">
+        <Table
+          columns={columns}
+          dataSource={appointments}
+          loading={loading}
+          rowKey="appointment_id"
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total) => `Total ${total} appointments`,
           }}
-        >
-          <div className="logo" />
-          <div className="flex justify-end p-4">
-            {collapsed ? (
-              <MenuUnfoldOutlined
-                className="text-xl"
-                onClick={() => setCollapsed(false)}
-              />
-            ) : (
-              <MenuFoldOutlined
-                className="text-xl"
-                onClick={() => setCollapsed(true)}
-              />
-            )}
-          </div>
-          <MenuDoctor collapsed={collapsed} />
-        </Sider>
-        <Layout style={{ marginLeft: collapsed ? 80 : 250, marginTop: 64 }}>
-          <Content
-            style={{
-              margin: "24px 16px",
-              padding: 24,
-              minHeight: 280,
-              background: "#fff",
-            }}
-          >
-            <Card title="Unconfirmed Appointments">
-              <Table
-                columns={columns}
-                dataSource={appointments}
-                loading={loading}
-                rowKey="appointment_id"
-              />
-            </Card>
-          </Content>
-        </Layout>
-      </Layout>
+        />
+      </Card>
       <AppointmentDetails
         visible={isDrawerVisible}
         onClose={() => setIsDrawerVisible(false)}
         appointment={selectedAppointment}
       />
-    </Layout>
+    </>
   );
 };
 
-export default AppointmentWTCDoctor;
+export default AppointmentComAdmin;

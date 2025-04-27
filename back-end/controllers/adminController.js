@@ -92,10 +92,18 @@ export const getPatientAppointmentsController = async (req, res, next) => {
 };
 export const getAllAppointmentsController = async (req, res, next) => {
   try {
-    const result = await adminService.getAllAppointments();
-    res.json(result);
+    // req.query có thể có: ?appointmentStatus=accepted,completed&paymentStatus=paid
+    const { appointmentStatus, paymentStatus } = req.query;
+    const result = await adminService.getAllAppointments({
+      appointmentStatus,
+      paymentStatus,
+    });
+    return res.status(200).json(result);
   } catch (err) {
-    if (err instanceof NotFoundError) {
+    if (err instanceof BadRequestError) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    if (err.name === "NotFoundError") {
       return res.status(404).json({ success: false, message: err.message });
     }
     next(err);
@@ -355,3 +363,146 @@ export const createMedicineController = async (req, res, next) => {
     next(err);
   }
 };
+export const getKpiController = async (req, res, next) => {
+  try {
+    const { start, end } = req.query;
+    const kpi = await adminService.getKpi(start, end);
+
+    return res.status(200).json({
+      success: true,
+      message: "Lấy thông tin KPI thành công",
+      data: {
+        ...kpi,
+        revenue: {
+          ...kpi.revenue,
+          value: `${kpi.revenue.value.toLocaleString("vi-VN")} VNĐ`,
+        },
+      },
+    });
+  } catch (err) {
+    if (err instanceof BadRequestError) {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    next(err);
+  }
+};
+export const getTotalPatientsController = async (req, res, next) => {
+  try {
+    const { filter, date, month, year } = req.query;
+    const result = await adminService.getTotalPatients({
+      filter,
+      date,
+      month,
+      year,
+    });
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (err) {
+    if (err.name === "BadRequestError") {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    next(err);
+  }
+};
+
+export const getAppointmentStatsController = async (req, res, next) => {
+  try {
+    const { period } = req.query; // Validate period if provided
+
+    if (period && !["weekly", "monthly", "yearly"].includes(period)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid period. Must be one of: weekly, monthly, yearly",
+      });
+    }
+
+    const data = await adminService.getAppointmentStats(period);
+    return res.status(200).json(data);
+  } catch (err) {
+    console.error("Error in getAppointmentStatsController:", err); // Log the error // Handle specific errors
+
+    if (err instanceof BadRequestError) {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    if (err instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        message: err.message,
+      });
+    } // For unexpected errors
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while getting appointment statistics",
+    });
+  }
+};
+export const acceptAppointmentAdminController = async (req, res, next) => {
+  try {
+    const appointment_id = parseInt(req.params.appointment_id, 10);
+    if (isNaN(appointment_id)) {
+      throw new BadRequestError("Invalid appointment_id");
+    }
+
+    const payload = {};
+    const { doctor_id, appointment_datetime } = req.body;
+    if (doctor_id) payload.doctor_id = doctor_id;
+    if (appointment_datetime)
+      payload.appointment_datetime = appointment_datetime;
+
+    const result = await adminService.acceptAppointmentByAdmin(
+      appointment_id,
+      payload
+    );
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err instanceof BadRequestError) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    if (err instanceof NotFoundError) {
+      return res.status(404).json({ success: false, message: err.message });
+    }
+    next(err);
+  }
+};
+export const cancelAppointmentController = async (req, res, next) => {
+  try {
+    const appointment_id = parseInt(req.params.appointment_id, 10);
+    if (isNaN(appointment_id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid appointment_id" });
+    }
+
+    const { reason } = req.body;
+    const user_id = req.user.user_id; // lấy từ JWT middleware
+    // console.log("Cancelled by from controller: ", cancelled_by);
+
+    const result = await adminService.cancelAppointmentByAdmin({
+      appointment_id,
+      reason,
+      user_id,
+    });
+
+    return res.json(result);
+  } catch (err) {
+    return next(err);
+  }
+};
+export const updateAppointmentController = asyncHandler(async (req, res) => {
+  const appointment_id = parseInt(req.params.appointment_id, 10);
+  const updateData = req.body;
+  const result = await adminService.updateAppointmentByAdmin(
+    appointment_id,
+    updateData
+  );
+  res.json(result);
+});

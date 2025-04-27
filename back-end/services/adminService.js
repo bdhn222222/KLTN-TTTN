@@ -415,95 +415,93 @@ export const deleteSpecialization = async (specialization_id) => {
   }
 };
 
-export const getAllAppointments = async () => {
-  const t = await db.sequelize.transaction();
-  try {
-    const appointments = await Appointment.findAll({
-      order: [["appointment_datetime", "DESC"]],
-      include: [
-        // FamilyMember → Patient → User
-        {
-          model: FamilyMember,
-          as: "FamilyMember",
-          include: [
-            {
-              model: Patient,
-              as: "patient",
-              include: [
-                {
-                  model: User,
-                  as: "user",
-                  attributes: ["user_id", "username", "email", "avatar"],
-                },
-              ],
-            },
-          ],
-        },
-        // Doctor → User + Specialization
-        {
-          model: Doctor,
-          as: "Doctor",
-          include: [
-            {
-              model: User,
-              as: "user",
-              attributes: ["user_id", "username", "email", "avatar"],
-            },
-            {
-              model: Specialization,
-              as: "Specialization",
-              attributes: ["specialization_id", "name", "fees"],
-            },
-          ],
-        },
-        // MedicalRecord
-        {
-          model: MedicalRecord,
-          as: "MedicalRecord",
-        },
-        // Prescription → Medicines
-        {
-          model: Prescription,
-          as: "Prescription",
-          include: [
-            {
-              model: PrescriptionMedicine,
-              as: "prescriptionMedicines",
-              include: [
-                {
-                  model: Medicine,
-                  as: "Medicine",
-                },
-              ],
-            },
-          ],
-        },
-        // Payments (lấy payment gần nhất)
-        {
-          model: Payment,
-          as: "Payments",
-          limit: 1,
-          order: [["createdAt", "DESC"]],
-        },
-      ],
-      transaction: t,
-    });
-
-    await t.commit();
-
-    if (!appointments.length) {
-      throw new NotFoundError("Chưa có cuộc hẹn nào");
-    }
-
-    return {
-      success: true,
-      message: "Lấy danh sách cuộc hẹn thành công",
-      data: appointments,
-    };
-  } catch (err) {
-    await t.rollback();
-    throw err;
+export const getAllAppointments = async ({
+  appointmentStatus,
+  paymentStatus,
+}) => {
+  // Xây dựng điều kiện cho Appointment
+  const whereAppointment = {};
+  if (appointmentStatus) {
+    whereAppointment.status = appointmentStatus;
   }
+
+  // Xây dựng include cho Payment
+  const paymentInclude = {
+    model: db.Payment,
+    as: "Payments",
+    limit: 1,
+    order: [["createdAt", "DESC"]],
+  };
+  if (paymentStatus) {
+    paymentInclude.where = { status: paymentStatus }; // = 'pending', 'paid',...
+    paymentInclude.required = true;
+  }
+
+  const appointments = await db.Appointment.findAll({
+    where: whereAppointment,
+    order: [["appointment_datetime", "DESC"]],
+    include: [
+      {
+        model: db.FamilyMember,
+        as: "FamilyMember",
+        include: [
+          {
+            model: db.Patient,
+            as: "patient",
+            include: [
+              {
+                model: db.User,
+                as: "user",
+                attributes: ["user_id", "username", "email", "avatar"],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        model: db.Doctor,
+        as: "Doctor",
+        include: [
+          {
+            model: db.User,
+            as: "user",
+            attributes: ["user_id", "username", "email", "avatar"],
+          },
+          {
+            model: db.Specialization,
+            as: "Specialization",
+            attributes: ["specialization_id", "name", "fees"],
+          },
+        ],
+      },
+      {
+        model: db.MedicalRecord,
+        as: "MedicalRecord",
+      },
+      {
+        model: db.Prescription,
+        as: "Prescription",
+        include: [
+          {
+            model: db.PrescriptionMedicine,
+            as: "prescriptionMedicines",
+            include: [{ model: db.Medicine, as: "Medicine" }],
+          },
+        ],
+      },
+      paymentInclude,
+    ],
+  });
+
+  if (!appointments.length) {
+    throw new NotFoundError("Chưa có cuộc hẹn nào khớp điều kiện");
+  }
+
+  return {
+    success: true,
+    message: "Lấy danh sách cuộc hẹn thành công",
+    data: appointments,
+  };
 };
 
 export const getSpecializationDetails = async ({ specialization_id }) => {
@@ -1080,4 +1078,770 @@ export const createMedicine = async (data) => {
   // Tạo mới
   const created = await Medicine.create(data);
   return created;
+};
+export const getKpi = async (startDate, endDate) => {
+  try {
+    // Set default date range to current month if not provided
+    const now = new Date();
+    const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1); // First day of current month
+    const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+
+    // Parse and validate dates
+    const start = startDate ? new Date(`${startDate}T00:00:00Z`) : defaultStart;
+    const end = endDate ? new Date(`${endDate}T23:59:59Z`) : defaultEnd;
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new BadRequestError("Invalid date format. Use YYYY-MM-DD");
+    }
+
+    // Debug log
+    console.log("KPI Query Period:", { start, end });
+
+    // Run queries in parallel for better performance
+    const [totalAppointments, appointmentRevenue, cancelledCount, newPatients] =
+      await Promise.all([
+        // 1. Total appointments
+        db.Appointment.count({
+          where: {
+            appointment_datetime: {
+              [Op.between]: [start, end],
+            },
+          },
+        }),
+
+        // 2. Total revenue from appointments - include both 'completed' and 'paid' status
+        db.Payment.sum("amount", {
+          where: {
+            createdAt: {
+              [Op.between]: [start, end],
+            },
+            status: {
+              [Op.in]: ["paid"],
+            },
+          },
+        }),
+
+        // 3. Cancelled appointments
+        db.Appointment.count({
+          where: {
+            appointment_datetime: {
+              [Op.between]: [start, end],
+            },
+            status: {
+              [Op.in]: ["cancelled", "doctor_day_off"],
+            },
+          },
+        }),
+
+        // 4. New patients
+        db.FamilyMember.count({
+          where: {
+            createdAt: {
+              [Op.between]: [start, end],
+            },
+          },
+        }),
+      ]);
+
+    // Debug log
+    console.log("Raw KPI Data:", {
+      totalAppointments,
+      appointmentRevenue,
+      cancelledCount,
+      newPatients,
+    });
+
+    // Calculate metrics
+    const revenue = appointmentRevenue || 0; // Handle null case
+    const cancellationRate =
+      totalAppointments > 0
+        ? parseFloat(((cancelledCount / totalAppointments) * 100).toFixed(1))
+        : 0;
+
+    // Calculate trends (% change from previous period)
+    const periodLength = end.getTime() - start.getTime();
+    const previousStart = new Date(start.getTime() - periodLength);
+    const previousEnd = new Date(start);
+
+    // Debug log
+    console.log("Previous Period:", { previousStart, previousEnd });
+
+    const [previousTotalAppointments, previousRevenue, previousNewPatients] =
+      await Promise.all([
+        db.Appointment.count({
+          where: {
+            appointment_datetime: {
+              [Op.between]: [previousStart, previousEnd],
+            },
+          },
+        }),
+        db.Payment.sum("amount", {
+          where: {
+            createdAt: {
+              [Op.between]: [previousStart, previousEnd],
+            },
+            status: {
+              [Op.in]: ["paid"],
+            },
+          },
+        }) || 0,
+        db.FamilyMember.count({
+          where: {
+            createdAt: {
+              [Op.between]: [previousStart, previousEnd],
+            },
+          },
+        }),
+      ]);
+
+    // Debug log
+    console.log("Previous Period Data:", {
+      previousTotalAppointments,
+      previousRevenue,
+      previousNewPatients,
+    });
+
+    // Calculate trend percentages
+    const calculateTrend = (current, previous) => {
+      if (!previous) return 0;
+      return parseFloat((((current - previous) / previous) * 100).toFixed(1));
+    };
+
+    return {
+      totalAppointments: {
+        value: totalAppointments,
+        trend: calculateTrend(totalAppointments, previousTotalAppointments),
+      },
+      revenue: {
+        value: revenue,
+        trend: calculateTrend(revenue, previousRevenue),
+      },
+      cancellationRate: {
+        value: cancellationRate,
+        isHigher: cancellationRate > 5, // Flag if above threshold
+      },
+      newPatients: {
+        value: newPatients,
+        trend: calculateTrend(newPatients, previousNewPatients),
+      },
+      period: {
+        start: start.toISOString().split("T")[0],
+        end: end.toISOString().split("T")[0],
+      },
+    };
+  } catch (error) {
+    console.error("Error in getKpi:", error);
+    throw error;
+  }
+};
+export const getTotalPatients = async ({ filter, date, month, year }) => {
+  let start = null,
+    end = null,
+    periodLabel = "all time";
+
+  // 1. Xác định khoảng thời gian hiện tại
+  switch (filter) {
+    case "day":
+      if (!date) throw new BadRequestError("Missing `date` for filter=day");
+      start = new Date(`${date}T00:00:00Z`);
+      end = new Date(`${date}T23:59:59Z`);
+      periodLabel = date;
+      break;
+
+    case "week":
+      if (!date) throw new BadRequestError("Missing `date` for filter=week");
+      {
+        const d = new Date(`${date}T00:00:00Z`);
+        const dow = (d.getDay() + 6) % 7; // 0=Monday, ... 6=Sunday
+        start = new Date(d);
+        start.setDate(d.getDate() - dow);
+        start.setHours(0, 0, 0);
+        end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        end.setHours(23, 59, 59);
+        periodLabel = `${start.toISOString().slice(0, 10)}→${end
+          .toISOString()
+          .slice(0, 10)}`;
+      }
+      break;
+
+    case "month":
+      if (!month) throw new BadRequestError("Missing `month` for filter=month");
+      {
+        const [y, m] = month.split("-").map(Number);
+        start = new Date(y, m - 1, 1, 0, 0, 0);
+        end = new Date(y, m, 0, 23, 59, 59);
+        periodLabel = month;
+      }
+      break;
+
+    case "year":
+      if (!year) throw new BadRequestError("Missing `year` for filter=year");
+      {
+        const y = Number(year);
+        start = new Date(y, 0, 1, 0, 0, 0);
+        end = new Date(y, 11, 31, 23, 59, 59);
+        periodLabel = String(year);
+      }
+      break;
+
+    case "all":
+    default:
+      // leave start/end null to cover all time
+      break;
+  }
+
+  // 2. Điều kiện lọc theo thời gian
+  const timeCond =
+    start && end
+      ? { appointment_datetime: { [Op.between]: [start, end] } }
+      : {};
+
+  // 3. Lấy tất cả appointment trong khoảng, chỉ lấy family_member_id và patient_id
+  const currentAppts = await db.Appointment.findAll({
+    attributes: ["family_member_id"],
+    where: {
+      ...timeCond,
+      status: { [Op.in]: ["accepted", "waiting_for_confirmation"] },
+    },
+    raw: true,
+  });
+
+  // 4. Đếm distinct bệnh nhân bằng Set
+  const currentKeys = new Set();
+  for (const { family_member_id, patient_id } of currentAppts) {
+    currentKeys.add(family_member_id || patient_id);
+  }
+  const totalPatients = currentKeys.size;
+
+  // 5. Xác định khoảng "previous" để so sánh
+  let prevStart = null,
+    prevEnd = null;
+  if (start && end) {
+    const spanMs = end.getTime() - start.getTime() + 1; // inclusive
+    prevEnd = new Date(start.getTime() - 1);
+    prevStart = new Date(prevEnd.getTime() - spanMs + 1);
+  }
+
+  // 6. Lấy và đếm appointment của khoảng trước
+  let previousTotal = 0;
+  if (prevStart && prevEnd) {
+    const prevAppts = await db.Appointment.findAll({
+      attributes: ["family_member_id"],
+      where: {
+        appointment_datetime: { [Op.between]: [prevStart, prevEnd] },
+        status: { [Op.in]: ["accepted", "waiting_for_confirmation"] },
+      },
+      raw: true,
+    });
+    const prevKeys = new Set();
+    for (const { family_member_id, patient_id } of prevAppts) {
+      prevKeys.add(family_member_id || patient_id);
+    }
+    previousTotal = prevKeys.size;
+  }
+
+  // 7. Tính trend %
+  const trend =
+    previousTotal > 0
+      ? parseFloat(
+          (((totalPatients - previousTotal) / previousTotal) * 100).toFixed(1)
+        )
+      : 0;
+
+  return {
+    filter,
+    period: periodLabel,
+    totalPatients,
+    trend,
+  };
+};
+
+export const getAppointmentStats = async (period) => {
+  const statuses = [
+    "waiting_for_confirmation",
+    "accepted",
+    "completed",
+    "cancelled",
+  ];
+  const colors = {
+    waiting_for_confirmation: {
+      border: "rgba(59, 130, 246, 1)", // blue
+      background: "rgba(59, 130, 246, 0.5)",
+    },
+    accepted: {
+      border: "rgba(16, 185, 129, 1)", // green
+      background: "rgba(16, 185, 129, 0.5)",
+    },
+    completed: {
+      border: "rgba(139, 92, 246, 1)", // purple
+      background: "rgba(139, 92, 246, 0.5)",
+    },
+    cancelled: {
+      border: "rgba(239, 68, 68, 1)", // red
+      background: "rgba(239, 68, 68, 0.5)",
+    },
+  };
+
+  try {
+    const now = dayjs().tz("Asia/Ho_Chi_Minh");
+    let timeRanges = [];
+    let labels = [];
+
+    if (!period) {
+      // Default: current day
+      const start = now.startOf("day");
+      const end = now.endOf("day");
+      timeRanges.push({
+        start: start.toDate(),
+        end: end.toDate(),
+        isPast: true,
+      });
+      labels.push(start.format("DD/MM"));
+    } else if (period === "weekly") {
+      // Fixed Monday → Friday
+      const monday = now.startOf("week").add(1, "day"); // ISO week: Monday is the first day
+      for (let i = 0; i < 5; i++) {
+        const day = monday.add(i, "day");
+        timeRanges.push({
+          start: day.startOf("day").toDate(),
+          end: day.endOf("day").toDate(),
+          isPast: day.isSameOrBefore(now, "day"),
+        });
+        labels.push(day.format("dddd")); // Monday, Tuesday, ..., Friday
+      }
+    } else if (period === "monthly") {
+      // Last 12 months
+      for (let i = 11; i >= 0; i--) {
+        const start = now.subtract(i, "month").startOf("month");
+        const end = now.subtract(i, "month").endOf("month");
+        timeRanges.push({
+          start: start.toDate(),
+          end: end.toDate(),
+          isPast: true,
+        });
+        labels.push(start.format("MM/YYYY")); // "05/2024", "06/2024", ..., "04/2025"
+      }
+    } else if (period === "yearly") {
+      // Last 6 years
+      for (let i = 5; i >= 0; i--) {
+        const start = now.subtract(i, "year").startOf("year");
+        const end = now.subtract(i, "year").endOf("year");
+        timeRanges.push({
+          start: start.toDate(),
+          end: end.toDate(),
+          isPast: true,
+        });
+        labels.push(start.format("YYYY")); // "2020", "2021", ..., "2025"
+      }
+    }
+
+    //     const datasets = await Promise.all(
+    //       statuses.map(async (status) => {
+    //         const data = await Promise.all(
+    //           timeRanges.map(({ start, end, isPast }) => {
+    //             if (!isPast) return Promise.resolve(null);
+    //             const count = await db.Appointment.count({
+    //               where: {
+    //                 status,
+    //                 appointment_datetime: { [Op.between]: [start, end] },
+    //               },
+    //             });
+    //             console.log(`Count for status ${status} from ${start} to ${end}: ${count}`); // Log the count
+    //             return count;
+    //           })
+    //         );
+    //         return {
+    //           label: status
+    //             .split("_")
+    //             .map((w) => w[0].toUpperCase() + w.slice(1))
+    //             .join(" "),
+    //           data,
+    //           borderColor: colors[status].border,
+    //           backgroundColor: colors[status].background,
+    //           tension: 0.4,
+    //         };
+    //       })
+    //     );
+
+    return {
+      success: true,
+      data: { labels, datasets },
+    };
+  } catch (error) {
+    console.error("Error in getAppointmentStats:", error);
+    throw new Error("Failed to get appointment statistics");
+  }
+};
+
+export const acceptAppointmentByAdmin = async (
+  appointment_id,
+  { doctor_id, appointment_datetime }
+) => {
+  const t = await db.sequelize.transaction();
+  try {
+    // 1. Lấy appointment kèm FamilyMember và Doctor
+    const appointment = await db.Appointment.findByPk(appointment_id, {
+      include: [
+        {
+          model: db.FamilyMember,
+          as: "FamilyMember",
+        },
+        {
+          model: db.Doctor,
+          as: "Doctor",
+          include: [
+            { model: db.User, as: "user", attributes: ["username"] },
+            {
+              model: db.Specialization,
+              as: "Specialization",
+              attributes: ["name", "fees"],
+            },
+          ],
+        },
+      ],
+      transaction: t,
+    });
+    if (!appointment) {
+      throw new NotFoundError(`Không tìm thấy lịch hẹn #${appointment_id}`);
+    }
+
+    // 2. Nếu thay đổi bác sĩ
+    if (doctor_id) {
+      const doctor = await db.Doctor.findByPk(doctor_id, { transaction: t });
+      if (!doctor) {
+        throw new BadRequestError(`Bác sĩ #${doctor_id} không tồn tại`);
+      }
+      appointment.doctor_id = doctor_id;
+    }
+
+    // 3. Nếu thay đổi thời gian hẹn
+    if (appointment_datetime) {
+      const newDate = dayjs(appointment_datetime).tz("Asia/Ho_Chi_Minh", true);
+      if (!newDate.isValid()) {
+        throw new BadRequestError("appointment_datetime không hợp lệ");
+      }
+      if (newDate.isBefore(dayjs().tz("Asia/Ho_Chi_Minh"))) {
+        throw new BadRequestError("Không thể đặt lịch trong quá khứ");
+      }
+      // Kiểm tra cuối tuần
+      const wd = newDate.day(); // 0=Chủ nhật, 6=Thứ 7
+      if (wd === 0 || wd === 6) {
+        throw new BadRequestError("Bác sĩ không làm việc thứ 7/CN");
+      }
+      // Kiểm tra ngày nghỉ của bác sĩ
+      const off = await db.DoctorDayOff.findOne({
+        where: {
+          doctor_id: appointment.doctor_id,
+          off_date: newDate.format("YYYY-MM-DD"),
+          status: "active",
+        },
+        transaction: t,
+      });
+      if (off) {
+        const isMorning = newDate.hour() < 12;
+        if (
+          (off.off_morning && isMorning) ||
+          (off.off_afternoon && !isMorning) ||
+          (off.off_morning && off.off_afternoon)
+        ) {
+          throw new BadRequestError(
+            "Bác sĩ đã đăng ký nghỉ buổi đó, không thể đặt lịch"
+          );
+        }
+      }
+      // Kiểm tra trùng giờ với bác sĩ
+      const conflictDoc = await db.Appointment.findOne({
+        where: {
+          doctor_id: appointment.doctor_id,
+          appointment_datetime: newDate.toDate(),
+          status: { [Op.in]: ["accepted", "waiting_for_confirmation"] },
+          appointment_id: { [Op.ne]: appointment_id },
+        },
+        transaction: t,
+      });
+      if (conflictDoc) {
+        throw new BadRequestError("Bác sĩ đã có lịch khác vào khung giờ này");
+      }
+      // Kiểm tra trùng giờ với bệnh nhân
+      const famId = appointment.family_member_id;
+      const conflictPat = await db.Appointment.findOne({
+        where: {
+          family_member_id: famId,
+          appointment_datetime: newDate.toDate(),
+          status: { [Op.in]: ["accepted", "waiting_for_confirmation"] },
+          appointment_id: { [Op.ne]: appointment_id },
+        },
+        transaction: t,
+      });
+      if (conflictPat) {
+        throw new BadRequestError(
+          "Bệnh nhân đã có lịch khác vào khung giờ này"
+        );
+      }
+      appointment.appointment_datetime = newDate.toDate();
+    }
+
+    // 4. Chuyển trạng thái sang accepted
+    appointment.status = "accepted";
+    await appointment.save({ transaction: t });
+    await t.commit();
+
+    // 5. Format và trả về
+    const formattedDate = dayjs(appointment.appointment_datetime)
+      .tz("Asia/Ho_Chi_Minh")
+      .format("YYYY-MM-DDTHH:mm:ssZ");
+
+    return {
+      success: true,
+      message: "Xác nhận lịch hẹn thành công",
+      data: {
+        appointment_id: appointment.appointment_id,
+        doctor_name: appointment.Doctor.user.username,
+        specialization: appointment.Doctor.Specialization.name,
+        fees: `${appointment.Doctor.Specialization.fees.toLocaleString(
+          "vi-VN"
+        )} VNĐ`,
+        appointment_datetime: formattedDate,
+        status: appointment.status,
+        family_member: {
+          username: appointment.FamilyMember.username,
+          email: appointment.FamilyMember.email,
+        },
+      },
+    };
+  } catch (error) {
+    if (!t.finished) await t.rollback();
+    throw error;
+  }
+};
+
+export const cancelAppointmentByAdmin = async ({
+  appointment_id,
+  reason,
+  user_id, // user_id của admin
+}) => {
+  const t = await db.sequelize.transaction();
+  try {
+    // 1. Lấy admin
+    const admin = await db.User.findByPk(user_id, {
+      attributes: ["username", "email"],
+      include: [{ model: db.Admin, as: "admin", attributes: ["admin_id"] }],
+      transaction: t,
+    });
+    if (!admin) {
+      throw new NotFoundError(`Không tìm thấy admin #${user_id}`);
+    }
+
+    // 2. Lấy cuộc hẹn
+    const appointment = await db.Appointment.findByPk(appointment_id, {
+      include: [
+        { model: db.FamilyMember, as: "FamilyMember" },
+        {
+          model: db.Doctor,
+          as: "Doctor",
+          include: [
+            { model: db.User, as: "user", attributes: ["username", "email"] },
+          ],
+        },
+      ],
+      transaction: t,
+    });
+    if (!appointment) {
+      throw new NotFoundError(`Không tìm thấy cuộc hẹn #${appointment_id}`);
+    }
+
+    // 3. Kiểm tra trạng thái
+    const oldStatus = appointment.status;
+    const forbidden = [
+      "cancelled",
+      "completed",
+      "doctor_day_off",
+      "patient_not_coming",
+    ];
+    if (forbidden.includes(oldStatus)) {
+      throw new BadRequestError(
+        `Không thể hủy lịch hẹn đang ở trạng thái "${oldStatus}"`
+      );
+    }
+    if (oldStatus === "accepted" && (!reason || !reason.trim())) {
+      throw new BadRequestError(
+        "Lý do hủy là bắt buộc khi lịch đã được xác nhận"
+      );
+    }
+
+    // 4. Cập nhật
+    appointment.status = "cancelled";
+    appointment.cancelled_at = dayjs().tz("Asia/Ho_Chi_Minh").toDate();
+    appointment.cancelled_by = admin.username;
+    appointment.cancel_reason = oldStatus === "accepted" ? reason : null;
+    await appointment.save({ transaction: t });
+
+    await t.commit();
+
+    return {
+      success: true,
+      message: "Hủy lịch hẹn thành công",
+      data: {
+        appointment_id: appointment.appointment_id,
+        status: appointment.status,
+        cancelled_at: dayjs(appointment.cancelled_at)
+          .tz("Asia/Ho_Chi_Minh")
+          .format("YYYY-MM-DDTHH:mm:ssZ"),
+        cancelled_by: appointment.cancelled_by,
+        cancel_reason: appointment.cancel_reason,
+        family_member: {
+          username: appointment.FamilyMember.username,
+          email: appointment.FamilyMember.email,
+        },
+        doctor: {
+          username: appointment.Doctor.user.username,
+          email: appointment.Doctor.user.email,
+        },
+      },
+    };
+  } catch (err) {
+    // rollback nếu chưa commit
+    if (!t.finished) {
+      await t.rollback();
+    }
+    throw err;
+  }
+};
+const VALID_STATUSES = [
+  "waiting_for_confirmation",
+  "accepted",
+  // "completed",
+  // "cancelled",
+];
+
+export const updateAppointmentByAdmin = async (appointment_id, updateData) => {
+  // 1. Lấy appointment kèm FamilyMember + Doctor
+  const appointment = await db.Appointment.findByPk(appointment_id, {
+    include: [
+      { model: db.FamilyMember, as: "FamilyMember" },
+      {
+        model: db.Doctor,
+        as: "Doctor",
+        include: [
+          { model: db.User, as: "user", attributes: ["username"] },
+          {
+            model: db.Specialization,
+            as: "Specialization",
+            attributes: ["name", "fees"],
+          },
+        ],
+      },
+    ],
+  });
+  if (!appointment) {
+    throw new NotFoundError(`Không tìm thấy lịch hẹn #${appointment_id}`);
+  }
+
+  // 2. Thay đổi bác sĩ (nếu có)
+  if (updateData.doctor_id) {
+    const doctor = await db.Doctor.findByPk(updateData.doctor_id);
+    if (!doctor) {
+      throw new BadRequestError(
+        `Bác sĩ #${updateData.doctor_id} không tồn tại`
+      );
+    }
+    appointment.doctor_id = updateData.doctor_id;
+  }
+
+  // 3. Thay đổi thời gian (nếu có)
+  if (updateData.appointment_datetime) {
+    // parse input as Asia/Ho_Chi_Minh
+    const newDt = dayjs.tz(updateData.appointment_datetime, "Asia/Ho_Chi_Minh");
+    if (!newDt.isValid()) {
+      throw new BadRequestError("appointment_datetime không hợp lệ");
+    }
+    // không ở quá khứ
+    if (newDt.isBefore(dayjs().tz("Asia/Ho_Chi_Minh"))) {
+      throw new BadRequestError("Không thể đặt lịch trong quá khứ");
+    }
+    // cuối tuần?
+    const wd = newDt.day(); // 0 = CN, 6 = Th7
+    if (wd === 0 || wd === 6) {
+      throw new BadRequestError("Không đặt lịch vào Thứ 7/CN");
+    }
+    // bác sĩ nghỉ buổi
+    const off = await db.DoctorDayOff.findOne({
+      where: {
+        doctor_id: appointment.doctor_id,
+        off_date: newDt.format("YYYY-MM-DD"),
+        status: "active",
+      },
+    });
+    if (off) {
+      const isMorn = newDt.hour() < 12;
+      if (
+        (off.off_morning && isMorn) ||
+        (off.off_afternoon && !isMorn) ||
+        (off.off_morning && off.off_afternoon)
+      ) {
+        throw new BadRequestError("Bác sĩ đã nghỉ buổi này");
+      }
+    }
+    // trùng giờ bác sĩ
+    const conflictDoc = await db.Appointment.findOne({
+      where: {
+        doctor_id: appointment.doctor_id,
+        appointment_datetime: newDt.toDate(),
+        status: { [Op.in]: ["waiting_for_confirmation", "accepted"] },
+        appointment_id: { [Op.ne]: appointment_id },
+      },
+    });
+    if (conflictDoc) {
+      throw new BadRequestError("Bác sĩ đã có lịch khác vào khung giờ này");
+    }
+    // trùng giờ bệnh nhân
+    const famId = appointment.family_member_id;
+    const conflictPat = await db.Appointment.findOne({
+      where: {
+        family_member_id: famId,
+        appointment_datetime: newDt.toDate(),
+        status: { [Op.in]: ["waiting_for_confirmation", "accepted"] },
+        appointment_id: { [Op.ne]: appointment_id },
+      },
+    });
+    if (conflictPat) {
+      throw new BadRequestError("Bệnh nhân đã có lịch khác vào khung giờ này");
+    }
+
+    // gán
+    appointment.appointment_datetime = newDt.toDate();
+  }
+
+  // 4. Thay đổi status (nếu có)
+  if (updateData.status) {
+    if (!VALID_STATUSES.includes(updateData.status)) {
+      throw new BadRequestError("Trạng thái không hợp lệ");
+    }
+    appointment.status = updateData.status;
+  }
+
+  // 5. Lưu
+  await appointment.save();
+
+  // 6. Định dạng output về Asia/Ho_Chi_Minh
+  const formattedDt = dayjs(appointment.appointment_datetime)
+    .tz("Asia/Ho_Chi_Minh")
+    .format("YYYY-MM-DDTHH:mm:ssZ");
+
+  return {
+    success: true,
+    message: "Cập nhật lịch hẹn thành công",
+    data: {
+      appointment_id: appointment.appointment_id,
+      doctor_name: appointment.Doctor.user.username,
+      specialization: appointment.Doctor.Specialization.name,
+      fees: appointment.Doctor.Specialization.fees,
+      appointment_datetime: formattedDt,
+      status: appointment.status,
+      family_member: {
+        username: appointment.FamilyMember.username,
+        email: appointment.FamilyMember.email,
+      },
+    },
+  };
 };

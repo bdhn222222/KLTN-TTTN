@@ -42,6 +42,11 @@ export default (sequelize) => {
         allowNull: false,
         defaultValue: "pending",
       },
+      compensation_amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+        defaultValue: 0.0,
+      },
     },
     {
       sequelize,

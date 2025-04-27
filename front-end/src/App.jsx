@@ -31,6 +31,15 @@ import PrescriptionPrepare from "./pages/Pharmacists/PrescriptionPrepare";
 import BookAppointment from "./pages/Patient/bookAppointment";
 import AppointmentDetail from "./pages/Patient/AppointmentDetail";
 import PaymentAppointment from "./pages/Patient/PaymentAppointment";
+import AdminLayout from "./components/Admin/AdminLayout";
+import AppointmentWTCAdmin from "./pages/Admin/AppointmentWTCAdmin";
+import AppointmentAccAdmin from "./pages/Admin/AppointmentAccAdmin";
+import AppointmentComAdmin from "./pages/Admin/AppointmentComAdmin";
+import AppointmentCanAdmin from "./pages/Admin/AppointmentCanAdmin";
+// import PaymentUnpaidAdmin from "./pages/Admin/PaymentUnpaidAdmin";
+// import PaymentPaidAdmin from "./pages/Admin/PaymentPaidAdmin";
+// import DepartmentManageAdmin from "./pages/Admin/DepartmentManageAdmin";
+// import DoctorManageAdmin from "./pages/Admin/DoctorManageAdmin";
 
 // Layout cho Patient Portal
 const PatientLayout = () => {
@@ -68,9 +77,9 @@ const App = () => {
       <Routes>
         {/* Patient Routes */}
         <Route path="/" element={<PatientLayout />}>
+          <Route path="/" element={<Navigate to="/login" />} />
           <Route index element={<Home />} />
           <Route path="doctors" element={<Doctors />} />
-
           <Route path="doctors/:speciality" element={<Doctors />} />
           <Route path="about" element={<About />} />
           <Route path="contact" element={<Contact />} />
@@ -87,8 +96,42 @@ const App = () => {
         />
         <Route path="/patient/payment/:id" element={<PaymentAppointment />} />
 
+        {/* Admin Routes */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route
+            index
+            element={
+              <Navigate to="/admin/appointments/waiting-to-confirm" replace />
+            }
+          />
+          <Route path="appointments">
+            <Route
+              index
+              element={
+                <Navigate to="/admin/appointments/waiting-to-confirm" replace />
+              }
+            />
+            <Route
+              path="waiting-to-confirm"
+              element={<AppointmentWTCAdmin />}
+            />
+            <Route path="accepted" element={<AppointmentAccAdmin />} />
+            <Route path="completed" element={<AppointmentComAdmin />} />
+            <Route path="cancelled" element={<AppointmentCanAdmin />} />
+          </Route>
+          <Route path="payments">
+            {/* <Route path="unpaid" element={<PaymentUnpaidAdmin />} />
+            <Route path="paid" element={<PaymentPaidAdmin />} /> */}
+          </Route>
+          <Route path="management">
+            {/* <Route path="departments" element={<DepartmentManageAdmin />} /> */}
+            {/* <Route path="doctors" element={<DoctorManageAdmin />} /> */}
+          </Route>
+        </Route>
+
         {/* Doctor Routes */}
         <Route path="/doctor" element={<DoctorLayout />}>
+          <Route index element={<Navigate to="/doctor/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardDoctor />} />
           <Route path="appointments">
             <Route
@@ -118,7 +161,6 @@ const App = () => {
 
         {/* Pharmacist Routes */}
         <Route path="/pharmacists" element={<PharmacistLayout />}>
-          {/* Default route for pharmacists - redirects to pending_prepare */}
           <Route
             index
             element={
@@ -130,11 +172,6 @@ const App = () => {
           />
           <Route path="prescription">
             <Route path="pending_prepare" element={<PrescriptionPrepare />} />
-            {/* Uncomment these routes when the components are ready */}
-            {/* <Route path="waiting_payment" element={<PrescriptionWaitingPayment />} /> */}
-            {/* <Route path="completed" element={<PrescriptionCompleted />} /> */}
-            {/* <Route path="cancelled" element={<PrescriptionCancelled />} /> */}
-            {/* You can use the line below temporarily until you create the other components */}
             <Route path="*" element={<PrescriptionPrepare />} />
           </Route>
           <Route
@@ -153,7 +190,7 @@ const App = () => {
         <Route path="/register" element={<Register />} />
 
         {/* Redirect unknown routes to login */}
-        <Route path="*" element={<Navigate to="/login" />} />
+        <Route path="/" element={<Navigate to="/login" />} />
 
         <Route path="/patient" element={<PatientLayout />}>
           <Route path="my-appointments" element={<MyAppointments />} />
@@ -169,4 +206,5 @@ const App = () => {
     </AppContextProvider>
   );
 };
+
 export default App;

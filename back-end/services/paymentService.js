@@ -50,7 +50,7 @@ export async function createMomoPayment(appointment_id) {
   const extraData = Buffer.from(JSON.stringify({ appointment_id })).toString(
     "base64"
   );
-  const redirectUrl = `${FRONTEND_URL}/patient/appointments/${appointment_id}`;
+  const redirectUrl = `${FRONTEND_URL}/patient/appointment/${appointment_id}`;
   const ipnUrl = `${APP_DOMAIN}/patient/appointments/${appointment_id}/payment/callback`;
   console.log("=============================");
   console.log("MoMo Callback URL:", ipnUrl);
@@ -193,7 +193,7 @@ export async function verifyMomoPayment(appointment_id, momoPayload) {
         await payment.update(
           {
             status: "paid",
-            method: "MoMo",
+            payment_method: "MoMo",
             // transaction_id: transId,
             // paid_at: new Date(),
           },

@@ -84,7 +84,10 @@ function Navbar() {
                 >
                   My Appointments
                 </p>
-                <p onClick={logout} className="hover:text-black cursor-pointer">
+                <p
+                  onClick={() => navigate("/login")}
+                  className="hover:text-black cursor-pointer"
+                >
                   Logout
                 </p>
               </div>
