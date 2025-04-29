@@ -865,7 +865,7 @@ export const getAppointmentDetails = async (appointment_id) => {
           {
             model: db.Specialization,
             as: "Specialization",
-            attributes: ["name", "fees"],
+            attributes: ["name", "specialization_id", "fees"],
           },
         ],
       },
@@ -908,6 +908,10 @@ export const getAppointmentDetails = async (appointment_id) => {
     appointment_datetime: format(appt.appointment_datetime),
     status: appt.status,
     fees: appt.fees,
+    specialization_id: appt.Doctor.Specialization.specialization_id,
+    reason_cancel: appt.cancel_reason,
+    cancel_datetime: format(appt.cancelled_at),
+    cancel_by: appt.cancelled_by,
 
     doctor: appt.Doctor && {
       doctor_id: appt.Doctor.doctor_id,
@@ -1714,6 +1718,15 @@ const VALID_STATUSES = [
   // "cancelled",
 ];
 
+// import dayjs from "dayjs";
+// import timezone from "dayjs/plugin/timezone";
+// import utc from "dayjs/plugin/utc";
+// import customParseFormat from "dayjs/plugin/customParseFormat";
+// dayjs.extend(utc);
+// dayjs.extend(timezone);
+// dayjs.extend(customParseFormat);
+// dayjs.tz.setDefault("Asia/Ho_Chi_Minh");
+
 export const updateAppointmentByAdmin = async (appointment_id, updateData) => {
   // 1. Lấy appointment kèm FamilyMember + Doctor
   const appointment = await db.Appointment.findByPk(appointment_id, {
@@ -1733,6 +1746,7 @@ export const updateAppointmentByAdmin = async (appointment_id, updateData) => {
       },
     ],
   });
+
   if (!appointment) {
     throw new NotFoundError(`Không tìm thấy lịch hẹn #${appointment_id}`);
   }
@@ -1750,21 +1764,30 @@ export const updateAppointmentByAdmin = async (appointment_id, updateData) => {
 
   // 3. Thay đổi thời gian (nếu có)
   if (updateData.appointment_datetime) {
-    // parse input as Asia/Ho_Chi_Minh
-    const newDt = dayjs.tz(updateData.appointment_datetime, "Asia/Ho_Chi_Minh");
-    if (!newDt.isValid()) {
+    // Parse chuẩn input
+    const parsedDt = dayjs(
+      updateData.appointment_datetime,
+      "DD-MM-YYYY HH:mm:ss"
+    );
+    if (!parsedDt.isValid()) {
       throw new BadRequestError("appointment_datetime không hợp lệ");
     }
-    // không ở quá khứ
+
+    // Convert sang Asia/Ho_Chi_Minh
+    const newDt = parsedDt.tz("Asia/Ho_Chi_Minh");
+
+    // Check không ở quá khứ
     if (newDt.isBefore(dayjs().tz("Asia/Ho_Chi_Minh"))) {
       throw new BadRequestError("Không thể đặt lịch trong quá khứ");
     }
-    // cuối tuần?
-    const wd = newDt.day(); // 0 = CN, 6 = Th7
+
+    // Check không vào thứ 7 / CN
+    const wd = newDt.day(); // 0 = CN, 6 = T7
     if (wd === 0 || wd === 6) {
-      throw new BadRequestError("Không đặt lịch vào Thứ 7/CN");
+      throw new BadRequestError("Không đặt lịch vào Thứ 7 hoặc Chủ nhật");
     }
-    // bác sĩ nghỉ buổi
+
+    // Check bác sĩ nghỉ
     const off = await db.DoctorDayOff.findOne({
       where: {
         doctor_id: appointment.doctor_id,
@@ -1772,6 +1795,7 @@ export const updateAppointmentByAdmin = async (appointment_id, updateData) => {
         status: "active",
       },
     });
+
     if (off) {
       const isMorn = newDt.hour() < 12;
       if (
@@ -1779,10 +1803,11 @@ export const updateAppointmentByAdmin = async (appointment_id, updateData) => {
         (off.off_afternoon && !isMorn) ||
         (off.off_morning && off.off_afternoon)
       ) {
-        throw new BadRequestError("Bác sĩ đã nghỉ buổi này");
+        throw new BadRequestError("Bác sĩ đã đăng ký nghỉ buổi này");
       }
     }
-    // trùng giờ bác sĩ
+
+    // Check trùng giờ bác sĩ
     const conflictDoc = await db.Appointment.findOne({
       where: {
         doctor_id: appointment.doctor_id,
@@ -1792,23 +1817,23 @@ export const updateAppointmentByAdmin = async (appointment_id, updateData) => {
       },
     });
     if (conflictDoc) {
-      throw new BadRequestError("Bác sĩ đã có lịch khác vào khung giờ này");
+      throw new BadRequestError("Bác sĩ đã có lịch khám vào khung giờ này");
     }
-    // trùng giờ bệnh nhân
-    const famId = appointment.family_member_id;
+
+    // Check trùng giờ bệnh nhân
     const conflictPat = await db.Appointment.findOne({
       where: {
-        family_member_id: famId,
+        family_member_id: appointment.family_member_id,
         appointment_datetime: newDt.toDate(),
         status: { [Op.in]: ["waiting_for_confirmation", "accepted"] },
         appointment_id: { [Op.ne]: appointment_id },
       },
     });
     if (conflictPat) {
-      throw new BadRequestError("Bệnh nhân đã có lịch khác vào khung giờ này");
+      throw new BadRequestError("Bệnh nhân đã có lịch khám vào khung giờ này");
     }
 
-    // gán
+    // Gán lại
     appointment.appointment_datetime = newDt.toDate();
   }
 
@@ -1820,10 +1845,10 @@ export const updateAppointmentByAdmin = async (appointment_id, updateData) => {
     appointment.status = updateData.status;
   }
 
-  // 5. Lưu
+  // 5. Lưu vào database
   await appointment.save();
 
-  // 6. Định dạng output về Asia/Ho_Chi_Minh
+  // 6. Trả kết quả
   const formattedDt = dayjs(appointment.appointment_datetime)
     .tz("Asia/Ho_Chi_Minh")
     .format("YYYY-MM-DDTHH:mm:ssZ");
@@ -1833,15 +1858,29 @@ export const updateAppointmentByAdmin = async (appointment_id, updateData) => {
     message: "Cập nhật lịch hẹn thành công",
     data: {
       appointment_id: appointment.appointment_id,
-      doctor_name: appointment.Doctor.user.username,
-      specialization: appointment.Doctor.Specialization.name,
-      fees: appointment.Doctor.Specialization.fees,
+      doctor_name: appointment.Doctor?.user?.username || "",
+      specialization: appointment.Doctor?.Specialization?.name || "",
+      fees: appointment.Doctor?.Specialization?.fees || 0,
       appointment_datetime: formattedDt,
       status: appointment.status,
       family_member: {
-        username: appointment.FamilyMember.username,
-        email: appointment.FamilyMember.email,
+        username: appointment.FamilyMember?.username || "",
+        email: appointment.FamilyMember?.email || "",
       },
     },
   };
+};
+
+export const getDoctorbySpecialization = async (specialization_id) => {
+  const doctors = await db.Doctor.findAll({
+    where: { specialization_id },
+    include: [
+      {
+        model: db.User,
+        as: "user",
+        attributes: ["username", "email"],
+      },
+    ],
+  });
+  return doctors;
 };

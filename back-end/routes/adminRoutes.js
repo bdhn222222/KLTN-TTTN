@@ -25,6 +25,7 @@ import {
   acceptAppointmentAdminController,
   cancelAppointmentController,
   updateAppointmentController,
+  getDoctorbySpecializationController,
 } from "../controllers/adminController.js";
 import { authenticateUser } from "../middleware/authentication.js";
 import authorize from "../middleware/authorization.js";
@@ -213,5 +214,11 @@ router.patch(
   authenticateUser,
   authorize(["admin"]),
   updateAppointmentController
+);
+router.get(
+  "/doctors/specialization/:specialization_id",
+  authenticateUser,
+  authorize(["admin"]),
+  getDoctorbySpecializationController
 );
 export default router;

@@ -78,7 +78,7 @@ const App = () => {
         {/* Patient Routes */}
         <Route path="/" element={<PatientLayout />}>
           <Route path="/" element={<Navigate to="/login" />} />
-          <Route index element={<Home />} />
+          {/* <Route index element={<Home />} /> */}
           <Route path="doctors" element={<Doctors />} />
           <Route path="doctors/:speciality" element={<Doctors />} />
           <Route path="about" element={<About />} />

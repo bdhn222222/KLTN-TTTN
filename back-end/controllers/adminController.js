@@ -506,3 +506,14 @@ export const updateAppointmentController = asyncHandler(async (req, res) => {
   );
   res.json(result);
 });
+export const getDoctorbySpecializationController = async (req, res, next) => {
+  try {
+    const specialization_id = parseInt(req.params.specialization_id, 10);
+    const result = await adminService.getDoctorbySpecialization(
+      specialization_id
+    );
+    return res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
