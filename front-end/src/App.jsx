@@ -36,6 +36,7 @@ import AppointmentWTCAdmin from "./pages/Admin/AppointmentWTCAdmin";
 import AppointmentAccAdmin from "./pages/Admin/AppointmentAccAdmin";
 import AppointmentComAdmin from "./pages/Admin/AppointmentComAdmin";
 import AppointmentCanAdmin from "./pages/Admin/AppointmentCanAdmin";
+import AppointmentNotComingAdmin from "./pages/Admin/AppointmentNotComingAdmin";
 // import PaymentUnpaidAdmin from "./pages/Admin/PaymentUnpaidAdmin";
 // import PaymentPaidAdmin from "./pages/Admin/PaymentPaidAdmin";
 // import DepartmentManageAdmin from "./pages/Admin/DepartmentManageAdmin";
@@ -118,6 +119,10 @@ const App = () => {
             <Route path="accepted" element={<AppointmentAccAdmin />} />
             <Route path="completed" element={<AppointmentComAdmin />} />
             <Route path="cancelled" element={<AppointmentCanAdmin />} />
+            <Route
+              path="patient-not-coming"
+              element={<AppointmentNotComingAdmin />}
+            />
           </Route>
           <Route path="payments">
             {/* <Route path="unpaid" element={<PaymentUnpaidAdmin />} />

@@ -32,7 +32,7 @@ const PaymentUnpaidAdmin = () => {
         },
         params: {
           appointmentStatus: "completed",
-          paymentStatus: "unpaid",
+          paymentStatus: "pending",
         },
       });
 

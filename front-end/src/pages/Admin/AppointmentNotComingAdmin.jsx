@@ -1,17 +1,29 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Card, Table, Button, Space, Tag, notification, Modal } from "antd";
+import { Card, Table, Button, Tag, notification, Modal, Empty } from "antd";
 import { EyeOutlined } from "@ant-design/icons";
 import axios from "axios";
 import { AppContext } from "../../context/AppContext";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 
-const AppointmentCanAdmin = () => {
+// Cấu hình dayjs để xử lý UTC
+dayjs.extend(utc);
+
+const AppointmentNotComingAdmin = () => {
   const [loading, setLoading] = useState(false);
   const [appointments, setAppointments] = useState([]);
   const { url1 } = useContext(AppContext);
   const [api, contextHolder] = notification.useNotification();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+
+  // Hàm hiển thị ngày giờ an toàn
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return "Chưa có thông tin";
+    return dayjs(dateStr, "DD-MM-YYYY HH:mm:ss").isValid()
+      ? dayjs(dateStr, "DD-MM-YYYY HH:mm:ss").format("DD/MM/YYYY HH:mm")
+      : "Ngày giờ không hợp lệ";
+  };
 
   const showNotification = (type, message, description) => {
     api[type]({
@@ -30,11 +42,12 @@ const AppointmentCanAdmin = () => {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         params: {
-          appointmentStatus: "cancelled",
+          appointmentStatus: "patient_not_coming",
         },
       });
 
       if (response.data && response.data.data) {
+        console.log("Appointments data:", response.data.data);
         setAppointments(response.data.data);
       } else {
         console.error("Invalid data format from API:", response.data);
@@ -67,6 +80,7 @@ const AppointmentCanAdmin = () => {
           },
         }
       );
+      console.log("Appointment details:", response.data.data);
       setSelectedAppointment(response.data.data);
       setIsModalVisible(true);
     } catch (error) {
@@ -76,13 +90,6 @@ const AppointmentCanAdmin = () => {
         "Không thể tải thông tin chi tiết cuộc hẹn"
       );
     }
-  };
-
-  const formatDateTime = (dateStr) => {
-    if (!dateStr) return "Chưa có thông tin";
-    return dayjs(dateStr, "DD-MM-YYYY HH:mm:ss").isValid()
-      ? dayjs(dateStr, "DD-MM-YYYY HH:mm:ss").format("DD/MM/YYYY HH:mm")
-      : "Ngày giờ không hợp lệ";
   };
 
   const columns = [
@@ -142,12 +149,15 @@ const AppointmentCanAdmin = () => {
   return (
     <>
       {contextHolder}
-      <Card title="Danh sách cuộc hẹn đã hủy">
+      <Card title="Danh sách cuộc hẹn không đến">
         <Table
           columns={columns}
           dataSource={appointments}
           loading={loading}
           rowKey="appointment_id"
+          locale={{
+            emptyText: <Empty description="Không có cuộc hẹn nào không đến" />,
+          }}
           pagination={{
             pageSize: 10,
             showSizeChanger: true,
@@ -256,18 +266,18 @@ const AppointmentCanAdmin = () => {
                     </p>
                     <p>
                       <span className="font-medium">Trạng thái:</span>{" "}
-                      <Tag color="red">Đã hủy</Tag>
+                      <Tag color="orange">Không đến khám</Tag>
                     </p>
                   </div>
                 </div>
 
-                {/* Lý do hủy */}
-                <div className="bg-red-50 p-4 rounded-lg border border-red-100">
-                  <h3 className="font-medium text-lg mb-3 text-red-600">
-                    Lý do hủy
+                {/* Ghi chú */}
+                {/* <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                  <h3 className="font-medium text-lg mb-3 text-yellow-600">
+                    Ghi chú
                   </h3>
-                  <p>{selectedAppointment.reason_cancel || "Không có lý do"}</p>
-                </div>
+                  <p>{selectedAppointment.notes || "Không có ghi chú"}</p>
+                </div> */}
               </div>
             </div>
           </div>
@@ -277,4 +287,4 @@ const AppointmentCanAdmin = () => {
   );
 };
 
-export default AppointmentCanAdmin;
+export default AppointmentNotComingAdmin;
