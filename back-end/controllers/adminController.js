@@ -28,16 +28,16 @@ export const loginAdminController = async (req, res, next) => {
     }
   }
 };
-export async function addSpecializationController(req, res) {
+export async function createSpecializationController(req, res) {
   try {
     const { name, fees } = req.body;
-    const imageFile = req.file?.path; // đường dẫn tạm do multer lưu
+    const file = req.file;
 
     if (!name || fees == null) {
       throw new BadRequestError("Thiếu tên hoặc phí chuyên khoa");
     }
 
-    await adminService.createSpecialization(name, Number(fees), imageFile);
+    await adminService.createSpecialization(name, Number(fees), file);
 
     return res.status(201).json({
       success: true,

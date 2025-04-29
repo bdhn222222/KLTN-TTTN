@@ -39,8 +39,8 @@ import AppointmentCanAdmin from "./pages/Admin/AppointmentCanAdmin";
 import AppointmentNotComingAdmin from "./pages/Admin/AppointmentNotComingAdmin";
 import PaymentUnpaidAdmin from "./pages/Admin/PaymentUnpaidAdmin";
 import PaymentPaidAdmin from "./pages/Admin/PaymentPaidAdmin";
-import DepartmentManageAdmin from "./pages/Admin/DepartmentManageAdmin";
-// import DoctorManageAdmin from "./pages/Admin/DoctorManageAdmin";
+import SpecializationManageAdmin from "./pages/Admin/SpecializationManageAdmin";
+import DoctorManageAdmin from "./pages/Admin/DoctorManageAdmin";
 
 // Layout cho Patient Portal
 const PatientLayout = () => {
@@ -129,8 +129,8 @@ const App = () => {
             <Route path="paid" element={<PaymentPaidAdmin />} />
           </Route>
           <Route path="management">
-            <Route path="departments" element={<DepartmentManageAdmin />} />
-            {/* <Route path="doctors" element={<DoctorManageAdmin />} /> */}
+            <Route path="departments" element={<SpecializationManageAdmin />} />
+            <Route path="doctors" element={<DoctorManageAdmin />} />
           </Route>
         </Route>
 

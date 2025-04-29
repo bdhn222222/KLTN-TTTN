@@ -15,6 +15,7 @@ import {
   Empty,
   Image,
   Divider,
+  Avatar,
 } from "antd";
 import {
   EyeOutlined,
@@ -53,6 +54,11 @@ const DepartmentManageAdmin = () => {
   const [formValues, setFormValues] = useState({});
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
+  const [createForm] = Form.useForm();
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createImageUrl, setCreateImageUrl] = useState("");
+  const [createUploadedFile, setCreateUploadedFile] = useState(null);
 
   const showNotification = (type, message, description) => {
     api[type]({
@@ -311,6 +317,34 @@ const DepartmentManageAdmin = () => {
       title: "Tên chuyên khoa",
       dataIndex: "name",
       key: "name",
+      render: (text, record) => (
+        <div className="flex items-center">
+          <div
+            style={{
+              width: "20px",
+              height: "20px",
+              marginRight: "8px",
+              borderRadius: "4px",
+              overflow: "hidden",
+              background: "#f5f5f5",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <img
+              src={record.image}
+              alt={text}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+              }}
+            />
+          </div>
+          <span>{text}</span>
+        </div>
+      ),
     },
     {
       title: "Số lượng bác sĩ",
@@ -339,18 +373,102 @@ const DepartmentManageAdmin = () => {
     },
   ];
 
+  const handleCreateSubmit = async (values) => {
+    try {
+      setCreateLoading(true);
+      const formData = new FormData();
+      formData.append("name", values.name);
+      formData.append("fees", values.fees);
+
+      if (createUploadedFile instanceof File) {
+        formData.append("image", createUploadedFile);
+      }
+
+      const response = await axios({
+        method: "post",
+        url: `${url1}/admin/specializations`,
+        data: formData,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 20000,
+      });
+
+      if (response.data.success) {
+        showNotification(
+          "success",
+          "Thành công",
+          "Thêm chuyên khoa mới thành công"
+        );
+        setIsCreateModalVisible(false);
+        createForm.resetFields();
+        setCreateImageUrl("");
+        setCreateUploadedFile(null);
+        fetchSpecializations(
+          pagination.current,
+          pagination.pageSize,
+          searchText
+        );
+      }
+    } catch (error) {
+      console.error("Error creating specialization:", error);
+      let errorMessage = "Không thể thêm chuyên khoa mới";
+
+      if (error.response?.data?.message === "Specialization already exists") {
+        errorMessage = "Chuyên khoa này đã tồn tại";
+      } else if (error.code === "ERR_NETWORK") {
+        errorMessage = "Không thể kết nối đến máy chủ";
+      } else {
+        errorMessage = error.response?.data?.message || errorMessage;
+      }
+
+      showNotification("error", "Lỗi", errorMessage);
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const handleCreateImageUpload = async (info) => {
+    const file = info.file.originFileObj;
+    if (!file) return;
+
+    setUploadLoading(true);
+    try {
+      getBase64(file, (imageUrl) => {
+        setCreateImageUrl(imageUrl);
+        setCreateUploadedFile(file);
+        setUploadLoading(false);
+      });
+    } catch (error) {
+      console.error("Error processing image:", error);
+      showNotification("error", "Lỗi", "Không thể xử lý ảnh");
+      setUploadLoading(false);
+    }
+  };
+
   return (
     <>
       {contextHolder}
       <Card
         title="Danh sách chuyên khoa"
         extra={
-          <Input.Search
-            placeholder="Tìm kiếm chuyên khoa"
-            onSearch={handleSearch}
-            style={{ width: 250 }}
-            allowClear
-          />
+          <Space>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setIsCreateModalVisible(true)}
+              className="!bg-blue-900 !text-white hover:!bg-blue-800"
+            >
+              Thêm mới
+            </Button>
+            <Input.Search
+              placeholder="Tìm kiếm chuyên khoa"
+              onSearch={handleSearch}
+              style={{ width: 250 }}
+              allowClear
+            />
+          </Space>
         }
       >
         <Table
@@ -614,6 +732,127 @@ const DepartmentManageAdmin = () => {
           Các thay đổi sẽ được áp dụng ngay lập tức và có thể ảnh hưởng đến các
           bác sĩ và cuộc hẹn liên quan.
         </p>
+      </Modal>
+
+      <Modal
+        title={
+          <div className="flex items-center">
+            <PlusOutlined className="mr-2" />
+            <span className="text-xl font-semibold text-blue-900">
+              Thêm chuyên khoa mới
+            </span>
+          </div>
+        }
+        open={isCreateModalVisible}
+        onCancel={() => {
+          setIsCreateModalVisible(false);
+          createForm.resetFields();
+          setCreateImageUrl("");
+          setCreateUploadedFile(null);
+        }}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setIsCreateModalVisible(false);
+              createForm.resetFields();
+              setCreateImageUrl("");
+              setCreateUploadedFile(null);
+            }}
+          >
+            Hủy
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={createLoading}
+            onClick={createForm.submit}
+            className="!bg-blue-900 !text-white hover:!bg-blue-800"
+          >
+            Thêm mới
+          </Button>,
+        ]}
+      >
+        <Form form={createForm} layout="vertical" onFinish={handleCreateSubmit}>
+          <Form.Item
+            name="name"
+            label="Tên chuyên khoa"
+            rules={[
+              {
+                required: true,
+                message: "Vui lòng nhập tên chuyên khoa",
+              },
+            ]}
+          >
+            <Input placeholder="Nhập tên chuyên khoa" />
+          </Form.Item>
+
+          <Form.Item
+            name="fees"
+            label="Phí khám (VNĐ)"
+            rules={[{ required: true, message: "Vui lòng nhập phí khám" }]}
+          >
+            <InputNumber
+              style={{ width: "100%" }}
+              min={0}
+              step={10000}
+              formatter={(value) =>
+                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+              }
+              parser={(value) => value.replace(/\$\s?|(,*)/g, "")}
+              placeholder="Nhập phí khám"
+            />
+          </Form.Item>
+
+          <Form.Item label="Hình ảnh chuyên khoa">
+            <Upload
+              name="image"
+              listType="picture-card"
+              className="avatar-uploader"
+              showUploadList={false}
+              beforeUpload={beforeUpload}
+              onChange={handleCreateImageUpload}
+              action=""
+              customRequest={({ onSuccess }) => {
+                setTimeout(() => {
+                  onSuccess("ok");
+                }, 0);
+              }}
+            >
+              {createImageUrl ? (
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <img
+                    src={createImageUrl}
+                    alt="Chuyên khoa"
+                    style={{
+                      width: "130px",
+                      height: "130px",
+                      objectFit: "cover",
+                      borderRadius: "8px",
+                    }}
+                  />
+                </div>
+              ) : (
+                <div>
+                  {uploadLoading ? <LoadingOutlined /> : <PlusOutlined />}
+                  <div style={{ marginTop: 8 }}>Tải lên</div>
+                </div>
+              )}
+            </Upload>
+            <div className="text-sm text-gray-500 mt-2">
+              Nhấp vào ô trên để tải lên hình ảnh (Kích thước: 130x130)
+            </div>
+          </Form.Item>
+        </Form>
       </Modal>
     </>
   );

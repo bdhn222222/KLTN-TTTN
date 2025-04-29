@@ -26,6 +26,7 @@ import {
   cancelAppointmentController,
   updateAppointmentController,
   getDoctorbySpecializationController,
+  createSpecializationController,
 } from "../controllers/adminController.js";
 import { authenticateUser } from "../middleware/authentication.js";
 import authorize from "../middleware/authorization.js";
@@ -224,5 +225,12 @@ router.get(
   authenticateUser,
   authorize(["admin"]),
   getDoctorbySpecializationController
+);
+router.post(
+  "/specializations",
+  authenticateUser,
+  authorize(["admin"]),
+  upload.single("image"),
+  createSpecializationController
 );
 export default router;

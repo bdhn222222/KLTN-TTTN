@@ -295,7 +295,7 @@ export const getAllSpecializations = async ({
     },
   };
 };
-export const createSpecialization = async (name, fees, imageFile) => {
+export const createSpecialization = async (name, fees, file) => {
   const transaction = await db.sequelize.transaction();
   try {
     const existingSpecialization = await Specialization.findOne({
@@ -303,18 +303,29 @@ export const createSpecialization = async (name, fees, imageFile) => {
       transaction,
     });
     if (existingSpecialization) {
-      throw new BadRequestError("Specialization already exists");
+      throw new BadRequestError("Tên chuyên khoa đã tồn tại");
     }
 
     let imageUrl = null;
-    if (imageFile) {
-      const uploadResult = await cloudinary.uploader.upload(imageFile, {
-        folder: "specializations",
-        use_filename: true,
-        unique_filename: false,
-      });
+    if (file && file.buffer) {
+      const uploadStream = () =>
+        new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: "specializations",
+              use_filename: true,
+              unique_filename: false,
+            },
+            (error, result) => {
+              if (error) return reject(error);
+              resolve(result);
+            }
+          );
+          Readable.from(file.buffer).pipe(stream);
+        });
 
-      imageUrl = uploadResult.secure_url;
+      const result = await uploadStream();
+      imageUrl = result.secure_url;
     }
 
     await Specialization.create(
@@ -332,9 +343,10 @@ export const createSpecialization = async (name, fees, imageFile) => {
     return { message: "Success" };
   } catch (error) {
     await transaction.rollback();
-    throw new Error(error.message);
+    throw error;
   }
 };
+
 export const updateSpecialization = async (
   specialization_id,
   updateData,
