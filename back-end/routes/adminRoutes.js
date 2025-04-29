@@ -38,6 +38,8 @@ import {
 } from "../middleware/rateLimiter.js";
 
 const router = express.Router();
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 router.post(
   "/register",
@@ -124,10 +126,12 @@ router.get(
   authorize(["admin"]),
   getDoctorDetailsController
 );
+
 router.patch(
   "/specializations/:specialization_id",
   authenticateUser,
   authorize(["admin"]),
+  upload.single("image"), // 🟢 để multer đọc file từ FormData
   updateSpecializationController
 );
 router.get(

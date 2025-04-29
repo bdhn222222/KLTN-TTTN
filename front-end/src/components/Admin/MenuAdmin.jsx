@@ -76,27 +76,27 @@ const MenuAdmin = ({ collapsed }) => {
         },
       ],
     },
-    {
-      key: "patients",
-      icon: <UserOutlined className="text-blue-900" />,
-      label: <span className="text-blue-900">Patient Management</span>,
-      onClick: () => navigate("/admin/patients"),
-    },
+    // {
+    //   key: "patients",
+    //   icon: <UserOutlined className="text-blue-900" />,
+    //   label: <span className="text-blue-900">Patient Management</span>,
+    //   onClick: () => navigate("/admin/patients"),
+    // },
     {
       key: "management",
       icon: <TeamOutlined className="text-blue-900" />,
-      label: <span className="text-blue-900">General Management</span>,
+      label: <span className="text-blue-900">Quản lý chung</span>,
       children: [
         {
           key: "departments",
           icon: <MedicineBoxOutlined className="text-blue-900" />,
-          label: "Departments",
+          label: "Chuyên khoa",
           onClick: () => navigate("/admin/management/departments"),
         },
         {
           key: "doctors",
           icon: <UserOutlined className="text-blue-900" />,
-          label: "Doctors",
+          label: "Bác sĩ",
           onClick: () => navigate("/admin/management/doctors"),
         },
       ],

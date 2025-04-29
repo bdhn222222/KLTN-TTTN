@@ -1,4 +1,6 @@
 import db from "../models/index.js";
+
+import { Readable } from "stream";
 import bcrypt from "bcryptjs";
 import BadRequestError from "../errors/bad_request.js";
 import cloudinary from "../config/cloudinary.js";
@@ -245,16 +247,13 @@ export const getAllSpecializations = async ({
   limit = 20,
   search = "",
 } = {}) => {
-  // 1. Tính toán offset
   const offset = (Number(page) - 1) * Number(limit);
 
-  // 2. Build điều kiện tìm kiếm
   const where = {};
   if (search.trim()) {
     where.name = { [Op.like]: `%${search.trim()}%` };
   }
 
-  // 3. Query với pagination và đếm tổng
   const { count, rows } = await Specialization.findAndCountAll({
     where,
     order: [["name", "ASC"]],
@@ -267,15 +266,23 @@ export const getAllSpecializations = async ({
     throw new NotFoundError("Không tìm thấy chuyên khoa nào");
   }
 
-  // 4. Format dữ liệu
-  const data = rows.map((sp) => ({
-    specialization_id: sp.specialization_id,
-    name: sp.name,
-    fees: `${sp.fees.toLocaleString("vi-VN")} VNĐ`,
-    image: sp.image,
-  }));
+  // 🔄 Fetch doctor count cho từng chuyên khoa
+  const data = await Promise.all(
+    rows.map(async (sp) => {
+      const doctorCount = await db.Doctor.count({
+        where: { specialization_id: sp.specialization_id },
+      });
 
-  // 5. Trả về kèm pagination
+      return {
+        specialization_id: sp.specialization_id,
+        name: sp.name,
+        fees: `${sp.fees.toLocaleString("vi-VN")} VNĐ`,
+        image: sp.image,
+        doctor_count: doctorCount,
+      };
+    })
+  );
+
   return {
     success: true,
     message: "Lấy danh sách chuyên khoa thành công",
@@ -328,13 +335,19 @@ export const createSpecialization = async (name, fees, imageFile) => {
     throw new Error(error.message);
   }
 };
-export const updateSpecialization = async (specialization_id, updateData) => {
+export const updateSpecialization = async (
+  specialization_id,
+  updateData,
+  file
+) => {
   const t = await db.sequelize.transaction();
   try {
-    // 1. Tìm chuyên khoa
+    // Fetch the specialization with doctors for doctor_count
     const specialization = await Specialization.findByPk(specialization_id, {
       transaction: t,
+      include: [{ model: Doctor, as: "doctors", attributes: ["doctor_id"] }],
     });
+
     if (!specialization) {
       throw new NotFoundError(
         `Chuyên khoa #${specialization_id} không tồn tại`
@@ -343,56 +356,81 @@ export const updateSpecialization = async (specialization_id, updateData) => {
 
     const data = {};
 
-    // 2. Đổi tên (nếu có)
+    // Handle name update
     if (updateData.name) {
       const exists = await Specialization.findOne({
-        where: { name: updateData.name },
+        where: {
+          name: updateData.name,
+          specialization_id: { [Op.ne]: specialization_id },
+        },
         transaction: t,
       });
-      if (exists && exists.specialization_id !== specialization_id) {
+
+      if (exists) {
         throw new BadRequestError("Tên chuyên khoa đã tồn tại");
       }
       data.name = updateData.name;
     }
 
-    // 3. Cập nhật phí (nếu có)
+    // Handle fees update
     if (updateData.fees != null) {
       data.fees = updateData.fees;
     }
 
-    // 4. Upload ảnh mới (nếu có)
-    if (updateData.image) {
-      const uploadResult = await cloudinary.uploader.upload(updateData.image, {
-        folder: "specializations",
-        use_filename: true,
-        unique_filename: false,
-      });
-      data.image = uploadResult.secure_url;
+    // Handle image update (from multer memory buffer)
+    if (file && file.buffer) {
+      const uploadStream = () =>
+        new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: "specializations",
+              use_filename: true,
+              unique_filename: false,
+              transformation: [
+                { width: 400, height: 300, crop: "fill", quality: "auto:good" },
+                { fetch_format: "auto" },
+              ],
+              format: "webp",
+            },
+            (error, result) => {
+              if (error) return reject(error);
+              resolve(result);
+            }
+          );
+
+          Readable.from(file.buffer).pipe(stream);
+        });
+
+      const result = await uploadStream();
+      data.image = result.secure_url;
     }
 
-    // 5. Áp dụng cập nhật
     await specialization.update(data, { transaction: t });
     await t.commit();
+
+    // Fetch the updated specialization to get the latest data
+    const updatedSpecialization = await Specialization.findByPk(
+      specialization_id,
+      {
+        include: [{ model: Doctor, as: "doctors", attributes: ["doctor_id"] }],
+      }
+    );
 
     return {
       success: true,
       message: "Cập nhật chuyên khoa thành công",
       data: {
-        specialization_id: specialization.specialization_id,
-        name: specialization.name,
-        fees: `${specialization.fees.toLocaleString("vi-VN")} VNĐ`,
-        image: specialization.image,
-        description: specialization.description,
+        specialization_id: updatedSpecialization.specialization_id,
+        name: updatedSpecialization.name,
+        fees: `${updatedSpecialization.fees.toLocaleString("vi-VN")} VNĐ`,
+        image: updatedSpecialization.image,
+        doctor_count: updatedSpecialization.doctors.length,
       },
     };
   } catch (err) {
     await t.rollback();
-    // Nếu là lỗi do validation, ném thẳng để controller trả về đúng HTTP code
-    if (err instanceof BadRequestError || err instanceof NotFoundError) {
-      throw err;
-    }
-    // Các lỗi khác thì gói chung
-    throw new Error(err.message);
+    console.error("Error in updateSpecialization:", err);
+    throw err;
   }
 };
 
@@ -505,13 +543,12 @@ export const getAllAppointments = async ({
 };
 
 export const getSpecializationDetails = async ({ specialization_id }) => {
-  // 1. Lấy chuyên khoa và kèm danh sách bác sĩ
   const specialization = await Specialization.findByPk(specialization_id, {
     attributes: ["specialization_id", "name", "fees", "image"],
     include: [
       {
         model: Doctor,
-        as: "doctors", // phải khớp alias trong associate
+        as: "doctors",
         attributes: ["doctor_id", "degree", "experience_years", "rating"],
         include: [
           {
@@ -522,31 +559,18 @@ export const getSpecializationDetails = async ({ specialization_id }) => {
         ],
       },
     ],
-    order: [
-      [{ model: Doctor, as: "doctors" }, "rating", "DESC"], // cũng phải dùng alias 'doctors'
-    ],
   });
 
   if (!specialization) {
     throw new NotFoundError(`Chuyên khoa #${specialization_id} không tồn tại`);
   }
 
-  // 2. Format fees & doctors
   const data = {
     specialization_id: specialization.specialization_id,
     name: specialization.name,
     fees: `${specialization.fees.toLocaleString("vi-VN")} VNĐ`,
     image: specialization.image,
-    description: specialization.description,
-    doctors: specialization.doctors.map((doc) => ({
-      doctor_id: doc.doctor_id,
-      name: doc.user?.username,
-      email: doc.user?.email,
-      avatar: doc.user?.avatar,
-      degree: doc.degree,
-      experience_years: doc.experience_years,
-      rating: doc.rating,
-    })),
+    doctor_count: specialization.doctors.length, // ✅ thêm dòng này
   };
 
   return {
@@ -555,6 +579,7 @@ export const getSpecializationDetails = async ({ specialization_id }) => {
     data,
   };
 };
+
 export const getAllPatients = async () => {
   const patients = await db.Patient.findAll({
     attributes: [

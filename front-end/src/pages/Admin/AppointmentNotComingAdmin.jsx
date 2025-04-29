@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Card, Table, Button, Tag, notification, Modal, Empty } from "antd";
+import {
+  Card,
+  Table,
+  Button,
+  Tag,
+  notification,
+  Modal,
+  Empty,
+  Descriptions,
+} from "antd";
 import { EyeOutlined } from "@ant-design/icons";
 import axios from "axios";
 import { AppContext } from "../../context/AppContext";
@@ -185,101 +194,60 @@ const AppointmentNotComingAdmin = () => {
         width={800}
       >
         {selectedAppointment && (
-          <div>
-            <div className="grid grid-cols-2 gap-8">
-              {/* Cột trái */}
-              <div>
-                {/* Thông tin bệnh nhân */}
-                <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                  <h3 className="font-medium text-lg mb-3 text-blue-900">
-                    Thông tin bệnh nhân
-                  </h3>
-                  <div className="space-y-2">
-                    <p>
-                      <span className="font-medium">Họ tên:</span>{" "}
-                      {selectedAppointment.family_member?.username ||
-                        "Chưa có thông tin"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Số điện thoại:</span>{" "}
-                      {selectedAppointment.family_member?.phone_number ||
-                        "Chưa có thông tin"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Email:</span>{" "}
-                      {selectedAppointment.family_member?.email ||
-                        "Chưa có thông tin"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Giới tính:</span>{" "}
-                      {selectedAppointment.family_member?.gender === "female"
-                        ? "Nữ"
-                        : "Nam"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Ngày sinh:</span>{" "}
-                      {selectedAppointment.family_member?.date_of_birth
-                        ? dayjs(
-                            selectedAppointment.family_member.date_of_birth
-                          ).format("DD/MM/YYYY")
-                        : "Chưa có thông tin"}
-                    </p>
-                  </div>
-                </div>
+          <div className="mt-4">
+            <h3 className="text-lg font-medium mb-4">Thông tin bệnh nhân</h3>
+            <Descriptions bordered column={2}>
+              <Descriptions.Item label="Tên bệnh nhân">
+                {selectedAppointment?.family_member?.username || "N/A"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số điện thoại">
+                {selectedAppointment?.family_member?.phone_number || "N/A"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Email">
+                {selectedAppointment?.family_member?.email || "N/A"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Giới tính">
+                {selectedAppointment?.family_member?.gender === "male"
+                  ? "Nam"
+                  : selectedAppointment?.family_member?.gender === "female"
+                  ? "Nữ"
+                  : "Khác"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ngày sinh">
+                {selectedAppointment?.family_member?.date_of_birth
+                  ? dayjs(
+                      selectedAppointment.family_member.date_of_birth
+                    ).format("DD/MM/YYYY")
+                  : "N/A"}
+              </Descriptions.Item>
+            </Descriptions>
 
-                {/* Thông tin khoa */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-medium text-lg mb-3 text-blue-900">
-                    Thông tin khoa
-                  </h3>
-                  <div className="space-y-2">
-                    <p>
-                      <span className="font-medium">Khoa:</span>{" "}
-                      {selectedAppointment.doctor?.specialization ||
-                        "Chưa có thông tin"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Phí khám:</span>{" "}
-                      {selectedAppointment.fees?.toLocaleString("vi-VN") +
-                        " VNĐ"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Cột phải */}
-              <div>
-                {/* Thông tin khám bệnh */}
-                <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                  <h3 className="font-medium text-lg mb-3 text-blue-900">
-                    Thông tin khám bệnh
-                  </h3>
-                  <div className="space-y-2">
-                    <p>
-                      <span className="font-medium">Bác sĩ:</span>{" "}
-                      {selectedAppointment.doctor?.username ||
-                        "Chưa có thông tin"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Ngày và giờ khám:</span>{" "}
-                      {formatDateTime(selectedAppointment.appointment_datetime)}
-                    </p>
-                    <p>
-                      <span className="font-medium">Trạng thái:</span>{" "}
-                      <Tag color="orange">Không đến khám</Tag>
-                    </p>
-                  </div>
-                </div>
-
-                {/* Ghi chú */}
-                {/* <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
-                  <h3 className="font-medium text-lg mb-3 text-yellow-600">
-                    Ghi chú
-                  </h3>
-                  <p>{selectedAppointment.notes || "Không có ghi chú"}</p>
-                </div> */}
-              </div>
-            </div>
+            <h3 className="text-lg font-medium mt-6 mb-4">
+              Thông tin cuộc hẹn
+            </h3>
+            <Descriptions bordered column={2}>
+              <Descriptions.Item label="Ngày và giờ hẹn">
+                {selectedAppointment?.appointment_datetime
+                  ? dayjs(selectedAppointment.appointment_datetime).format(
+                      "DD/MM/YYYY HH:mm"
+                    )
+                  : "N/A"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Bác sĩ">
+                {selectedAppointment?.doctor?.user?.username || "N/A"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Khoa">
+                {selectedAppointment?.doctor?.specialization?.name || "N/A"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Phí khám">
+                {selectedAppointment?.fees
+                  ? `${selectedAppointment.fees.toLocaleString("vi-VN")} VNĐ`
+                  : "N/A"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Trạng thái" span={2}>
+                <Tag color="red">Bệnh nhân không đến khám</Tag>
+              </Descriptions.Item>
+            </Descriptions>
           </div>
         )}
       </Modal>

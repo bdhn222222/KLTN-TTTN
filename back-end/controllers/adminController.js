@@ -205,36 +205,19 @@ export const getDoctorDetailsController = async (req, res, next) => {
 };
 
 export const updateSpecializationController = async (req, res, next) => {
-  // Accept either :id or :specialization_id
-  const rawId = req.params.id ?? req.params.specialization_id;
-  const specialization_id = Number(rawId);
-
-  if (Number.isNaN(specialization_id)) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Invalid specialization id" });
-  }
-
-  const { name, fees, image } = req.body;
-
   try {
-    const result = await adminService.updateSpecialization(specialization_id, {
-      name,
-      fees,
-      image,
-    });
-    return res.status(200).json({
-      success: true,
-      message: result.message,
-      data: result.data,
-    });
+    const specialization_id = parseInt(req.params.specialization_id, 10);
+    if (isNaN(specialization_id)) {
+      throw new BadRequestError("ID chuyên khoa không hợp lệ");
+    }
+
+    const result = await adminService.updateSpecialization(
+      specialization_id,
+      req.body,
+      req.file
+    );
+    return res.status(200).json(result);
   } catch (err) {
-    if (err instanceof BadRequestError) {
-      return res.status(400).json({ success: false, message: err.message });
-    }
-    if (err instanceof NotFoundError) {
-      return res.status(404).json({ success: false, message: err.message });
-    }
     next(err);
   }
 };
