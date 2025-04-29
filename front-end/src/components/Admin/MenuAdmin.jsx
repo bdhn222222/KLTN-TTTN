@@ -60,18 +60,18 @@ const MenuAdmin = ({ collapsed }) => {
     {
       key: "payments",
       icon: <DollarOutlined className="text-blue-900" />,
-      label: <span className="text-blue-900">Payment Management</span>,
+      label: <span className="text-blue-900">Quản lý thanh toán</span>,
       children: [
         {
           key: "unpaid",
           icon: <WalletOutlined className="text-blue-900" />,
-          label: "Unpaid",
+          label: "Cần thanh toán",
           onClick: () => navigate("/admin/payments/unpaid"),
         },
         {
           key: "paid",
           icon: <BankOutlined className="text-blue-900" />,
-          label: "Paid",
+          label: "Đã thanh toán",
           onClick: () => navigate("/admin/payments/paid"),
         },
       ],

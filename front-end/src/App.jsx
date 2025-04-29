@@ -37,8 +37,8 @@ import AppointmentAccAdmin from "./pages/Admin/AppointmentAccAdmin";
 import AppointmentComAdmin from "./pages/Admin/AppointmentComAdmin";
 import AppointmentCanAdmin from "./pages/Admin/AppointmentCanAdmin";
 import AppointmentNotComingAdmin from "./pages/Admin/AppointmentNotComingAdmin";
-// import PaymentUnpaidAdmin from "./pages/Admin/PaymentUnpaidAdmin";
-// import PaymentPaidAdmin from "./pages/Admin/PaymentPaidAdmin";
+import PaymentUnpaidAdmin from "./pages/Admin/PaymentUnpaidAdmin";
+import PaymentPaidAdmin from "./pages/Admin/PaymentPaidAdmin";
 // import DepartmentManageAdmin from "./pages/Admin/DepartmentManageAdmin";
 // import DoctorManageAdmin from "./pages/Admin/DoctorManageAdmin";
 
@@ -125,8 +125,8 @@ const App = () => {
             />
           </Route>
           <Route path="payments">
-            {/* <Route path="unpaid" element={<PaymentUnpaidAdmin />} />
-            <Route path="paid" element={<PaymentPaidAdmin />} /> */}
+            <Route path="unpaid" element={<PaymentUnpaidAdmin />} />
+            <Route path="paid" element={<PaymentPaidAdmin />} />
           </Route>
           <Route path="management">
             {/* <Route path="departments" element={<DepartmentManageAdmin />} /> */}

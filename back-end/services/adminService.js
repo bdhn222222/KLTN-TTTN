@@ -811,10 +811,10 @@ export const updatePaymentStatus = async ({
       throw new NotFoundError("Không tìm thấy thông tin thanh toán");
     } // 2. Validate
 
-    const validStatuses = ["pending", "cancelled"];
-    if (!validStatuses.includes(status)) {
+    const validCurrentStatuses = ["pending", "cancelled"];
+    if (!validCurrentStatuses.includes(payment.status)) {
       throw new BadRequestError("Cuộc hẹn này đã được thanh toán");
-    } // 3. Cập nhật
+    }
 
     await payment.update(
       { status, note: note || payment.note },
@@ -975,15 +975,18 @@ export const getAppointmentDetails = async (appointment_id) => {
       })),
     },
 
-    payment: appt.Payments && {
-      payment_id: appt.Payments.payment_id,
-      amount: appt.Payments.amount
-        ? `${appt.Payments.amount.toLocaleString("vi-VN")} VNĐ`
+    payment:
+      appt.Payments && appt.Payments.length > 0
+        ? {
+            payment_id: appt.Payments[0].payment_id,
+            amount: appt.Payments[0].amount
+              ? `${appt.Payments[0].amount.toLocaleString("vi-VN")} VNĐ`
+              : null,
+            payment_method: appt.Payments[0].payment_method,
+            status: appt.Payments[0].status,
+            createdAt: format(appt.Payments[0].createdAt),
+          }
         : null,
-      payment_method: appt.Payments.payment_method,
-      status: appt.Payments.status,
-      createdAt: format(appt.Payments.createdAt),
-    },
   };
 };
 
