@@ -30,6 +30,7 @@ import {
   getAppointmentByIdDoctorController,
   getDoctorDayOffsController,
   getDoctorStatsController,
+  updateDoctorController,
 } from "../controllers/adminController.js";
 import { authenticateUser } from "../middleware/authentication.js";
 import authorize from "../middleware/authorization.js";
@@ -253,5 +254,11 @@ router.get(
   authenticateUser,
   authorize(["admin"]),
   getDoctorStatsController
+);
+router.patch(
+  "/doctors/:doctor_id",
+  authenticateUser,
+  authorize(["admin"]),
+  updateDoctorController
 );
 export default router;

@@ -552,3 +552,24 @@ export const getDoctorStatsController = async (req, res, next) => {
     next(error);
   }
 };
+export const updateDoctorController = async (req, res, next) => {
+  try {
+    const doctor_id = parseInt(req.params.doctor_id, 10);
+    if (isNaN(doctor_id)) {
+      throw new BadRequestError("ID bác sĩ không hợp lệ");
+    }
+
+    const updateData = req.body;
+
+    const result = await adminService.updateDoctor(doctor_id, updateData);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof BadRequestError || error instanceof NotFoundError) {
+      return res
+        .status(error.statusCode)
+        .json({ success: false, message: error.message });
+    }
+    next(error); // InternalServerError sẽ được middleware xử lý
+  }
+};

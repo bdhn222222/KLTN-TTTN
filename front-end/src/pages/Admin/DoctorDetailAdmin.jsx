@@ -28,6 +28,9 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   EyeOutlined,
+  MailOutlined,
+  ClockCircleOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
 import { AppContext } from "../../context/AppContext";
@@ -93,12 +96,15 @@ const DoctorDetailAdmin = () => {
         },
       });
       if (response.data.success) {
+        console.log("Thông tin doctor sau khi fetch lại:", response.data.data);
         setDoctor(response.data.data);
         form.setFieldsValue({
+          username: response.data.data.user?.username,
+          email: response.data.data.user?.email,
           full_name: response.data.data.full_name,
           specialization_id: response.data.data.specialization_id,
-          experience: response.data.data.experience,
-          certificates: response.data.data.certificates,
+          experience_years: response.data.data.experience_years,
+          degree: response.data.data.degree,
         });
       }
     } catch (error) {
@@ -234,23 +240,42 @@ const DoctorDetailAdmin = () => {
 
   const handleEdit = async (values) => {
     try {
-      const response = await axios.put(
-        `${url1}/admin/doctors/${doctorId}`,
-        values,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+      console.log("Thông tin doctor trước khi update:", doctor);
+      console.log("Giá trị form submit:", values);
+
+      // Cập nhật dữ liệu gửi lên API
+      const updateData = {
+        degree: values.degree,
+        experience_years: parseInt(values.experience_years),
+        description: values.description || "",
+        specialization_id: parseInt(values.specialization_id),
+        username: values.username, // Thêm username vào dữ liệu update
+      };
+
+      console.log("Dữ liệu gửi lên API:", updateData);
+
+      const response = await axios({
+        method: "patch",
+        url: `${url1}/admin/doctors/${doctorId}`,
+        data: updateData,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      console.log("Kết quả từ API:", response.data);
+
       if (response.data.success) {
         message.success("Cập nhật thông tin bác sĩ thành công");
         setIsEditModalVisible(false);
-        fetchDoctorDetails();
+        fetchDoctorDetails(); // Fetch lại thông tin sau khi cập nhật thành công
       }
     } catch (error) {
       console.error("Error updating doctor:", error);
-      message.error("Cập nhật thông tin bác sĩ thất bại");
+      console.error("Error response:", error.response);
+      message.error(
+        error.response?.data?.message || "Cập nhật thông tin bác sĩ thất bại"
+      );
     }
   };
 
@@ -260,13 +285,18 @@ const DoctorDetailAdmin = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Button
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate("/admin/management/doctors")}
-        >
-          Quay lại
-        </Button>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <Button
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate("/admin/management/doctors")}
+          >
+            Quay lại
+          </Button>
+          <span className="text-lg font-bold text-gray-800">
+            Chi tiết thông tin bác sĩ
+          </span>
+        </div>
         <Button
           type="primary"
           icon={<EditOutlined />}
@@ -278,45 +308,65 @@ const DoctorDetailAdmin = () => {
       </div>
 
       <Card>
-        <div className="flex items-start space-x-6 mb-6">
-          <Avatar
-            src={doctor.user?.avatar}
-            size={120}
-            icon={<UserOutlined />}
-            style={{
-              backgroundColor: "#f5f5f5",
-            }}
-          />
+        <div className="flex items-start space-x-8 mb-8">
+          <div className="flex-shrink-0">
+            <Avatar
+              src={doctor.user?.avatar}
+              size={150}
+              icon={<UserOutlined />}
+              style={{
+                backgroundColor: "#f5f5f5",
+              }}
+            />
+          </div>
           <div className="flex-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-blue-900 mb-2">
+            <div className="flex items-start justify-between">
+              <div className="space-y-3">
+                <h1 className="text-2xl font-bold text-blue-900">
                   {doctor.user.username}
                 </h1>
-                <p className="text-lg text-gray-600">
-                  <MedicineBoxOutlined className="mr-2" />
-                  {doctor.Specialization?.name}
-                </p>
+                <div className="flex items-center text-lg text-gray-600 space-x-2">
+                  <MedicineBoxOutlined className="text-blue-600" />
+                  <span>{doctor.Specialization?.name}</span>
+                </div>
+                {doctor.description && (
+                  <div className="mt-4 text-gray-600 max-w-2xl">
+                    <div className="flex gap-1.5 items-center text-gray-500 mb-1">
+                      <FileTextOutlined />
+                      <span>Mô tả</span>
+                    </div>
+                    <p className="text-sm whitespace-pre-line">
+                      {doctor.description}
+                    </p>
+                  </div>
+                )}
               </div>
-              <Space size="large">
-                {/* <Statistic
-                  title="Tổng lượt khám"
-                  value={statistics.total}
-                  prefix={<TeamOutlined />}
-                /> */}
-                <Statistic
-                  title="Đã hoàn thành"
-                  value={statistics.completed_paid}
-                  valueStyle={{ color: "#3f8600" }}
-                  prefix={<CheckCircleOutlined />}
-                />
-                <Statistic
-                  title="Đã hủy"
-                  value={statistics.cancelled}
-                  valueStyle={{ color: "#cf1322" }}
-                  prefix={<CloseCircleOutlined />}
-                />
-              </Space>
+              <div className="flex space-x-8">
+                <div className="text-center">
+                  <Statistic
+                    title={
+                      <div className="flex items-center justify-center space-x-2">
+                        <CheckCircleOutlined className="text-green-600" />
+                        <span>Đã hoàn thành</span>
+                      </div>
+                    }
+                    value={statistics.completed_paid}
+                    valueStyle={{ color: "#3f8600" }}
+                  />
+                </div>
+                <div className="text-center">
+                  <Statistic
+                    title={
+                      <div className="flex items-center justify-center space-x-2">
+                        <CloseCircleOutlined className="text-red-600" />
+                        <span>Đã hủy</span>
+                      </div>
+                    }
+                    value={statistics.cancelled}
+                    valueStyle={{ color: "#cf1322" }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -324,21 +374,47 @@ const DoctorDetailAdmin = () => {
         <Tabs defaultActiveKey="1">
           <TabPane
             tab={
-              <span>
+              <span className="flex gap-1.5 items-center">
                 <UserOutlined />
-                Thông tin cá nhân
+                <span>Thông tin cá nhân</span>
               </span>
             }
             key="1"
           >
             <Descriptions bordered column={2}>
-              <Descriptions.Item label="Email" span={2}>
+              <Descriptions.Item
+                label={
+                  <div className="flex items-center space-x-2">
+                    <MailOutlined className="text-blue-600" />
+                    <span>Email</span>
+                  </div>
+                }
+                span={2}
+              >
                 {doctor.user?.email}
               </Descriptions.Item>
-              <Descriptions.Item label="Kinh nghiệm" span={2}>
-                {doctor.experience_years || "Chưa cập nhật"}
+              <Descriptions.Item
+                label={
+                  <div className="flex gap-1.5 items-center space-x-2">
+                    <ClockCircleOutlined className="text-blue-600" />
+                    <span>Kinh nghiệm</span>
+                  </div>
+                }
+                span={2}
+              >
+                {doctor.experience_years
+                  ? `${doctor.experience_years} năm`
+                  : "Chưa cập nhật"}
               </Descriptions.Item>
-              <Descriptions.Item label="Bằng cấp/Chứng chỉ" span={2}>
+              <Descriptions.Item
+                label={
+                  <div className="flex items-center space-x-2">
+                    <MedicineBoxOutlined className="text-blue-600" />
+                    <span>Bằng cấp/Chứng chỉ</span>
+                  </div>
+                }
+                span={2}
+              >
                 {doctor.degree || "Chưa cập nhật"}
               </Descriptions.Item>
             </Descriptions>
@@ -346,7 +422,7 @@ const DoctorDetailAdmin = () => {
 
           <TabPane
             tab={
-              <span>
+              <span className="flex gap-1.5 items-center space-x-2">
                 <HistoryOutlined />
                 Lịch sử khám bệnh
               </span>
@@ -369,7 +445,7 @@ const DoctorDetailAdmin = () => {
 
           <TabPane
             tab={
-              <span>
+              <span className="flex gap-1.5 items-center">
                 <CalendarOutlined />
                 Lịch nghỉ
               </span>
@@ -474,18 +550,24 @@ const DoctorDetailAdmin = () => {
           layout="vertical"
           onFinish={handleEdit}
           initialValues={{
-            full_name: doctor.full_name,
+            username: doctor.user?.username,
+            email: doctor.user?.email,
             specialization_id: doctor.specialization_id,
-            experience: doctor.experience,
-            certificates: doctor.certificates,
+            experience_years: doctor.experience_years,
+            degree: doctor.degree,
+            description: doctor.description,
           }}
         >
           <Form.Item
-            name="full_name"
+            name="username"
             label="Họ và tên"
             rules={[{ required: true, message: "Vui lòng nhập họ và tên" }]}
           >
             <Input />
+          </Form.Item>
+
+          <Form.Item name="email" label="Email">
+            <Input disabled />
           </Form.Item>
 
           <Form.Item
@@ -505,12 +587,34 @@ const DoctorDetailAdmin = () => {
             </Select>
           </Form.Item>
 
-          <Form.Item name="experience" label="Kinh nghiệm">
+          <Form.Item
+            name="experience_years"
+            label="Số năm kinh nghiệm"
+            rules={[
+              { required: true, message: "Vui lòng nhập số năm kinh nghiệm" },
+            ]}
+          >
+            <Input type="number" min={0} />
+          </Form.Item>
+
+          <Form.Item
+            name="degree"
+            label="Bằng cấp/Chứng chỉ"
+            rules={[
+              {
+                required: true,
+                message: "Vui lòng nhập thông tin bằng cấp/chứng chỉ",
+              },
+            ]}
+          >
             <TextArea rows={4} />
           </Form.Item>
 
-          <Form.Item name="certificates" label="Bằng cấp/Chứng chỉ">
-            <TextArea rows={4} />
+          <Form.Item name="description" label="Mô tả">
+            <TextArea
+              rows={4}
+              placeholder="Nhập mô tả về bác sĩ (không bắt buộc)"
+            />
           </Form.Item>
 
           <Form.Item className="text-right">

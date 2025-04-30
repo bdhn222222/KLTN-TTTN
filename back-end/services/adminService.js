@@ -2127,3 +2127,50 @@ export const getDoctorStats = async (doctor_id) => {
     },
   };
 };
+export const updateDoctor = async (doctor_id, updateData) => {
+  const t = await db.sequelize.transaction();
+  try {
+    // 1. Kiểm tra bác sĩ tồn tại
+    const doctor = await db.Doctor.findByPk(doctor_id, {
+      include: [{ model: db.User, as: "user" }],
+      transaction: t,
+    });
+    if (!doctor) throw new NotFoundError("Không tìm thấy bác sĩ");
+
+    // 2. Cập nhật bảng Doctor
+    const doctorFields = [
+      "degree",
+      "experience_years",
+      "description",
+      "specialization_id",
+    ];
+    const doctorUpdates = {};
+    for (let field of doctorFields) {
+      if (updateData[field] !== undefined)
+        doctorUpdates[field] = updateData[field];
+    }
+
+    if (Object.keys(doctorUpdates).length > 0) {
+      await doctor.update(doctorUpdates, { transaction: t });
+    }
+
+    // 3. Cập nhật bảng Users nếu có truyền username
+    const userUpdates = {};
+    if (updateData.username !== undefined) {
+      userUpdates.username = updateData.username;
+    }
+    if (Object.keys(userUpdates).length > 0) {
+      await doctor.user.update(userUpdates, { transaction: t });
+    }
+
+    await t.commit();
+    return {
+      success: true,
+      message: "Cập nhật bác sĩ thành công",
+    };
+  } catch (err) {
+    await t.rollback();
+    console.error("Error in updateDoctor:", err);
+    throw new InternalServerError("Không thể cập nhật bác sĩ");
+  }
+};
