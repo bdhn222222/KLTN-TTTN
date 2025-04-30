@@ -1924,3 +1924,206 @@ export const getDoctorbySpecialization = async (specialization_id) => {
   });
   return doctors;
 };
+export const getAppointmentByIdDoctor = async (doctor_id) => {
+  if (!doctor_id) {
+    throw new BadRequestError("Thiếu doctor_id");
+  }
+
+  const appointments = await Appointment.findAll({
+    where: {
+      doctor_id,
+      [Op.or]: [
+        { status: "cancelled" },
+        {
+          status: "completed",
+        },
+      ],
+    },
+    include: [
+      {
+        model: Payment,
+        as: "Payments",
+        where: {
+          status: "paid",
+        },
+        required: false,
+      },
+      {
+        model: FamilyMember,
+        as: "FamilyMember",
+        attributes: ["username", "email"],
+      },
+    ],
+  });
+
+  const filteredAppointments = appointments.filter((appt) => {
+    return (
+      appt.status === "cancelled" ||
+      (appt.status === "completed" &&
+        appt.Payments &&
+        appt.Payments.some((p) => p.status === "paid"))
+    );
+  });
+
+  return {
+    success: true,
+    data: filteredAppointments,
+  };
+};
+export const getDoctorDayOffs = async (doctor_id, start, end, status, date) => {
+  try {
+    let whereClause = {
+      doctor_id,
+    };
+
+    // Add status filtering if provided
+    if (status) {
+      whereClause.status = status;
+    } else {
+      whereClause.status = "active"; // Default to active day-offs
+    }
+
+    // Handle date filtering
+    if (date) {
+      const targetDate = dayjs
+        .tz(date, "Asia/Ho_Chi_Minh")
+        .format("YYYY-MM-DD");
+      whereClause.off_date = targetDate;
+    } else if (start && end) {
+      whereClause.off_date = {
+        [Op.between]: [
+          dayjs
+            .tz(start, "Asia/Ho_Chi_Minh")
+            .startOf("day")
+            .format("YYYY-MM-DD"),
+          dayjs.tz(end, "Asia/Ho_Chi_Minh").endOf("day").format("YYYY-MM-DD"),
+        ],
+      };
+    } else if (start) {
+      whereClause.off_date = {
+        [Op.gte]: dayjs
+          .tz(start, "Asia/Ho_Chi_Minh")
+          .startOf("day")
+          .format("YYYY-MM-DD"),
+      };
+    } else if (end) {
+      whereClause.off_date = {
+        [Op.lte]: dayjs
+          .tz(end, "Asia/Ho_Chi_Minh")
+          .endOf("day")
+          .format("YYYY-MM-DD"),
+      };
+    }
+
+    const dayOffs = await DoctorDayOff.findAll({
+      where: whereClause,
+      order: [["off_date", "ASC"]],
+    });
+
+    // Format response with affected appointments
+    const formattedDayOffs = await Promise.all(
+      dayOffs.map(async (dayOff) => {
+        const affectedAppointments = await Appointment.findAll({
+          where: {
+            doctor_id,
+            status: "doctor_day_off",
+            appointment_datetime: {
+              [Op.between]: [
+                dayjs
+                  .tz(dayOff.off_date, "Asia/Ho_Chi_Minh")
+                  .startOf("day")
+                  .format("YYYY-MM-DD HH:mm:ss"),
+                dayjs
+                  .tz(dayOff.off_date, "Asia/Ho_Chi_Minh")
+                  .endOf("day")
+                  .format("YYYY-MM-DD HH:mm:ss"),
+              ],
+            },
+          },
+          include: [
+            {
+              model: db.FamilyMember,
+              as: "FamilyMember",
+              attributes: ["phone_number", "username", "email"],
+            },
+          ],
+        });
+
+        return {
+          id: dayOff.day_off_id,
+          date: dayjs(dayOff.off_date)
+            .tz("Asia/Ho_Chi_Minh")
+            .format("YYYY-MM-DD"),
+          morning: dayOff.off_morning,
+          afternoon: dayOff.off_afternoon,
+          reason: dayOff.reason,
+          status: dayOff.status,
+          createdAt: dayjs(dayOff.createdAt).tz("Asia/Ho_Chi_Minh").format(),
+          affected_appointments: affectedAppointments.map((apt) => ({
+            id: apt.appointment_id,
+            datetime: dayjs(apt.appointment_datetime)
+              .tz("Asia/Ho_Chi_Minh")
+              .format(),
+            patient_name: apt.FamilyMember?.username || "Không có thông tin",
+            patient_phone:
+              apt.FamilyMember?.phone_number || "Không có số điện thoại",
+            patient_email: apt.FamilyMember?.email || "Không có email",
+          })),
+        };
+      })
+    );
+
+    return {
+      success: true,
+      message: "Lấy danh sách ngày nghỉ thành công",
+      data: formattedDayOffs,
+    };
+  } catch (error) {
+    console.error("Error in getDoctorDayOffs:", error);
+    throw new InternalServerError("Có lỗi xảy ra khi lấy danh sách ngày nghỉ");
+  }
+};
+export const getDoctorStats = async (doctor_id) => {
+  if (!doctor_id) throw new BadRequestError("Thiếu doctor_id");
+
+  // Tổng số lịch hẹn của bác sĩ
+  const totalAppointments = await Appointment.count({
+    where: { doctor_id },
+  });
+
+  // Số lịch hẹn hoàn thành + đã thanh toán
+  const completedPaidAppointments = await Appointment.count({
+    where: {
+      doctor_id,
+      status: "completed",
+    },
+    include: [
+      {
+        model: Payment,
+        as: "Payments",
+        where: {
+          status: "paid",
+        },
+        required: true, // chỉ tính nếu có payment paid
+      },
+    ],
+  });
+
+  // Số lịch bị huỷ
+  const cancelledAppointments = await Appointment.count({
+    where: {
+      doctor_id,
+      status: "cancelled",
+    },
+  });
+
+  return {
+    success: true,
+    message: "Thống kê lịch hẹn bác sĩ thành công",
+    data: {
+      total: totalAppointments,
+      completed_paid: completedPaidAppointments,
+      cancelled: cancelledAppointments,
+    },
+  };
+};

@@ -41,6 +41,7 @@ import PaymentUnpaidAdmin from "./pages/Admin/PaymentUnpaidAdmin";
 import PaymentPaidAdmin from "./pages/Admin/PaymentPaidAdmin";
 import SpecializationManageAdmin from "./pages/Admin/SpecializationManageAdmin";
 import DoctorManageAdmin from "./pages/Admin/DoctorManageAdmin";
+import DoctorDetailAdmin from "./pages/Admin/DoctorDetailAdmin";
 
 // Layout cho Patient Portal
 const PatientLayout = () => {
@@ -130,7 +131,10 @@ const App = () => {
           </Route>
           <Route path="management">
             <Route path="departments" element={<SpecializationManageAdmin />} />
-            <Route path="doctors" element={<DoctorManageAdmin />} />
+            <Route path="doctors">
+              <Route index element={<DoctorManageAdmin />} />
+              <Route path=":doctorId" element={<DoctorDetailAdmin />} />
+            </Route>
           </Route>
         </Route>
 

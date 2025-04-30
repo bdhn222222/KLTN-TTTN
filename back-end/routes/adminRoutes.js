@@ -27,6 +27,9 @@ import {
   updateAppointmentController,
   getDoctorbySpecializationController,
   createSpecializationController,
+  getAppointmentByIdDoctorController,
+  getDoctorDayOffsController,
+  getDoctorStatsController,
 } from "../controllers/adminController.js";
 import { authenticateUser } from "../middleware/authentication.js";
 import authorize from "../middleware/authorization.js";
@@ -232,5 +235,23 @@ router.post(
   authorize(["admin"]),
   upload.single("image"),
   createSpecializationController
+);
+router.get(
+  "/doctors/:doctor_id/appointments",
+  authenticateUser,
+  authorize(["admin"]),
+  getAppointmentByIdDoctorController
+);
+router.get(
+  "/doctors/day-off/:doctor_id",
+  authenticateUser,
+  authorize(["admin"]),
+  getDoctorDayOffsController
+);
+router.get(
+  "/doctors/:doctor_id/stats",
+  authenticateUser,
+  authorize(["admin"]),
+  getDoctorStatsController
 );
 export default router;

@@ -500,3 +500,55 @@ export const getDoctorbySpecializationController = async (req, res, next) => {
     next(err);
   }
 };
+export const getAppointmentByIdDoctorController = async (req, res, next) => {
+  try {
+    const doctor_id = parseInt(req.params.doctor_id, 10);
+    if (isNaN(doctor_id)) {
+      throw new BadRequestError("ID bác sĩ không hợp lệ");
+    }
+
+    const result = await adminService.getAppointmentByIdDoctor(doctor_id);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+export const getDoctorDayOffsController = async (req, res, next) => {
+  try {
+    const { doctor_id } = req.params; // Get doctor_id from the URL parameters
+    const { start, end, status, date } = req.query;
+
+    // Validate doctor_id if necessary
+    if (!doctor_id) {
+      throw new BadRequestError("Doctor ID is required");
+    }
+
+    const result = await adminService.getDoctorDayOffs(
+      doctor_id, // Pass the doctor_id directly
+      start,
+      end,
+      status,
+      date
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof BadRequestError) {
+      next(error);
+    } else {
+      next(new InternalServerError(error.message));
+    }
+  }
+};
+export const getDoctorStatsController = async (req, res, next) => {
+  try {
+    const doctor_id = parseInt(req.params.doctor_id, 10);
+    if (isNaN(doctor_id)) {
+      throw new BadRequestError("ID bác sĩ không hợp lệ");
+    }
+
+    const result = await adminService.getDoctorStats(doctor_id);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
