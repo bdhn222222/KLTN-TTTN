@@ -13,6 +13,10 @@ import utc from "dayjs/plugin/utc.js"; // Sử dụng phần mở rộng .js
 import timezone from "dayjs/plugin/timezone.js"; // Sử dụng phần mở rộng .js
 import NotFoundError from "../errors/not_found.js";
 import doctorDayOffs from "../models/doctor-day-offs.js";
+import {
+  sendEmailAcceptAppointment,
+  sendEmailCancelAppointment,
+} from "../utils/gmail.js";
 
 dayjs.extend(timezone);
 dayjs.extend(utc);
@@ -1628,12 +1632,20 @@ export const acceptAppointmentByAdmin = async (
     // 4. Chuyển trạng thái sang accepted
     appointment.status = "accepted";
     await appointment.save({ transaction: t });
-    await t.commit();
-
-    // 5. Format và trả về
     const formattedDate = dayjs(appointment.appointment_datetime)
       .tz("Asia/Ho_Chi_Minh")
       .format("YYYY-MM-DDTHH:mm:ssZ");
+    await sendEmailAcceptAppointment(
+      appointment.FamilyMember.email,
+      appointment.FamilyMember.username,
+      appointment.appointment_datetime
+    );
+    await t.commit();
+
+    // 5. Format và trả về
+    // const formattedDate = dayjs(appointment.appointment_datetime)
+    //   .tz("Asia/Ho_Chi_Minh")
+    //   .format("YYYY-MM-DDTHH:mm:ssZ");
 
     return {
       success: true,
@@ -1719,7 +1731,14 @@ export const cancelAppointmentByAdmin = async ({
     appointment.cancelled_by = admin.username;
     appointment.cancel_reason = oldStatus === "accepted" ? reason : null;
     await appointment.save({ transaction: t });
-
+    const formattedDate = dayjs(appointment.appointment_datetime)
+      .tz("Asia/Ho_Chi_Minh")
+      .format("YYYY-MM-DDTHH:mm:ssZ");
+    await sendEmailCancelAppointment(
+      appointment.FamilyMember.email,
+      appointment.FamilyMember.username,
+      formattedDate
+    );
     await t.commit();
 
     return {

@@ -11,6 +11,7 @@ import patientRoutes from "./routes/patientRoutes.js";
 import requestLogger from "./middleware/logger.js";
 import errorHandler from "./middleware/errorHandler.js";
 import momoRoutes from "./routes/momoRoutes.js";
+import { scheduleBatchExpiryCheck } from "./utils/batchScheduler.js";
 
 dotenv.config();
 
@@ -43,6 +44,8 @@ app.use(requestLogger);
 app.use(errorHandler);
 app.use(requestLogger);
 app.use(errorHandler);
+
+scheduleBatchExpiryCheck();
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);

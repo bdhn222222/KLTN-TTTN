@@ -146,48 +146,36 @@ router.post(
   authorize(["pharmacist"]),
   validate([
     body("name").notEmpty().withMessage("Tên thuốc không được để trống"),
-    body("quantity")
-      .isInt({ min: 0 })
-      .withMessage("Số lượng phải là số nguyên >= 0"),
     body("price").isInt({ min: 0 }).withMessage("Giá phải là số nguyên >= 0"),
     body("unit").notEmpty().withMessage("Đơn vị không được để trống"),
-    body("expiry_date").isISO8601().withMessage("Ngày hết hạn không hợp lệ"),
   ]),
   addMedicineController
 );
-router.put(
+router.patch(
   "/medicines/:id",
   authenticateUser,
   authorize(["pharmacist"]),
   validate([
-    body("name")
-      .optional()
-      .trim()
-      .notEmpty()
-      .withMessage("Tên thuốc không được để trống"),
-    body("quantity")
-      .optional()
-      .isInt({ min: 0 })
-      .withMessage("Số lượng phải là số nguyên >= 0"),
+    // body("name")
+    //   .optional()
+    //   .trim()
+    //   .notEmpty()
+    //   .withMessage("Tên thuốc không được để trống"),
+    // body("price")
+    //   .optional()
+    //   .isInt({ min: 0 })
+    //   .withMessage("Giá phải là số nguyên >= 0"),
+    // body("unit")
+    //   .optional()
+    //   .trim()
+    //   .notEmpty()
+    //   .withMessage("Đơn vị không được để trống"),
+    body("name").optional().isString().withMessage("Tên phải là chuỗi"),
+    body("unit").optional().isString().withMessage("Đơn vị phải là chuỗi"),
     body("price")
       .optional()
-      .isInt({ min: 0 })
-      .withMessage("Giá phải là số nguyên >= 0"),
-    body("unit")
-      .optional()
-      .trim()
-      .notEmpty()
-      .withMessage("Đơn vị không được để trống"),
-    body("expiry_date")
-      .optional()
-      .isISO8601()
-      .withMessage("Ngày hết hạn không hợp lệ")
-      .custom((value) => {
-        if (new Date(value) <= new Date()) {
-          throw new Error("Ngày hết hạn phải lớn hơn hiện tại");
-        }
-        return true;
-      }),
+      .isFloat({ gt: 0 })
+      .withMessage("Giá phải là số lớn hơn 0"),
     body("description").optional(),
     body("supplier").optional(),
   ]),

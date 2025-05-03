@@ -31,11 +31,11 @@ export default (sequelize) => {
       //   allowNull: false,
       //   defaultValue: 0,
       // },
-      is_out_of_stock: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
-      },
+      // is_out_of_stock: {
+      //   type: DataTypes.BOOLEAN,
+      //   allowNull: false,
+      //   defaultValue: false,
+      // },
       price: {
         type: DataTypes.INTEGER,
         allowNull: false,

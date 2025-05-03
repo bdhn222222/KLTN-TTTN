@@ -255,8 +255,12 @@ export const getAllMedicinesController = asyncHandler(async (req, res) => {
 
 // Thêm thuốc mới
 export const addMedicineController = asyncHandler(async (req, res) => {
-  const result = await addMedicine(req.body);
-  res.status(201).json(result);
+  try {
+    const result = await addMedicine(req.body);
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Cập nhật thuốc

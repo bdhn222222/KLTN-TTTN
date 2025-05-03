@@ -704,23 +704,37 @@ export const getAllMedicines = async ({ search, expiry_before, page = 1 }) => {
 };
 
 export const addMedicine = async (medicineData) => {
-  const { name, description, quantity, price, unit, expiry_date, supplier } =
-    medicineData;
-  medicineData.is_out_of_stock = Number(quantity) === 0;
-  if (!name || !quantity || !price || !unit) {
-    throw new BadRequestError("Vui lòng nhập đầy đủ thông tin bắt buộc");
+  try {
+    const { name, unit, price, description } = medicineData;
+
+    // 1. Validate bắt buộc
+    if (!name || !unit || !price) {
+      throw new BadRequestError(
+        "Vui lòng nhập đủ tên thuốc (name), đơn vị (unit) và giá (price)"
+      );
+    }
+
+    // 2. Không cho phép thuốc trùng tên
+    const exists = await Medicine.findOne({ where: { name } });
+    if (exists) {
+      throw new BadRequestError("Tên thuốc đã tồn tại");
+    }
+
+    // 3. Tạo Medicine
+    const newMedicine = await Medicine.create({
+      name,
+      unit,
+      price,
+      description,
+    });
+
+    return {
+      message: "Thêm thuốc thành công",
+      medicine: newMedicine,
+    };
+  } catch (error) {
+    throw new BadRequestError("Lỗi khi thêm thuốc: " + error.message);
   }
-  const existingMedicine = await Medicine.findOne({
-    where: { name },
-  });
-  if (existingMedicine) {
-    throw new BadRequestError("Tên thuốc đã tồn tại");
-  }
-  const newMedicine = await db.Medicine.create(medicineData);
-  return {
-    message: "Thêm thuốc vào kho thành công",
-    medicine: newMedicine,
-  };
 };
 
 export const updateMedicine = async (medicine_id, updateData) => {
@@ -732,65 +746,30 @@ export const updateMedicine = async (medicine_id, updateData) => {
   const allowedFields = [
     "name",
     "description",
-    "quantity",
+    // "quantity",
     "price",
     "unit",
-    "expiry_date",
+    // "expiry_date",
     "supplier",
   ];
 
   const validUpdateData = {};
   for (const field of allowedFields) {
     if (updateData[field] !== undefined) {
+      if (field === "name") {
+        const exists = await Medicine.findOne({
+          where: { name: updateData[field] },
+        });
+        if (exists) {
+          throw new BadRequestError("Tên thuốc đã tồn tại");
+        }
+      }
       validUpdateData[field] = updateData[field];
     }
   }
 
   if (Object.keys(validUpdateData).length === 0) {
     throw new BadRequestError("Không có thông tin hợp lệ để cập nhật");
-  }
-
-  // Validate
-  if (
-    validUpdateData.name !== undefined &&
-    validUpdateData.name.trim() === ""
-  ) {
-    throw new BadRequestError("Tên thuốc không được để trống");
-  }
-
-  if (
-    validUpdateData.price !== undefined &&
-    (isNaN(validUpdateData.price) ||
-      validUpdateData.price < 0 ||
-      !Number.isInteger(Number(validUpdateData.price)))
-  ) {
-    throw new BadRequestError("Giá thuốc phải là số nguyên >= 0");
-  }
-
-  if (validUpdateData.quantity !== undefined) {
-    const quantity = Number(validUpdateData.quantity);
-
-    if (isNaN(quantity) || quantity < 0 || !Number.isInteger(quantity)) {
-      throw new BadRequestError("Số lượng thuốc phải là số nguyên >= 0");
-    }
-
-    validUpdateData.quantity = quantity;
-    validUpdateData.is_out_of_stock = quantity === 0;
-  }
-
-  if (
-    validUpdateData.expiry_date !== undefined &&
-    (!dayjs(validUpdateData.expiry_date).isValid() ||
-      dayjs(validUpdateData.expiry_date).isBefore(dayjs()))
-  ) {
-    throw new BadRequestError("Ngày hết hạn phải hợp lệ và trong tương lai");
-  }
-
-  if (
-    validUpdateData.unit !== undefined &&
-    validUpdateData.unit.trim() === ""
-  ) {
-    throw new BadRequestError("Đơn vị thuốc không được để trống");
   }
 
   await medicine.update(validUpdateData);
