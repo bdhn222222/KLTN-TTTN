@@ -26,11 +26,11 @@ export default (sequelize) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
-      quantity: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 0,
-      },
+      // quantity: {
+      //   type: DataTypes.INTEGER,
+      //   allowNull: false,
+      //   defaultValue: 0,
+      // },
       is_out_of_stock: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
@@ -44,10 +44,10 @@ export default (sequelize) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      expiry_date: {
-        type: DataTypes.DATE,
-        allowNull: false,
-      },
+      // expiry_date: {
+      //   type: DataTypes.DATE,
+      //   allowNull: false,
+      // },
       supplier: {
         type: DataTypes.STRING,
         allowNull: true,

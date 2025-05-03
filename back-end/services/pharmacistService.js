@@ -5,8 +5,8 @@ import jwt from "jsonwebtoken";
 import NotFoundError from "../errors/not_found.js";
 import { Op } from "sequelize";
 import dayjs from "dayjs";
-import utc from 'dayjs/plugin/utc.js';
-import timezone from 'dayjs/plugin/timezone.js';
+import utc from "dayjs/plugin/utc.js";
+import timezone from "dayjs/plugin/timezone.js";
 import InternalServerError from "../errors/internalServerError.js";
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -20,6 +20,7 @@ const {
   Patient,
   PrescriptionMedicine,
   Medicine,
+  Batch,
 } = db;
 
 export const registerPharmacist = async ({
@@ -83,136 +84,153 @@ export const loginPharmacist = async ({ email, password }) => {
 
 export const getPrescriptionDetails = async (prescription_id) => {
   try {
-  const prescription = await db.Prescription.findByPk(prescription_id, {
-    include: [
-      {
-        model: db.PrescriptionMedicine,
-        as: "prescriptionMedicines",
-        attributes: [
-          "prescription_medicine_id",
-          "medicine_id",
-          "quantity",
-          "actual_quantity",
-          "dosage",
-          "frequency", 
-          "duration",
-          "instructions"
-        ],
-        include: [
-          {
-            model: db.Medicine,
-            as: "Medicine",
-            attributes: [
-              "medicine_id",
-              "name",
-              "price",
-              "unit",
-              "expiry_date",
-              "is_out_of_stock",
-              "quantity"
-            ],
-          },
-        ],
-      },
-      {
-        model: db.Appointment,
-        as: "Appointment",
-        attributes: ["appointment_id", "appointment_datetime", "status"],
-        include: [
-          {
-            model: db.Patient,
-            as: "Patient",
-            include: [
-              {
-                model: db.User,
-                as: "user",
-                attributes: ["username", "email"],
-              },
-            ],
-          },
-          {
-            model: db.Doctor,
-            as: "Doctor",
-            include: [
-              {
-                model: db.User,
-                as: "user",
-                attributes: ["username", "email"],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        model: db.PrescriptionPayment,
-        as: "prescriptionPayments",
-        attributes: ["prescription_payment_id", "amount", "status", "payment_method"]
-      }
-    ],
-  });
+    const prescription = await db.Prescription.findByPk(prescription_id, {
+      include: [
+        {
+          model: db.PrescriptionMedicine,
+          as: "prescriptionMedicines",
+          attributes: [
+            "prescription_medicine_id",
+            "medicine_id",
+            "quantity",
+            "actual_quantity",
+            "dosage",
+            "frequency",
+            "duration",
+            "instructions",
+          ],
+          include: [
+            {
+              model: db.Medicine,
+              as: "Medicine",
+              attributes: [
+                "medicine_id",
+                "name",
+                "price",
+                "unit",
+                "is_out_of_stock",
+                "quantity",
+              ],
+            },
+          ],
+        },
+        {
+          model: db.Appointment,
+          as: "Appointment",
+          attributes: ["appointment_id", "appointment_datetime", "status"],
+          include: [
+            {
+              model: db.FamilyMember,
+              as: "FamilyMember",
+              // include: [
+              //   {
+              //     model: db.User,
+              //     as: "user",
+              //     attributes: ["username", "email"],
+              //   },
+              // ],
+            },
+            {
+              model: db.Doctor,
+              as: "Doctor",
+              include: [
+                {
+                  model: db.User,
+                  as: "user",
+                  attributes: ["username", "email"],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          model: db.PrescriptionPayment,
+          as: "prescriptionPayments",
+          attributes: [
+            "prescription_payment_id",
+            "amount",
+            "status",
+            "payment_method",
+          ],
+        },
+      ],
+    });
 
-  if (!prescription) {
-    throw new NotFoundError("Không tìm thấy đơn thuốc");
-  }
-
-  // Format response data
-  return {
-    success: true,
-    message: "Lấy thông tin đơn thuốc thành công",
-    data: {
-      prescription_id: prescription.prescription_id,
-      created_at: dayjs(prescription.createdAt).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
-      appointment: {
-        appointment_id: prescription.Appointment.appointment_id,
-        datetime: dayjs(prescription.Appointment.appointment_datetime)
-          .tz('Asia/Ho_Chi_Minh')
-          .format('YYYY-MM-DD HH:mm:ss'),
-        status: prescription.Appointment.status,
-        patient: {
-          name: prescription.Appointment.Patient.user.username,
-          email: prescription.Appointment.Patient.user.email
-        },
-        doctor: {
-          name: prescription.Appointment.Doctor.user.username,
-          email: prescription.Appointment.Doctor.user.email
-        }
-      },
-      medicines: prescription.prescriptionMedicines.map(item => ({
-        prescription_medicine_id: item.prescription_medicine_id,
-        medicine: {
-          medicine_id: item.Medicine.medicine_id,
-          name: item.Medicine.name,
-          unit: item.Medicine.unit,
-          price: item.Medicine.price ? `${item.Medicine.price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-          stock_quantity: item.Medicine.quantity,
-          expiry_date: item.Medicine.expiry_date ? 
-            dayjs(item.Medicine.expiry_date).format('YYYY-MM-DD') : null,
-          status: item.Medicine.is_out_of_stock ? 'Tạm hết hàng' : 'Còn hàng'
-        },
-        prescribed: {
-          quantity: item.quantity || 0,
-          dosage: item.dosage || 'Chưa có thông tin',
-          frequency: item.frequency || 'Chưa có thông tin',
-          duration: item.duration || 'Chưa có thông tin',
-          instructions: item.instructions || 'Chưa có hướng dẫn'
-        },
-        dispensed: {
-          quantity: item.actual_quantity || null
-        }
-      })),
-      payment: prescription.prescriptionPayments ? {
-        payment_id: prescription.prescriptionPayments.prescription_payment_id,
-        amount: prescription.prescriptionPayments.amount ? 
-          `${prescription.prescriptionPayments.amount.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-        status: prescription.prescriptionPayments.status,
-        payment_method: prescription.prescriptionPayments.payment_method
-      } : null
+    if (!prescription) {
+      throw new NotFoundError("Không tìm thấy đơn thuốc");
     }
-  };
-} catch (error) {
-  console.error('Error fetching prescription details:', error);
-  throw new InternalServerError('Lỗi khi lấy thông tin đơn thuốc');
-}
+
+    // Format response data
+    return {
+      success: true,
+      message: "Lấy thông tin đơn thuốc thành công",
+      data: {
+        prescription_id: prescription.prescription_id,
+        created_at: dayjs(prescription.createdAt)
+          .tz("Asia/Ho_Chi_Minh")
+          .format("YYYY-MM-DD HH:mm:ss"),
+        appointment: {
+          appointment_id: prescription.Appointment.appointment_id,
+          datetime: dayjs(prescription.Appointment.appointment_datetime)
+            .tz("Asia/Ho_Chi_Minh")
+            .format("YYYY-MM-DD HH:mm:ss"),
+          status: prescription.Appointment.status,
+          family_member: {
+            name: prescription.Appointment.FamilyMember.username,
+            email: prescription.Appointment.FamilyMember.email,
+            date_of_birth: prescription.Appointment.FamilyMember.date_of_birth,
+            gender: prescription.Appointment.FamilyMember.gender,
+            relationship: prescription.Appointment.FamilyMember.relationship,
+          },
+          doctor: {
+            name: prescription.Appointment.Doctor.user.username,
+            email: prescription.Appointment.Doctor.user.email,
+          },
+        },
+        medicines: prescription.prescriptionMedicines.map((item) => ({
+          prescription_medicine_id: item.prescription_medicine_id,
+          medicine: {
+            medicine_id: item.Medicine.medicine_id,
+            name: item.Medicine.name,
+            unit: item.Medicine.unit,
+            price: item.Medicine.price
+              ? `${item.Medicine.price.toLocaleString("vi-VN")} VNĐ`
+              : "0 VNĐ",
+            status: item.Medicine.is_out_of_stock ? "Tạm hết hàng" : "Còn hàng",
+            description: item.Medicine.description || "Chưa có mô tả",
+            supplier:
+              item.Medicine.supplier || "Chưa có thông tin nhà cung cấp",
+          },
+          prescribed: {
+            quantity: item.quantity || 0,
+            dosage: item.dosage || "Chưa có thông tin",
+            frequency: item.frequency || "Chưa có thông tin",
+            duration: item.duration || "Chưa có thông tin",
+            instructions: item.instructions || "Chưa có hướng dẫn",
+          },
+          dispensed: {
+            quantity: item.actual_quantity || null,
+          },
+        })),
+        payment: prescription.prescriptionPayments
+          ? {
+              payment_id:
+                prescription.prescriptionPayments.prescription_payment_id,
+              amount: prescription.prescriptionPayments.amount
+                ? `${prescription.prescriptionPayments.amount.toLocaleString(
+                    "vi-VN"
+                  )} VNĐ`
+                : "0 VNĐ",
+              status: prescription.prescriptionPayments.status,
+              payment_method: prescription.prescriptionPayments.payment_method,
+            }
+          : null,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching prescription details:", error);
+    throw new InternalServerError("Lỗi khi lấy thông tin đơn thuốc");
+  }
 };
 
 export const updatePrescriptionItem = async (
@@ -249,9 +267,9 @@ export const updatePrescriptionItem = async (
     include: [
       {
         model: db.Medicine,
-        as: "medicine"
-      }
-    ]
+        as: "medicine",
+      },
+    ],
   });
 
   if (!prescriptionMedicine) {
@@ -259,7 +277,11 @@ export const updatePrescriptionItem = async (
   }
 
   // Kiểm tra số lượng thực tế
-  if (isNaN(actual_quantity) || !Number.isInteger(actual_quantity) || actual_quantity < 0) {
+  if (
+    isNaN(actual_quantity) ||
+    !Number.isInteger(actual_quantity) ||
+    actual_quantity < 0
+  ) {
     throw new BadRequestError("Số lượng thuốc phải là số nguyên >= 0");
   }
 
@@ -274,9 +296,9 @@ export const updatePrescriptionItem = async (
         medicine: {
           medicine_id: prescriptionMedicine.medicine.medicine_id,
           name: prescriptionMedicine.medicine.name,
-          unit: prescriptionMedicine.medicine.unit
-        }
-      }
+          unit: prescriptionMedicine.medicine.unit,
+        },
+      },
     };
   }
 
@@ -285,7 +307,7 @@ export const updatePrescriptionItem = async (
     // Kiểm tra số lượng tồn kho
     if (actual_quantity > prescriptionMedicine.medicine.quantity) {
       throw new BadRequestError(
-        `Thuốc ${prescriptionMedicine.medicine.name} không đủ số lượng trong kho. Hiện chỉ còn ${prescriptionMedicine.medicine.quantity} ${prescriptionMedicine.medicine.unit}`
+        `Thuốc ${prescriptionMedicine.medicine.name} không đủ số lượng trong kho hoặc đã hết hàng`
       );
     }
 
@@ -296,7 +318,7 @@ export const updatePrescriptionItem = async (
       dosage: dosage || prescriptionMedicine.dosage,
       frequency: frequency || prescriptionMedicine.frequency,
       duration: duration || prescriptionMedicine.duration,
-      instructions: instructions || prescriptionMedicine.instructions
+      instructions: instructions || prescriptionMedicine.instructions,
     };
 
     await prescriptionMedicine.update(updateData);
@@ -310,19 +332,31 @@ export const updatePrescriptionItem = async (
           medicine_id: prescriptionMedicine.medicine.medicine_id,
           name: prescriptionMedicine.medicine.name,
           unit: prescriptionMedicine.medicine.unit,
-          price: prescriptionMedicine.medicine.price ? 
-            `${prescriptionMedicine.medicine.price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ'
+          price: prescriptionMedicine.medicine.price
+            ? `${prescriptionMedicine.medicine.price.toLocaleString(
+                "vi-VN"
+              )} VNĐ`
+            : "0 VNĐ",
         },
         quantity: actual_quantity,
-        total_price: prescriptionMedicine.medicine.price * actual_quantity ? 
-          `${(prescriptionMedicine.medicine.price * actual_quantity).toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
+        total_price:
+          prescriptionMedicine.medicine.price * actual_quantity
+            ? `${(
+                prescriptionMedicine.medicine.price * actual_quantity
+              ).toLocaleString("vi-VN")} VNĐ`
+            : "0 VNĐ",
         prescribed: {
-          dosage: dosage || prescriptionMedicine.dosage || 'Chưa có thông tin',
-          frequency: frequency || prescriptionMedicine.frequency || 'Chưa có thông tin',
-          duration: duration || prescriptionMedicine.duration || 'Chưa có thông tin',
-          instructions: instructions || prescriptionMedicine.instructions || 'Chưa có hướng dẫn'
-        }
-      }
+          dosage: dosage || prescriptionMedicine.dosage || "Chưa có thông tin",
+          frequency:
+            frequency || prescriptionMedicine.frequency || "Chưa có thông tin",
+          duration:
+            duration || prescriptionMedicine.duration || "Chưa có thông tin",
+          instructions:
+            instructions ||
+            prescriptionMedicine.instructions ||
+            "Chưa có hướng dẫn",
+        },
+      },
     };
   }
 
@@ -352,38 +386,50 @@ export const updatePrescriptionItem = async (
     dosage: dosage || prescriptionMedicine.dosage,
     frequency: frequency || prescriptionMedicine.frequency,
     duration: duration || prescriptionMedicine.duration,
-    instructions: instructions || prescriptionMedicine.instructions
+    instructions: instructions || prescriptionMedicine.instructions,
   });
 
   return {
     success: true,
     message: "Thay thế thuốc thành công",
     data: {
-      prescription_medicine_id: newPrescriptionMedicine.prescription_medicine_id,
+      prescription_medicine_id:
+        newPrescriptionMedicine.prescription_medicine_id,
       original_medicine: {
         medicine_id: prescriptionMedicine.medicine.medicine_id,
         name: prescriptionMedicine.medicine.name,
         unit: prescriptionMedicine.medicine.unit,
-        price: prescriptionMedicine.medicine.price ? 
-          `${prescriptionMedicine.medicine.price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ'
+        price: prescriptionMedicine.medicine.price
+          ? `${prescriptionMedicine.medicine.price.toLocaleString("vi-VN")} VNĐ`
+          : "0 VNĐ",
       },
       new_medicine: {
         medicine_id: newMedicine.medicine_id,
         name: newMedicine.name,
         unit: newMedicine.unit,
-        price: newMedicine.price ? 
-          `${newMedicine.price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ'
+        price: newMedicine.price
+          ? `${newMedicine.price.toLocaleString("vi-VN")} VNĐ`
+          : "0 VNĐ",
       },
       quantity: actual_quantity,
-      total_price: newMedicine.price * actual_quantity ? 
-        `${(newMedicine.price * actual_quantity).toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
+      total_price:
+        newMedicine.price * actual_quantity
+          ? `${(newMedicine.price * actual_quantity).toLocaleString(
+              "vi-VN"
+            )} VNĐ`
+          : "0 VNĐ",
       prescribed: {
-        dosage: dosage || prescriptionMedicine.dosage || 'Chưa có thông tin',
-        frequency: frequency || prescriptionMedicine.frequency || 'Chưa có thông tin',
-        duration: duration || prescriptionMedicine.duration || 'Chưa có thông tin',
-        instructions: instructions || prescriptionMedicine.instructions || 'Chưa có hướng dẫn'
-      }
-    }
+        dosage: dosage || prescriptionMedicine.dosage || "Chưa có thông tin",
+        frequency:
+          frequency || prescriptionMedicine.frequency || "Chưa có thông tin",
+        duration:
+          duration || prescriptionMedicine.duration || "Chưa có thông tin",
+        instructions:
+          instructions ||
+          prescriptionMedicine.instructions ||
+          "Chưa có hướng dẫn",
+      },
+    },
   };
 };
 
@@ -396,15 +442,15 @@ export const completePrescription = async (prescription_id, pharmacist_id) => {
         include: [
           {
             model: db.Medicine,
-            as: "medicine"
-          }
-        ]
+            as: "medicine",
+          },
+        ],
       },
       {
         model: db.PrescriptionPayment,
-        as: "prescriptionPayments"
-      }
-    ]
+        as: "prescriptionPayments",
+      },
+    ],
   });
 
   if (!prescription) {
@@ -415,32 +461,37 @@ export const completePrescription = async (prescription_id, pharmacist_id) => {
     throw new BadRequestError("Đơn thuốc đã được xác nhận phát thuốc trước đó");
   }
 
-  if (!prescription.prescriptionMedicines || prescription.prescriptionMedicines.length === 0) {
+  if (
+    !prescription.prescriptionMedicines ||
+    prescription.prescriptionMedicines.length === 0
+  ) {
     throw new BadRequestError("Đơn thuốc không có thuốc để xác nhận");
   }
 
   // Kiểm tra thanh toán
-  if (!prescription.prescriptionPayments || prescription.prescriptionPayments.status !== 'paid') {
+  if (
+    !prescription.prescriptionPayments ||
+    prescription.prescriptionPayments.status !== "paid"
+  ) {
     throw new BadRequestError("Đơn thuốc chưa được thanh toán");
   }
 
   // Kiểm tra số lượng thuốc thực tế
   for (const item of prescription.prescriptionMedicines) {
     if (!item.actual_quantity && item.actual_quantity !== 0) {
-      throw new BadRequestError(`Chưa nhập số lượng thực tế cho thuốc ${item.medicine.name}`);
-    }
-
-    // Kiểm tra số lượng tồn kho
-    if (item.actual_quantity > item.medicine.quantity) {
       throw new BadRequestError(
-        `Thuốc ${item.medicine.name} không đủ số lượng trong kho. Hiện chỉ còn ${item.medicine.quantity} ${item.medicine.unit}`
+        `Chưa nhập số lượng thực tế cho thuốc ${item.medicine.name}`
       );
     }
 
-    // Cập nhật số lượng tồn kho
+    // Kiểm tra số lượng tồn kho
+    if (item.medicine.is_out_of_stock) {
+      throw new BadRequestError(`Thuốc ${item.medicine.name} đã hết hàng`);
+    }
+
+    // Cập nhật trạng thái hết hàng
     await item.medicine.update({
-      quantity: item.medicine.quantity - item.actual_quantity,
-      is_out_of_stock: (item.medicine.quantity - item.actual_quantity) === 0
+      is_out_of_stock: true,
     });
   }
 
@@ -448,7 +499,7 @@ export const completePrescription = async (prescription_id, pharmacist_id) => {
   await prescription.update({
     status: "completed",
     pharmacist_id,
-    completed_at: new Date()
+    completed_at: new Date(),
   });
 
   return {
@@ -456,40 +507,47 @@ export const completePrescription = async (prescription_id, pharmacist_id) => {
     message: "Xác nhận phát thuốc thành công",
     data: {
       prescription_id: prescription.prescription_id,
-      completed_at: dayjs(prescription.completed_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
+      completed_at: dayjs(prescription.completed_at)
+        .tz("Asia/Ho_Chi_Minh")
+        .format("YYYY-MM-DD HH:mm:ss"),
       pharmacist_id: prescription.pharmacist_id,
-      medicines: prescription.prescriptionMedicines.map(item => ({
+      medicines: prescription.prescriptionMedicines.map((item) => ({
         medicine_name: item.medicine.name,
         actual_quantity: item.actual_quantity,
-        remaining_quantity: item.medicine.quantity - item.actual_quantity
-      }))
-    }
+        remaining_quantity: item.medicine.quantity - item.actual_quantity,
+      })),
+    },
   };
 };
 
-export const confirmPrescriptionPreparation = async (prescription_id, pharmacist_id) => {
+export const confirmPrescriptionPreparation = async (
+  prescription_id,
+  pharmacist_id
+) => {
   const t = await db.sequelize.transaction();
 
   try {
     // 1. Kiểm tra dược sĩ tồn tại
     const pharmacist = await db.Pharmacist.findOne({
       where: { user_id: pharmacist_id },
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['username']
-      }]
+      include: [
+        {
+          model: db.User,
+          as: "user",
+          attributes: ["username"],
+        },
+      ],
     });
 
     if (!pharmacist) {
-      console.log('Không tìm thấy pharmacist với user_id:', pharmacist_id);
+      console.log("Không tìm thấy pharmacist với user_id:", pharmacist_id);
       throw new NotFoundError("Không tìm thấy thông tin dược sĩ");
     }
 
-    console.log('Found pharmacist:', {
+    console.log("Found pharmacist:", {
       pharmacist_id: pharmacist.pharmacist_id,
       user_id: pharmacist.user_id,
-      username: pharmacist.user?.username
+      username: pharmacist.user?.username,
     });
 
     // 2. Kiểm tra đơn thuốc tồn tại
@@ -501,12 +559,12 @@ export const confirmPrescriptionPreparation = async (prescription_id, pharmacist
           include: [
             {
               model: db.Medicine,
-              as: "medicine"
-            }
-          ]
-        }
+              as: "medicine",
+            },
+          ],
+        },
       ],
-      transaction: t
+      transaction: t,
     });
 
     if (!prescription) {
@@ -519,7 +577,10 @@ export const confirmPrescriptionPreparation = async (prescription_id, pharmacist
     }
 
     // 4. Kiểm tra danh sách thuốc
-    if (!prescription.prescriptionMedicines || prescription.prescriptionMedicines.length === 0) {
+    if (
+      !prescription.prescriptionMedicines ||
+      prescription.prescriptionMedicines.length === 0
+    ) {
       throw new BadRequestError("Đơn thuốc không có thuốc để xác nhận");
     }
 
@@ -539,20 +600,26 @@ export const confirmPrescriptionPreparation = async (prescription_id, pharmacist
     }
 
     // 6. Tạo bản ghi thanh toán đơn thuốc
-    const prescriptionPayment = await db.PrescriptionPayment.create({
-      prescription_id: prescription.prescription_id,
-      amount: totalAmount,
-      status: 'pending',
-      created_by: pharmacist.pharmacist_id,
-      createdAt: new Date()
-    }, { transaction: t });
+    const prescriptionPayment = await db.PrescriptionPayment.create(
+      {
+        prescription_id: prescription.prescription_id,
+        amount: totalAmount,
+        status: "pending",
+        created_by: pharmacist.pharmacist_id,
+        createdAt: new Date(),
+      },
+      { transaction: t }
+    );
 
     // 7. Cập nhật đơn thuốc
-    await prescription.update({
-      status: "waiting_payment",
-      pharmacist_id: pharmacist.pharmacist_id,
-      confirmed_at: new Date()
-    }, { transaction: t });
+    await prescription.update(
+      {
+        status: "waiting_payment",
+        pharmacist_id: pharmacist.pharmacist_id,
+        confirmed_at: new Date(),
+      },
+      { transaction: t }
+    );
 
     await t.commit();
 
@@ -563,32 +630,34 @@ export const confirmPrescriptionPreparation = async (prescription_id, pharmacist
       data: {
         prescription_id: prescription.prescription_id,
         confirmed_at: dayjs(prescription.confirmed_at)
-          .tz('Asia/Ho_Chi_Minh')
-          .format('YYYY-MM-DD HH:mm:ss'),
+          .tz("Asia/Ho_Chi_Minh")
+          .format("YYYY-MM-DD HH:mm:ss"),
         payment: {
           prescription_payment_id: prescriptionPayment.prescription_payment_id,
-          amount: `${totalAmount.toLocaleString('vi-VN')} VNĐ`,
-          status: prescriptionPayment.status
+          amount: `${totalAmount.toLocaleString("vi-VN")} VNĐ`,
+          status: prescriptionPayment.status,
         },
-        medicines: prescription.prescriptionMedicines.map(item => ({
+        medicines: prescription.prescriptionMedicines.map((item) => ({
           medicine_id: item.medicine.medicine_id,
           name: item.medicine.name,
           quantity: item.quantity,
           unit: item.medicine.unit,
-          unit_price: `${item.medicine.price.toLocaleString('vi-VN')} VNĐ`,
-          total_price: `${(item.quantity * item.medicine.price).toLocaleString('vi-VN')} VNĐ`,
+          unit_price: `${item.medicine.price.toLocaleString("vi-VN")} VNĐ`,
+          total_price: `${(item.quantity * item.medicine.price).toLocaleString(
+            "vi-VN"
+          )} VNĐ`,
           prescribed: {
-            dosage: item.dosage || 'Chưa có thông tin',
-            frequency: item.frequency || 'Chưa có thông tin', 
-            duration: item.duration || 'Chưa có thông tin',
-            instructions: item.instructions || 'Chưa có hướng dẫn'
-          }
+            dosage: item.dosage || "Chưa có thông tin",
+            frequency: item.frequency || "Chưa có thông tin",
+            duration: item.duration || "Chưa có thông tin",
+            instructions: item.instructions || "Chưa có hướng dẫn",
+          },
         })),
         pharmacist: {
           pharmacist_id: pharmacist.pharmacist_id,
-          name: pharmacist.user ? pharmacist.user.username : null
-        }
-      }
+          name: pharmacist.user ? pharmacist.user.username : null,
+        },
+      },
     };
   } catch (error) {
     await t.rollback();
@@ -638,7 +707,7 @@ export const addMedicine = async (medicineData) => {
   const { name, description, quantity, price, unit, expiry_date, supplier } =
     medicineData;
   medicineData.is_out_of_stock = Number(quantity) === 0;
-  if (!name || !quantity || !price || !unit || !expiry_date) {
+  if (!name || !quantity || !price || !unit) {
     throw new BadRequestError("Vui lòng nhập đầy đủ thông tin bắt buộc");
   }
   const existingMedicine = await Medicine.findOne({
@@ -872,7 +941,7 @@ export const changePharmacistPassword = async (user_id, data) => {
   if (newPassword !== confirmPassword) {
     throw new BadRequestError("Mật khẩu xác nhận không khớp");
   }
-}
+};
 
 /**
  * Từ chối đơn thuốc
@@ -888,11 +957,13 @@ export const rejectPrescription = async (prescription_id, reason, user_id) => {
     // 1. Kiểm tra dược sĩ tồn tại
     const pharmacist = await db.Pharmacist.findOne({
       where: { user_id },
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['username']
-      }]
+      include: [
+        {
+          model: db.User,
+          as: "user",
+          attributes: ["username"],
+        },
+      ],
     });
 
     if (!pharmacist) {
@@ -913,13 +984,13 @@ export const rejectPrescription = async (prescription_id, reason, user_id) => {
                 {
                   model: db.User,
                   as: "user",
-                  attributes: ["username", "email"]
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                  attributes: ["username", "email"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
     });
 
     if (!prescription) {
@@ -928,54 +999,69 @@ export const rejectPrescription = async (prescription_id, reason, user_id) => {
 
     // 3. Kiểm tra điều kiện từ chối
     if (!prescription.use_hospital_pharmacy) {
-      throw new BadRequestError("Đơn thuốc này không sử dụng nhà thuốc bệnh viện");
+      throw new BadRequestError(
+        "Đơn thuốc này không sử dụng nhà thuốc bệnh viện"
+      );
     }
 
-    if (prescription.status === "completed" || prescription.status === "cancelled") {
-      throw new BadRequestError("Không thể từ chối đơn thuốc đã hoàn tất hoặc đã hủy");
+    if (
+      prescription.status === "completed" ||
+      prescription.status === "cancelled"
+    ) {
+      throw new BadRequestError(
+        "Không thể từ chối đơn thuốc đã hoàn tất hoặc đã hủy"
+      );
     }
 
     // 4. Cập nhật đơn thuốc
-    await prescription.update({
-      status: "cancelled",
-      cancel_reason: reason,
-      cancelled_at: new Date(),
-      cancelled_by: pharmacist.pharmacist_id
-    }, { transaction: t });
+    await prescription.update(
+      {
+        status: "cancelled",
+        cancel_reason: reason,
+        cancelled_at: new Date(),
+        cancelled_by: pharmacist.pharmacist_id,
+      },
+      { transaction: t }
+    );
 
     // 5. Nếu đã có payment, cập nhật trạng thái payment thành cancelled
     const prescriptionPayment = await db.PrescriptionPayment.findOne({
       where: { prescription_id },
-      transaction: t
+      transaction: t,
     });
 
-    if (prescriptionPayment && prescriptionPayment.status === 'pending') {
-      await prescriptionPayment.update({
-        status: 'cancelled',
-        updated_by: pharmacist.pharmacist_id,
-        note: `Đơn thuốc bị từ chối: ${reason}`
-      }, { transaction: t });
+    if (prescriptionPayment && prescriptionPayment.status === "pending") {
+      await prescriptionPayment.update(
+        {
+          status: "cancelled",
+          updated_by: pharmacist.pharmacist_id,
+          note: `Đơn thuốc bị từ chối: ${reason}`,
+        },
+        { transaction: t }
+      );
     }
 
     await t.commit();
 
     // 6. Trả về kết quả
-  return {
-    success: true,
+    return {
+      success: true,
       message: "Từ chối đơn thuốc thành công",
       data: {
         prescription_id: prescription.prescription_id,
-        cancelled_at: dayjs(prescription.cancelled_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
+        cancelled_at: dayjs(prescription.cancelled_at)
+          .tz("Asia/Ho_Chi_Minh")
+          .format("YYYY-MM-DD HH:mm:ss"),
         cancel_reason: prescription.cancel_reason,
         pharmacist: {
           pharmacist_id: pharmacist.pharmacist_id,
-          name: pharmacist.user.username
+          name: pharmacist.user.username,
         },
         patient: {
           name: prescription.Appointment.Patient.user.username,
-          email: prescription.Appointment.Patient.user.email
-        }
-      }
+          email: prescription.Appointment.Patient.user.email,
+        },
+      },
     };
   } catch (error) {
     await t.rollback();
@@ -1002,11 +1088,11 @@ export const getAllPrescriptions = async ({
   payment_status,
   status,
   page = 1,
-  limit = 10
+  limit = 10,
 }) => {
   const offset = (page - 1) * limit;
   const whereClause = {
-    use_hospital_pharmacy: true // Chỉ lấy đơn thuốc được phát tại nhà thuốc bệnh viện
+    use_hospital_pharmacy: true, // Chỉ lấy đơn thuốc được phát tại nhà thuốc bệnh viện
   };
   const paymentWhereClause = {};
 
@@ -1014,17 +1100,26 @@ export const getAllPrescriptions = async ({
   if (start_date || end_date) {
     whereClause.createdAt = {};
     if (start_date) {
-      whereClause.createdAt[Op.gte] = dayjs.tz(start_date, 'Asia/Ho_Chi_Minh').startOf('day').toDate();
+      whereClause.createdAt[Op.gte] = dayjs
+        .tz(start_date, "Asia/Ho_Chi_Minh")
+        .startOf("day")
+        .toDate();
     }
     if (end_date) {
-      whereClause.createdAt[Op.lte] = dayjs.tz(end_date, 'Asia/Ho_Chi_Minh').endOf('day').toDate();
+      whereClause.createdAt[Op.lte] = dayjs
+        .tz(end_date, "Asia/Ho_Chi_Minh")
+        .endOf("day")
+        .toDate();
     }
   }
   if (date) {
-    const startOfDay = dayjs.tz(date, 'Asia/Ho_Chi_Minh').startOf('day').toDate();
-    const endOfDay = dayjs.tz(date, 'Asia/Ho_Chi_Minh').endOf('day').toDate();
+    const startOfDay = dayjs
+      .tz(date, "Asia/Ho_Chi_Minh")
+      .startOf("day")
+      .toDate();
+    const endOfDay = dayjs.tz(date, "Asia/Ho_Chi_Minh").endOf("day").toDate();
     whereClause.createdAt = {
-      [Op.between]: [startOfDay, endOfDay]
+      [Op.between]: [startOfDay, endOfDay],
     };
   }
 
@@ -1039,29 +1134,16 @@ export const getAllPrescriptions = async ({
   }
 
   // Log điều kiện tìm kiếm để debug
-  console.log('Search Conditions:', {
+  console.log("Search Conditions:", {
     whereClause,
     paymentWhereClause,
     page,
     limit,
-    offset
+    offset,
   });
 
   // Thực hiện truy vấn
   const { count, rows } = await db.Prescription.findAndCountAll({
-    attributes: [
-      'prescription_id',
-      'pharmacist_id',
-      'appointment_id',
-      'status',
-      'createdAt',
-      'confirmed_at',
-      'completed_at',
-      'cancelled_at',
-      'rejected_at',
-      'rejection_reason',
-      'cancel_reason'
-    ],
     where: whereClause,
     include: [
       {
@@ -1078,7 +1160,8 @@ export const getAllPrescriptions = async ({
           "duration",
           "instructions",
           "unit_price",
-          "total_price"
+          "total_price",
+          "note",
         ],
         include: [
           {
@@ -1089,8 +1172,9 @@ export const getAllPrescriptions = async ({
               "name",
               "unit",
               "price",
-              "quantity",
-              "is_out_of_stock"
+              "is_out_of_stock",
+              "description",
+              "supplier",
             ],
           },
         ],
@@ -1099,20 +1183,28 @@ export const getAllPrescriptions = async ({
         model: db.Appointment,
         as: "Appointment",
         required: false,
-        attributes: ["appointment_id", "appointment_datetime", "status"],
+        attributes: [
+          "appointment_id",
+          "appointment_datetime",
+          "status",
+          "fees",
+          "cancelled_at",
+          "cancelled_by",
+          "cancel_reason",
+        ],
         include: [
           {
-            model: db.Patient,
-            as: "Patient",
+            model: db.FamilyMember,
+            as: "FamilyMember",
             required: false,
-            attributes: ["patient_id", "phone_number"],
-            include: [
-              {
-                model: db.User,
-                as: "user",
-                required: false,
-                attributes: ["username", "email"],
-              },
+            attributes: [
+              "family_member_id",
+              "username",
+              "email",
+              "phone_number",
+              "gender",
+              "date_of_birth",
+              "relationship",
             ],
           },
           {
@@ -1135,7 +1227,16 @@ export const getAllPrescriptions = async ({
         as: "prescriptionPayments",
         where: paymentWhereClause,
         required: !!payment_status,
-        attributes: ["prescription_payment_id", "amount", "status", "payment_method", "payment_date"]
+        attributes: [
+          "prescription_payment_id",
+          "amount",
+          "status",
+          "payment_method",
+          "payment_date",
+          "note",
+          "created_by",
+          "updated_by",
+        ],
       },
       {
         model: db.Pharmacist,
@@ -1146,104 +1247,175 @@ export const getAllPrescriptions = async ({
             model: db.User,
             as: "user",
             required: false,
-            attributes: ["username"]
-          }
-        ]
-      }
+            attributes: ["username", "email"],
+          },
+        ],
+      },
     ],
-    order: [['createdAt', 'DESC']],
+    order: [["createdAt", "DESC"]],
     limit,
     offset,
-    distinct: true
+    distinct: true,
   });
 
-  // Log kết quả truy vấn để debug
-  console.log('Query Results:', {
-    totalRecords: count,
-    recordsReturned: rows.length
-  });
-
-  const prescriptions = rows.map(prescription => ({
+  // Format dữ liệu trả về
+  const prescriptions = rows.map((prescription) => ({
     prescription_id: prescription.prescription_id,
-    created_at: dayjs(prescription.createdAt).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
+    created_at: dayjs(prescription.createdAt)
+      .tz("Asia/Ho_Chi_Minh")
+      .format("YYYY-MM-DD HH:mm:ss"),
     status: prescription.status,
     status_info: {
-      confirmed_at: prescription.confirmed_at ? 
-        dayjs(prescription.confirmed_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
-      completed_at: prescription.completed_at ? 
-        dayjs(prescription.completed_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
-      cancelled_at: prescription.cancelled_at ? 
-        dayjs(prescription.cancelled_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
-      rejected_at: prescription.rejected_at ? 
-        dayjs(prescription.rejected_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
+      confirmed_at: prescription.confirmed_at
+        ? dayjs(prescription.confirmed_at)
+            .tz("Asia/Ho_Chi_Minh")
+            .format("YYYY-MM-DD HH:mm:ss")
+        : null,
+      completed_at: prescription.completed_at
+        ? dayjs(prescription.completed_at)
+            .tz("Asia/Ho_Chi_Minh")
+            .format("YYYY-MM-DD HH:mm:ss")
+        : null,
+      cancelled_at: prescription.cancelled_at
+        ? dayjs(prescription.cancelled_at)
+            .tz("Asia/Ho_Chi_Minh")
+            .format("YYYY-MM-DD HH:mm:ss")
+        : null,
+      rejected_at: prescription.rejected_at
+        ? dayjs(prescription.rejected_at)
+            .tz("Asia/Ho_Chi_Minh")
+            .format("YYYY-MM-DD HH:mm:ss")
+        : null,
       rejection_reason: prescription.rejection_reason,
-      cancel_reason: prescription.cancel_reason
+      cancel_reason: prescription.cancel_reason,
     },
-    appointment: prescription.Appointment ? {
-      appointment_id: prescription.Appointment.appointment_id,
-      datetime: prescription.Appointment.appointment_datetime ? 
-        dayjs(prescription.Appointment.appointment_datetime)
-          .tz('Asia/Ho_Chi_Minh')
-          .format('YYYY-MM-DD HH:mm:ss') : null,
-      status: prescription.Appointment.status,
-      patient: prescription.Appointment.Patient?.user ? {
-        name: prescription.Appointment.Patient.user.username,
-        email: prescription.Appointment.Patient.user.email,
-        phone_number: prescription.Appointment.Patient.phone_number || null
-      } : null,
-      doctor: prescription.Appointment.Doctor?.user ? {
-        name: prescription.Appointment.Doctor.user.username,
-        email: prescription.Appointment.Doctor.user.email
-      } : null
-    } : null,
-    medicines: prescription.prescriptionMedicines?.map(item => ({
-      prescription_medicine_id: item.prescription_medicine_id,
-      medicine: item.Medicine ? {
-        medicine_id: item.Medicine.medicine_id,
-        name: item.Medicine.name,
-        unit: item.Medicine.unit,
-        price: item.Medicine.price ? `${item.Medicine.price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-        status: item.Medicine.is_out_of_stock ? 'Tạm hết hàng' : 'Còn hàng'
-      } : null,
-      prescribed: {
-        quantity: item.quantity || 0,
-        dosage: item.dosage || 'Chưa có thông tin',
-        frequency: item.frequency || 'Chưa có thông tin',
-        duration: item.duration || 'Chưa có thông tin',
-        instructions: item.instructions || 'Chưa có hướng dẫn',
-        total_price: item.total_price ? `${item.total_price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ'
-      },
-      dispensed: {
-        quantity: item.actual_quantity || null,
-      }
-    })) || [],
-    payment: prescription.prescriptionPayments ? {
-      payment_id: prescription.prescriptionPayments.prescription_payment_id,
-      amount: prescription.prescriptionPayments.amount ? 
-        `${prescription.prescriptionPayments.amount.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-      status: prescription.prescriptionPayments.status,
-      payment_method: prescription.prescriptionPayments.payment_method,
-      payment_date: prescription.prescriptionPayments.payment_date ? 
-        dayjs(prescription.prescriptionPayments.payment_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null
-    } : null,
-    pharmacist: prescription.pharmacist?.user ? {
-      pharmacist_id: prescription.pharmacist.pharmacist_id,
-      name: prescription.pharmacist.user.username
-    } : null
+    appointment: prescription.Appointment
+      ? {
+          appointment_id: prescription.Appointment.appointment_id,
+          datetime: prescription.Appointment.appointment_datetime
+            ? dayjs(prescription.Appointment.appointment_datetime)
+                .tz("Asia/Ho_Chi_Minh")
+                .format("YYYY-MM-DD HH:mm:ss")
+            : null,
+          status: prescription.Appointment.status,
+          fees: prescription.Appointment.fees
+            ? `${prescription.Appointment.fees.toLocaleString("vi-VN")} VNĐ`
+            : "0 VNĐ",
+          cancelled_info: prescription.Appointment.cancelled_at
+            ? {
+                cancelled_at: dayjs(prescription.Appointment.cancelled_at)
+                  .tz("Asia/Ho_Chi_Minh")
+                  .format("YYYY-MM-DD HH:mm:ss"),
+                cancelled_by: prescription.Appointment.cancelled_by,
+                cancel_reason: prescription.Appointment.cancel_reason,
+              }
+            : null,
+          family_member: prescription.Appointment.FamilyMember
+            ? {
+                name: prescription.Appointment.FamilyMember.username,
+                email: prescription.Appointment.FamilyMember.email,
+                phone_number:
+                  prescription.Appointment.FamilyMember.phone_number,
+                gender: prescription.Appointment.FamilyMember.gender,
+                date_of_birth: prescription.Appointment.FamilyMember
+                  .date_of_birth
+                  ? dayjs(prescription.Appointment.FamilyMember.date_of_birth)
+                      .tz("Asia/Ho_Chi_Minh")
+                      .format("YYYY-MM-DD")
+                  : null,
+                relationship:
+                  prescription.Appointment.FamilyMember.relationship,
+              }
+            : null,
+          doctor: prescription.Appointment.Doctor?.user
+            ? {
+                name: prescription.Appointment.Doctor.user.username,
+                email: prescription.Appointment.Doctor.user.email,
+              }
+            : null,
+        }
+      : null,
+    medicines:
+      prescription.prescriptionMedicines?.map((item) => ({
+        prescription_medicine_id: item.prescription_medicine_id,
+        medicine: item.Medicine
+          ? {
+              medicine_id: item.Medicine.medicine_id,
+              name: item.Medicine.name,
+              unit: item.Medicine.unit,
+              price: item.Medicine.price
+                ? `${item.Medicine.price.toLocaleString("vi-VN")} VNĐ`
+                : "0 VNĐ",
+              status: item.Medicine.is_out_of_stock
+                ? "Tạm hết hàng"
+                : "Còn hàng",
+              description: item.Medicine.description || "Chưa có mô tả",
+              supplier:
+                item.Medicine.supplier || "Chưa có thông tin nhà cung cấp",
+            }
+          : null,
+        prescribed: {
+          quantity: item.quantity || 0,
+          dosage: item.dosage || "Chưa có thông tin",
+          frequency: item.frequency || "Chưa có thông tin",
+          duration: item.duration || "Chưa có thông tin",
+          instructions: item.instructions || "Chưa có hướng dẫn",
+          note: item.note,
+          unit_price: item.unit_price
+            ? `${item.unit_price.toLocaleString("vi-VN")} VNĐ`
+            : "0 VNĐ",
+          total_price: item.total_price
+            ? `${item.total_price.toLocaleString("vi-VN")} VNĐ`
+            : "0 VNĐ",
+        },
+        dispensed: {
+          quantity: item.actual_quantity || null,
+        },
+      })) || [],
+    payment: prescription.prescriptionPayments
+      ? {
+          payment_id: prescription.prescriptionPayments.prescription_payment_id,
+          amount: prescription.prescriptionPayments.amount
+            ? `${prescription.prescriptionPayments.amount.toLocaleString(
+                "vi-VN"
+              )} VNĐ`
+            : "0 VNĐ",
+          status: prescription.prescriptionPayments.status,
+          payment_method: prescription.prescriptionPayments.payment_method,
+          payment_date: prescription.prescriptionPayments.payment_date
+            ? dayjs(prescription.prescriptionPayments.payment_date)
+                .tz("Asia/Ho_Chi_Minh")
+                .format("YYYY-MM-DD HH:mm:ss")
+            : null,
+          note: prescription.prescriptionPayments.note,
+          created_by: prescription.prescriptionPayments.created_by,
+          updated_by: prescription.prescriptionPayments.updated_by,
+        }
+      : null,
+    pharmacist: prescription.pharmacist?.user
+      ? {
+          pharmacist_id: prescription.pharmacist.pharmacist_id,
+          name: prescription.pharmacist.user.username,
+          email: prescription.pharmacist.user.email,
+        }
+      : null,
   }));
 
   return {
     success: true,
-    message: "Lấy danh sách đơn thuốc thành công",
+    message:
+      prescriptions.length > 0
+        ? "Lấy danh sách đơn thuốc thành công"
+        : "Không tìm thấy đơn thuốc nào",
     data: {
       prescriptions,
       pagination: {
         current_page: page,
         total_pages: Math.ceil(count / limit),
         total_records: count,
-        per_page: limit
-      }
-    }
+        per_page: limit,
+      },
+    },
   };
 };
 
@@ -1255,18 +1427,25 @@ export const getAllPrescriptions = async ({
  * @param {string} note - Ghi chú (nếu có)
  * @returns {Promise<Object>} - Thông tin thanh toán đã cập nhật
  */
-export const updatePrescriptionPaymentStatus = async (user_id, prescription_payment_id, payment_method, note = '') => {
+export const updatePrescriptionPaymentStatus = async (
+  user_id,
+  prescription_payment_id,
+  payment_method,
+  note = ""
+) => {
   const t = await db.sequelize.transaction();
 
   try {
     // 1. Kiểm tra dược sĩ tồn tại
     const pharmacist = await db.Pharmacist.findOne({
       where: { user_id },
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['username']
-      }]
+      include: [
+        {
+          model: db.User,
+          as: "user",
+          attributes: ["username"],
+        },
+      ],
     });
 
     if (!pharmacist) {
@@ -1276,24 +1455,32 @@ export const updatePrescriptionPaymentStatus = async (user_id, prescription_paym
     // 2. Kiểm tra thanh toán tồn tại
     const prescriptionPayment = await db.PrescriptionPayment.findOne({
       where: { prescription_payment_id },
-      include: [{
-        model: db.Prescription,
-        as: "prescription",
-        include: [{
-          model: db.Appointment,
-          as: "Appointment",
-          include: [{
-            model: db.Patient,
-            as: "Patient",
-            include: [{
-              model: db.User,
-              as: "user",
-              attributes: ["username", "email"]
-            }]
-          }]
-        }]
-      }],
-      transaction: t
+      include: [
+        {
+          model: db.Prescription,
+          as: "prescription",
+          include: [
+            {
+              model: db.Appointment,
+              as: "Appointment",
+              include: [
+                {
+                  model: db.Patient,
+                  as: "Patient",
+                  include: [
+                    {
+                      model: db.User,
+                      as: "user",
+                      attributes: ["username", "email"],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      transaction: t,
     });
 
     if (!prescriptionPayment) {
@@ -1301,54 +1488,62 @@ export const updatePrescriptionPaymentStatus = async (user_id, prescription_paym
     }
 
     // 3. Kiểm tra trạng thái hiện tại
-    if (prescriptionPayment.status === 'paid') {
+    if (prescriptionPayment.status === "paid") {
       throw new BadRequestError("Đơn thuốc đã được thanh toán trước đó");
     }
 
-    if (prescriptionPayment.status === 'cancelled') {
+    if (prescriptionPayment.status === "cancelled") {
       throw new BadRequestError("Đơn thuốc đã bị hủy");
     }
 
     // 4. Kiểm tra phương thức thanh toán hợp lệ
-    const validPaymentMethods = ['cash', 'zalopay'];
+    const validPaymentMethods = ["cash", "zalopay"];
     if (!validPaymentMethods.includes(payment_method)) {
       throw new BadRequestError("Phương thức thanh toán không hợp lệ");
     }
 
-    let status = 'pending';
+    let status = "pending";
     let paymentDate = null;
 
     // 5. Xử lý theo phương thức thanh toán
     switch (payment_method) {
-      case 'cash':
+      case "cash":
         // Thanh toán tiền mặt -> tự động chuyển trạng thái thành paid
-        status = 'paid';
+        status = "paid";
         paymentDate = new Date();
         break;
-      
-      case 'zalopay':
+
+      case "zalopay":
         // TODO: Tích hợp ZaloPay trong tương lai
         // Hiện tại throw error vì chưa hỗ trợ
-        throw new BadRequestError("Phương thức thanh toán ZaloPay chưa được hỗ trợ");
+        throw new BadRequestError(
+          "Phương thức thanh toán ZaloPay chưa được hỗ trợ"
+        );
         break;
     }
 
     // 6. Cập nhật thanh toán
-    await prescriptionPayment.update({
-      status,
-      payment_method,
-      note: note || prescriptionPayment.note,
-      payment_date: paymentDate,
-      updated_by: pharmacist.pharmacist_id
-    }, { transaction: t });
+    await prescriptionPayment.update(
+      {
+        status,
+        payment_method,
+        note: note || prescriptionPayment.note,
+        payment_date: paymentDate,
+        updated_by: pharmacist.pharmacist_id,
+      },
+      { transaction: t }
+    );
 
     // 7. Nếu thanh toán thành công, cập nhật trạng thái đơn thuốc
-    if (status === 'paid') {
-      await prescriptionPayment.prescription.update({
-        status: "completed",
-        completed_at: new Date(),
-        pharmacist_id: pharmacist.pharmacist_id
-      }, { transaction: t });
+    if (status === "paid") {
+      await prescriptionPayment.prescription.update(
+        {
+          status: "completed",
+          completed_at: new Date(),
+          pharmacist_id: pharmacist.pharmacist_id,
+        },
+        { transaction: t }
+      );
     }
 
     await t.commit();
@@ -1360,21 +1555,26 @@ export const updatePrescriptionPaymentStatus = async (user_id, prescription_paym
       data: {
         prescription_payment_id: prescriptionPayment.prescription_payment_id,
         prescription_id: prescriptionPayment.prescription_id,
-        amount: `${prescriptionPayment.amount.toLocaleString('vi-VN')} VNĐ`,
+        amount: `${prescriptionPayment.amount.toLocaleString("vi-VN")} VNĐ`,
         status: prescriptionPayment.status,
         payment_method: prescriptionPayment.payment_method,
-        payment_date: prescriptionPayment.payment_date ? 
-          dayjs(prescriptionPayment.payment_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
+        payment_date: prescriptionPayment.payment_date
+          ? dayjs(prescriptionPayment.payment_date)
+              .tz("Asia/Ho_Chi_Minh")
+              .format("YYYY-MM-DD HH:mm:ss")
+          : null,
         note: prescriptionPayment.note,
         patient: {
-          name: prescriptionPayment.prescription.Appointment.Patient.user.username,
-          email: prescriptionPayment.prescription.Appointment.Patient.user.email
+          name: prescriptionPayment.prescription.Appointment.Patient.user
+            .username,
+          email:
+            prescriptionPayment.prescription.Appointment.Patient.user.email,
         },
         pharmacist: {
           pharmacist_id: pharmacist.pharmacist_id,
-          name: pharmacist.user.username
-        }
-      }
+          name: pharmacist.user.username,
+        },
+      },
     };
   } catch (error) {
     await t.rollback();
@@ -1397,7 +1597,7 @@ export const getAllPrescriptionPayments = async ({
   start_date,
   end_date,
   page = 1,
-  limit = 10
+  limit = 10,
 }) => {
   const offset = (page - 1) * limit;
   const whereClause = {};
@@ -1411,10 +1611,16 @@ export const getAllPrescriptionPayments = async ({
   if (start_date || end_date) {
     whereClause.createdAt = {};
     if (start_date) {
-      whereClause.createdAt[Op.gte] = dayjs.tz(start_date, 'Asia/Ho_Chi_Minh').startOf('day').toDate();
+      whereClause.createdAt[Op.gte] = dayjs
+        .tz(start_date, "Asia/Ho_Chi_Minh")
+        .startOf("day")
+        .toDate();
     }
     if (end_date) {
-      whereClause.createdAt[Op.lte] = dayjs.tz(end_date, 'Asia/Ho_Chi_Minh').endOf('day').toDate();
+      whereClause.createdAt[Op.lte] = dayjs
+        .tz(end_date, "Asia/Ho_Chi_Minh")
+        .endOf("day")
+        .toDate();
     }
   }
 
@@ -1427,9 +1633,9 @@ export const getAllPrescriptionPayments = async ({
         as: "prescription",
         required: true,
         where: {
-          use_hospital_pharmacy: true
+          use_hospital_pharmacy: true,
         },
-        attributes: ['prescription_id', 'status', 'use_hospital_pharmacy'],
+        attributes: ["prescription_id", "status", "use_hospital_pharmacy"],
         include: [
           {
             model: db.Appointment,
@@ -1443,9 +1649,9 @@ export const getAllPrescriptionPayments = async ({
                   {
                     model: db.User,
                     as: "user",
-                    attributes: ["username", "email"]
-                  }
-                ]
+                    attributes: ["username", "email"],
+                  },
+                ],
               },
               {
                 model: db.Doctor,
@@ -1454,66 +1660,87 @@ export const getAllPrescriptionPayments = async ({
                   {
                     model: db.User,
                     as: "user",
-                    attributes: ["username", "email"]
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      }
+                    attributes: ["username", "email"],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
     ],
-    order: [['createdAt', 'DESC']],
+    order: [["createdAt", "DESC"]],
     limit,
     offset,
-    distinct: true
+    distinct: true,
   });
 
   // Format dữ liệu trả về
-  const payments = rows.map(payment => ({
+  const payments = rows.map((payment) => ({
     payment_id: payment.prescription_payment_id,
     prescription_id: payment.prescription_id,
-    amount: payment.amount ? `${payment.amount.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
+    amount: payment.amount
+      ? `${payment.amount.toLocaleString("vi-VN")} VNĐ`
+      : "0 VNĐ",
     status: payment.status,
     payment_method: payment.payment_method,
-    created_at: dayjs(payment.createdAt).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
-    payment_date: payment.payment_date ? 
-      dayjs(payment.payment_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
+    created_at: dayjs(payment.createdAt)
+      .tz("Asia/Ho_Chi_Minh")
+      .format("YYYY-MM-DD HH:mm:ss"),
+    payment_date: payment.payment_date
+      ? dayjs(payment.payment_date)
+          .tz("Asia/Ho_Chi_Minh")
+          .format("YYYY-MM-DD HH:mm:ss")
+      : null,
     note: payment.note,
-    prescription: payment.prescription ? {
-      prescription_id: payment.prescription.prescription_id,
-      status: payment.prescription.status,
-      appointment: payment.prescription.Appointment ? {
-        appointment_id: payment.prescription.Appointment.appointment_id,
-        datetime: dayjs(payment.prescription.Appointment.appointment_datetime)
-          .tz('Asia/Ho_Chi_Minh')
-          .format('YYYY-MM-DD HH:mm:ss'),
-        patient: payment.prescription.Appointment.Patient?.user ? {
-          name: payment.prescription.Appointment.Patient.user.username,
-          email: payment.prescription.Appointment.Patient.user.email
-        } : null,
-        doctor: payment.prescription.Appointment.Doctor?.user ? {
-          name: payment.prescription.Appointment.Doctor.user.username,
-          email: payment.prescription.Appointment.Doctor.user.email
-        } : null
-      } : null
-    } : null
+    prescription: payment.prescription
+      ? {
+          prescription_id: payment.prescription.prescription_id,
+          status: payment.prescription.status,
+          appointment: payment.prescription.Appointment
+            ? {
+                appointment_id: payment.prescription.Appointment.appointment_id,
+                datetime: dayjs(
+                  payment.prescription.Appointment.appointment_datetime
+                )
+                  .tz("Asia/Ho_Chi_Minh")
+                  .format("YYYY-MM-DD HH:mm:ss"),
+                patient: payment.prescription.Appointment.Patient?.user
+                  ? {
+                      name: payment.prescription.Appointment.Patient.user
+                        .username,
+                      email:
+                        payment.prescription.Appointment.Patient.user.email,
+                    }
+                  : null,
+                doctor: payment.prescription.Appointment.Doctor?.user
+                  ? {
+                      name: payment.prescription.Appointment.Doctor.user
+                        .username,
+                      email: payment.prescription.Appointment.Doctor.user.email,
+                    }
+                  : null,
+              }
+            : null,
+        }
+      : null,
   }));
 
   return {
     success: true,
-    message: payments.length > 0 ? 
-      "Lấy danh sách thanh toán đơn thuốc thành công" : 
-      "Không tìm thấy thanh toán đơn thuốc nào",
+    message:
+      payments.length > 0
+        ? "Lấy danh sách thanh toán đơn thuốc thành công"
+        : "Không tìm thấy thanh toán đơn thuốc nào",
     data: {
       payments,
       pagination: {
         current_page: page,
         total_pages: Math.ceil(count / limit),
         total_records: count,
-        per_page: limit
-      }
-    }
+        per_page: limit,
+      },
+    },
   };
 };
 
@@ -1534,16 +1761,18 @@ export const getAllPrescriptionPayments = async ({
  */
 
 export const createRetailPrescription = async (data, pharmacist_id) => {
-  const t = await db.sequelize.transaction();  // Bắt đầu transaction
+  const t = await db.sequelize.transaction(); // Bắt đầu transaction
 
   try {
     // 1. Kiểm tra bệnh nhân tồn tại
     const patient = await db.Patient.findByPk(data.patient_id, {
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['username', 'email']
-      }]
+      include: [
+        {
+          model: db.User,
+          as: "user",
+          attributes: ["username", "email"],
+        },
+      ],
     });
 
     if (!patient) {
@@ -1553,11 +1782,13 @@ export const createRetailPrescription = async (data, pharmacist_id) => {
     // 2. Kiểm tra dược sĩ tồn tại
     const pharmacist = await db.Pharmacist.findOne({
       where: { user_id: pharmacist_id },
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['username']
-      }]
+      include: [
+        {
+          model: db.User,
+          as: "user",
+          attributes: ["username"],
+        },
+      ],
     });
 
     if (!pharmacist) {
@@ -1565,12 +1796,15 @@ export const createRetailPrescription = async (data, pharmacist_id) => {
     }
 
     // 3. Tạo đơn thuốc mới
-    const retail_prescription_id = await db.RetailPrescription.create({
-      patient_id: data.patient_id,
-      pharmacist_id: pharmacist.pharmacist_id,
-      status: 'pending_prepare',  // Trạng thái mới
-      medicine_details: data.note || null  // Chi tiết thuốc
-    }, { transaction: t });
+    const retail_prescription_id = await db.RetailPrescription.create(
+      {
+        patient_id: data.patient_id,
+        pharmacist_id: pharmacist.pharmacist_id,
+        status: "pending_prepare", // Trạng thái mới
+        medicine_details: data.note || null, // Chi tiết thuốc
+      },
+      { transaction: t }
+    );
 
     // 4. Kiểm tra và thêm thuốc vào đơn
     let totalAmount = 0;
@@ -1579,7 +1813,9 @@ export const createRetailPrescription = async (data, pharmacist_id) => {
     for (const med of data.medicines) {
       const medicine = await db.Medicine.findByPk(med.medicine_id);
       if (!medicine) {
-        throw new NotFoundError(`Không tìm thấy thuốc với ID ${med.medicine_id}`);
+        throw new NotFoundError(
+          `Không tìm thấy thuốc với ID ${med.medicine_id}`
+        );
       }
 
       // Kiểm tra số lượng thuốc trong kho
@@ -1604,25 +1840,30 @@ export const createRetailPrescription = async (data, pharmacist_id) => {
         dosage: med.dosage,
         frequency: med.frequency,
         duration: med.duration,
-        instructions: med.instructions
+        instructions: med.instructions,
       });
     }
 
     // 5. Tạo chi tiết đơn thuốc
-    await db.RetailPrescriptionMedicine.bulkCreate(prescriptionMedicines, { transaction: t });
+    await db.RetailPrescriptionMedicine.bulkCreate(prescriptionMedicines, {
+      transaction: t,
+    });
 
     // 6. Tạo bản ghi thanh toán
-    const prescriptionPayment = await db.RetailPrescriptionPayment.create({
-      retail_prescription_id: retail_prescription_id.retail_prescription_id,
-      amount: totalAmount,
-      status: 'pending',  // Thanh toán chờ
-      payment_method: null,  // Chưa chọn phương thức thanh toán
-      created_by: pharmacist.pharmacist_id,  // Dược sĩ tạo đơn thanh toán
-      created_at: new Date(),
-      updated_at: new Date()
-    }, { transaction: t });
+    const prescriptionPayment = await db.RetailPrescriptionPayment.create(
+      {
+        retail_prescription_id: retail_prescription_id.retail_prescription_id,
+        amount: totalAmount,
+        status: "pending", // Thanh toán chờ
+        payment_method: null, // Chưa chọn phương thức thanh toán
+        created_by: pharmacist.pharmacist_id, // Dược sĩ tạo đơn thanh toán
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      { transaction: t }
+    );
 
-    await t.commit();  // Commit transaction sau khi thành công
+    await t.commit(); // Commit transaction sau khi thành công
 
     // 7. Trả về kết quả
     return {
@@ -1630,37 +1871,44 @@ export const createRetailPrescription = async (data, pharmacist_id) => {
       message: "Tạo đơn thuốc bán lẻ thành công",
       data: {
         retail_prescription_id: retail_prescription_id.retail_prescription_id,
-        created_at: dayjs(retail_prescription_id.created_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
+        created_at: dayjs(retail_prescription_id.created_at)
+          .tz("Asia/Ho_Chi_Minh")
+          .format("YYYY-MM-DD HH:mm:ss"),
         status: retail_prescription_id.status,
         note: retail_prescription_id.medicine_details,
         patient: {
           patient_id: patient.patient_id,
           name: patient.user.username,
-          email: patient.user.email
+          email: patient.user.email,
         },
         pharmacist: {
           pharmacist_id: pharmacist.pharmacist_id,
-          name: pharmacist.user.username
+          name: pharmacist.user.username,
         },
-        medicines: prescriptionMedicines.map(item => ({
+        medicines: prescriptionMedicines.map((item) => ({
           medicine_id: item.medicine_id,
           quantity: item.quantity,
-          unit_price: `${parseInt(item.unit_price).toLocaleString('vi-VN')} VNĐ`,
-          total_price: `${parseInt(item.total_price).toLocaleString('vi-VN')} VNĐ`,
+          unit_price: `${parseInt(item.unit_price).toLocaleString(
+            "vi-VN"
+          )} VNĐ`,
+          total_price: `${parseInt(item.total_price).toLocaleString(
+            "vi-VN"
+          )} VNĐ`,
           dosage: item.dosage,
           frequency: item.frequency,
           duration: item.duration,
-          instructions: item.instructions
+          instructions: item.instructions,
         })),
         payment: {
-          prescription_payment_id: prescriptionPayment.retail_prescription_payment_id,
-          amount: `${parseInt(totalAmount).toLocaleString('vi-VN')} VNĐ`,
-          status: prescriptionPayment.status
-        }
-      }
+          prescription_payment_id:
+            prescriptionPayment.retail_prescription_payment_id,
+          amount: `${parseInt(totalAmount).toLocaleString("vi-VN")} VNĐ`,
+          status: prescriptionPayment.status,
+        },
+      },
     };
   } catch (error) {
-    await t.rollback();  // Nếu có lỗi, rollback transaction
+    await t.rollback(); // Nếu có lỗi, rollback transaction
     throw error;
   }
 };
@@ -1680,7 +1928,7 @@ export const getAllRetailPrescriptions = async ({
   start_date,
   end_date,
   page = 1,
-  limit = 10
+  limit = 10,
 }) => {
   const offset = (page - 1) * limit;
   const whereClause = {};
@@ -1688,8 +1936,8 @@ export const getAllRetailPrescriptions = async ({
   // Lọc theo trạng thái
   if (status) {
     // Nếu status là 'pending', tìm cả 'pending_prepare'
-    if (status === 'pending') {
-      whereClause.status = 'pending_prepare';
+    if (status === "pending") {
+      whereClause.status = "pending_prepare";
     } else {
       whereClause.status = status;
     }
@@ -1699,14 +1947,20 @@ export const getAllRetailPrescriptions = async ({
   if (start_date || end_date) {
     whereClause.created_at = {};
     if (start_date) {
-      whereClause.created_at[Op.gte] = dayjs.tz(start_date, 'Asia/Ho_Chi_Minh').startOf('day').toDate();
+      whereClause.created_at[Op.gte] = dayjs
+        .tz(start_date, "Asia/Ho_Chi_Minh")
+        .startOf("day")
+        .toDate();
     }
     if (end_date) {
-      whereClause.created_at[Op.lte] = dayjs.tz(end_date, 'Asia/Ho_Chi_Minh').endOf('day').toDate();
+      whereClause.created_at[Op.lte] = dayjs
+        .tz(end_date, "Asia/Ho_Chi_Minh")
+        .endOf("day")
+        .toDate();
     }
   }
 
-  console.log('Search conditions:', whereClause);
+  console.log("Search conditions:", whereClause);
 
   // Thực hiện truy vấn
   const { count, rows } = await db.RetailPrescription.findAndCountAll({
@@ -1719,9 +1973,9 @@ export const getAllRetailPrescriptions = async ({
           {
             model: db.User,
             as: "user",
-            attributes: ["username", "email"]
-          }
-        ]
+            attributes: ["username", "email"],
+          },
+        ],
       },
       {
         model: db.Pharmacist,
@@ -1730,9 +1984,9 @@ export const getAllRetailPrescriptions = async ({
           {
             model: db.User,
             as: "user",
-            attributes: ["username"]
-          }
-        ]
+            attributes: ["username"],
+          },
+        ],
       },
       {
         model: db.RetailPrescriptionMedicine,
@@ -1741,85 +1995,123 @@ export const getAllRetailPrescriptions = async ({
           {
             model: db.Medicine,
             as: "medicine",
-            attributes: ["medicine_id", "name", "unit", "price"]
-          }
-        ]
+            attributes: ["medicine_id", "name", "unit", "price"],
+          },
+        ],
       },
       {
         model: db.RetailPrescriptionPayment,
         as: "retailPrescriptionPayments",
-        attributes: ["retail_prescription_payment_id", "amount", "status", "payment_method", "payment_date"]
-      }
+        attributes: [
+          "retail_prescription_payment_id",
+          "amount",
+          "status",
+          "payment_method",
+          "payment_date",
+        ],
+      },
     ],
-    order: [['created_at', 'DESC']],
+    order: [["created_at", "DESC"]],
     limit,
     offset,
-    distinct: true
+    distinct: true,
   });
 
-  console.log('Found prescriptions:', count);
+  console.log("Found prescriptions:", count);
 
   // Format dữ liệu trả về
-  const prescriptions = rows.map(prescription => ({
+  const prescriptions = rows.map((prescription) => ({
     retail_prescription_id: prescription.retail_prescription_id,
-    created_at: dayjs(prescription.created_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
+    created_at: dayjs(prescription.created_at)
+      .tz("Asia/Ho_Chi_Minh")
+      .format("YYYY-MM-DD HH:mm:ss"),
     status: prescription.status,
     status_info: {
-      confirmed_at: prescription.confirmed_at ? 
-        dayjs(prescription.confirmed_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
-      completed_at: prescription.completed_at ? 
-        dayjs(prescription.completed_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
-      cancelled_at: prescription.cancelled_at ? 
-        dayjs(prescription.cancelled_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
-      cancelled_reason: prescription.cancelled_reason
+      confirmed_at: prescription.confirmed_at
+        ? dayjs(prescription.confirmed_at)
+            .tz("Asia/Ho_Chi_Minh")
+            .format("YYYY-MM-DD HH:mm:ss")
+        : null,
+      completed_at: prescription.completed_at
+        ? dayjs(prescription.completed_at)
+            .tz("Asia/Ho_Chi_Minh")
+            .format("YYYY-MM-DD HH:mm:ss")
+        : null,
+      cancelled_at: prescription.cancelled_at
+        ? dayjs(prescription.cancelled_at)
+            .tz("Asia/Ho_Chi_Minh")
+            .format("YYYY-MM-DD HH:mm:ss")
+        : null,
+      cancelled_reason: prescription.cancelled_reason,
     },
-    patient: prescription.patient?.user ? {
-      patient_id: prescription.patient.patient_id,
-      name: prescription.patient.user.username,
-      email: prescription.patient.user.email
-    } : null,
-    pharmacist: prescription.pharmacist?.user ? {
-      pharmacist_id: prescription.pharmacist.pharmacist_id,
-      name: prescription.pharmacist.user.username
-    } : null,
-    medicines: prescription.retailPrescriptionMedicines?.map(item => ({
-      medicine_id: item.medicine_id,
-      name: item.medicine?.name,
-      quantity: item.quantity,
-      actual_quantity: item.actual_quantity,
-      unit: item.medicine?.unit,
-      unit_price: item.unit_price ? `${parseInt(item.unit_price).toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-      total_price: item.total_price ? `${parseInt(item.total_price).toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-      dosage: item.dosage,
-      frequency: item.frequency,
-      duration: item.duration,
-      instructions: item.instructions
-    })) || [],
-    payment: prescription.retailPrescriptionPayments?.[0] ? {
-      payment_id: prescription.retailPrescriptionPayments[0].retail_prescription_payment_id,
-      amount: prescription.retailPrescriptionPayments[0].amount ? 
-        `${parseInt(prescription.retailPrescriptionPayments[0].amount).toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-      status: prescription.retailPrescriptionPayments[0].status,
-      payment_method: prescription.retailPrescriptionPayments[0].payment_method,
-      payment_date: prescription.retailPrescriptionPayments[0].payment_date ? 
-        dayjs(prescription.retailPrescriptionPayments[0].payment_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null
-    } : null
+    patient: prescription.patient?.user
+      ? {
+          patient_id: prescription.patient.patient_id,
+          name: prescription.patient.user.username,
+          email: prescription.patient.user.email,
+        }
+      : null,
+    pharmacist: prescription.pharmacist?.user
+      ? {
+          pharmacist_id: prescription.pharmacist.pharmacist_id,
+          name: prescription.pharmacist.user.username,
+        }
+      : null,
+    medicines:
+      prescription.retailPrescriptionMedicines?.map((item) => ({
+        medicine_id: item.medicine_id,
+        name: item.medicine?.name,
+        quantity: item.quantity,
+        actual_quantity: item.actual_quantity,
+        unit: item.medicine?.unit,
+        unit_price: item.unit_price
+          ? `${parseInt(item.unit_price).toLocaleString("vi-VN")} VNĐ`
+          : "0 VNĐ",
+        total_price: item.total_price
+          ? `${parseInt(item.total_price).toLocaleString("vi-VN")} VNĐ`
+          : "0 VNĐ",
+        dosage: item.dosage,
+        frequency: item.frequency,
+        duration: item.duration,
+        instructions: item.instructions,
+      })) || [],
+    payment: prescription.retailPrescriptionPayments?.[0]
+      ? {
+          payment_id:
+            prescription.retailPrescriptionPayments[0]
+              .retail_prescription_payment_id,
+          amount: prescription.retailPrescriptionPayments[0].amount
+            ? `${parseInt(
+                prescription.retailPrescriptionPayments[0].amount
+              ).toLocaleString("vi-VN")} VNĐ`
+            : "0 VNĐ",
+          status: prescription.retailPrescriptionPayments[0].status,
+          payment_method:
+            prescription.retailPrescriptionPayments[0].payment_method,
+          payment_date: prescription.retailPrescriptionPayments[0].payment_date
+            ? dayjs(prescription.retailPrescriptionPayments[0].payment_date)
+                .tz("Asia/Ho_Chi_Minh")
+                .format("YYYY-MM-DD HH:mm:ss")
+            : null,
+        }
+      : null,
   }));
 
   return {
     success: true,
-    message: prescriptions.length > 0 ? 
-      "Lấy danh sách đơn thuốc bán lẻ thành công" : 
-      "Không tìm thấy đơn thuốc bán lẻ nào",
+    message:
+      prescriptions.length > 0
+        ? "Lấy danh sách đơn thuốc bán lẻ thành công"
+        : "Không tìm thấy đơn thuốc bán lẻ nào",
     data: {
       prescriptions,
       pagination: {
         current_page: page,
         total_pages: Math.ceil(count / limit),
         total_records: count,
-        per_page: limit
-      }
-    }
+        per_page: limit,
+      },
+    },
   };
 };
 
@@ -1830,48 +2122,65 @@ export const getAllRetailPrescriptions = async ({
  */
 export const getRetailPrescriptionDetails = async (retail_prescription_id) => {
   // Kiểm tra đơn thuốc tồn tại
-  const prescription = await db.RetailPrescription.findByPk(retail_prescription_id, {
-    include: [
-      {
-        model: db.Patient,
-        as: "patient",
-        include: [
-          {
-            model: db.User,
-            as: "user",
-            attributes: ["username", "email"]
-          }
-        ]
-      },
-      {
-        model: db.Pharmacist,
-        as: "pharmacist",
-        include: [
-          {
-            model: db.User,
-            as: "user",
-            attributes: ["username"]
-          }
-        ]
-      },
-      {
-        model: db.RetailPrescriptionMedicine,
-        as: "retailPrescriptionMedicines",
-        include: [
-          {
-            model: db.Medicine,
-            as: "medicine",
-            attributes: ["medicine_id", "name", "unit", "price", "quantity", "is_out_of_stock"]
-          }
-        ]
-      },
-      {
-        model: db.RetailPrescriptionPayment,
-        as: "retailPrescriptionPayments",
-        attributes: ["retail_prescription_payment_id", "amount", "status", "payment_method", "payment_date", "note"]
-      }
-    ]
-  });
+  const prescription = await db.RetailPrescription.findByPk(
+    retail_prescription_id,
+    {
+      include: [
+        {
+          model: db.Patient,
+          as: "patient",
+          include: [
+            {
+              model: db.User,
+              as: "user",
+              attributes: ["username", "email"],
+            },
+          ],
+        },
+        {
+          model: db.Pharmacist,
+          as: "pharmacist",
+          include: [
+            {
+              model: db.User,
+              as: "user",
+              attributes: ["username"],
+            },
+          ],
+        },
+        {
+          model: db.RetailPrescriptionMedicine,
+          as: "retailPrescriptionMedicines",
+          include: [
+            {
+              model: db.Medicine,
+              as: "medicine",
+              attributes: [
+                "medicine_id",
+                "name",
+                "unit",
+                "price",
+                "quantity",
+                "is_out_of_stock",
+              ],
+            },
+          ],
+        },
+        {
+          model: db.RetailPrescriptionPayment,
+          as: "retailPrescriptionPayments",
+          attributes: [
+            "retail_prescription_payment_id",
+            "amount",
+            "status",
+            "payment_method",
+            "payment_date",
+            "note",
+          ],
+        },
+      ],
+    }
+  );
 
   if (!prescription) {
     throw new NotFoundError("Không tìm thấy đơn thuốc bán lẻ");
@@ -1883,51 +2192,83 @@ export const getRetailPrescriptionDetails = async (retail_prescription_id) => {
     message: "Lấy thông tin đơn thuốc bán lẻ thành công",
     data: {
       prescription_id: prescription.retail_prescription_id,
-      created_at: dayjs(prescription.created_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
+      created_at: dayjs(prescription.created_at)
+        .tz("Asia/Ho_Chi_Minh")
+        .format("YYYY-MM-DD HH:mm:ss"),
       status: prescription.status,
       status_info: {
-        confirmed_at: prescription.confirmed_at ? 
-          dayjs(prescription.confirmed_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
-        completed_at: prescription.completed_at ? 
-          dayjs(prescription.completed_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
-        cancelled_at: prescription.cancelled_at ? 
-          dayjs(prescription.cancelled_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
-        cancelled_reason: prescription.cancelled_reason
+        confirmed_at: prescription.confirmed_at
+          ? dayjs(prescription.confirmed_at)
+              .tz("Asia/Ho_Chi_Minh")
+              .format("YYYY-MM-DD HH:mm:ss")
+          : null,
+        completed_at: prescription.completed_at
+          ? dayjs(prescription.completed_at)
+              .tz("Asia/Ho_Chi_Minh")
+              .format("YYYY-MM-DD HH:mm:ss")
+          : null,
+        cancelled_at: prescription.cancelled_at
+          ? dayjs(prescription.cancelled_at)
+              .tz("Asia/Ho_Chi_Minh")
+              .format("YYYY-MM-DD HH:mm:ss")
+          : null,
+        cancelled_reason: prescription.cancelled_reason,
       },
       medicine_details: prescription.medicine_details,
-      patient: prescription.patient?.user ? {
-        patient_id: prescription.patient.patient_id,
-        name: prescription.patient.user.username,
-        email: prescription.patient.user.email
-      } : null,
-      pharmacist: prescription.pharmacist?.user ? {
-        pharmacist_id: prescription.pharmacist.pharmacist_id,
-        name: prescription.pharmacist.user.username
-      } : null,
-      medicines: prescription.retailPrescriptionMedicines?.map(item => ({
-        medicine_id: item.medicine_id,
-        name: item.medicine?.name,
-        quantity: item.quantity,
-        actual_quantity: item.actual_quantity,
-        unit: item.medicine?.unit,
-        unit_price: item.unit_price ? `${parseInt(item.unit_price).toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-        total_price: item.total_price ? `${parseInt(item.total_price).toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-        dosage: item.dosage,
-        frequency: item.frequency,
-        duration: item.duration,
-        instructions: item.instructions
-      })) || [],
-      payment: prescription.retailPrescriptionPayments?.[0] ? {
-        payment_id: prescription.retailPrescriptionPayments[0].retail_prescription_payment_id,
-        amount: prescription.retailPrescriptionPayments[0].amount ? 
-          `${parseInt(prescription.retailPrescriptionPayments[0].amount).toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
-        status: prescription.retailPrescriptionPayments[0].status,
-        payment_method: prescription.retailPrescriptionPayments[0].payment_method,
-        payment_date: prescription.retailPrescriptionPayments[0].payment_date ? 
-          dayjs(prescription.retailPrescriptionPayments[0].payment_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
-        note: prescription.retailPrescriptionPayments[0].note
-      } : null
-    }
+      patient: prescription.patient?.user
+        ? {
+            patient_id: prescription.patient.patient_id,
+            name: prescription.patient.user.username,
+            email: prescription.patient.user.email,
+          }
+        : null,
+      pharmacist: prescription.pharmacist?.user
+        ? {
+            pharmacist_id: prescription.pharmacist.pharmacist_id,
+            name: prescription.pharmacist.user.username,
+          }
+        : null,
+      medicines:
+        prescription.retailPrescriptionMedicines?.map((item) => ({
+          medicine_id: item.medicine_id,
+          name: item.medicine?.name,
+          quantity: item.quantity,
+          actual_quantity: item.actual_quantity,
+          unit: item.medicine?.unit,
+          unit_price: item.unit_price
+            ? `${parseInt(item.unit_price).toLocaleString("vi-VN")} VNĐ`
+            : "0 VNĐ",
+          total_price: item.total_price
+            ? `${parseInt(item.total_price).toLocaleString("vi-VN")} VNĐ`
+            : "0 VNĐ",
+          dosage: item.dosage,
+          frequency: item.frequency,
+          duration: item.duration,
+          instructions: item.instructions,
+        })) || [],
+      payment: prescription.retailPrescriptionPayments?.[0]
+        ? {
+            payment_id:
+              prescription.retailPrescriptionPayments[0]
+                .retail_prescription_payment_id,
+            amount: prescription.retailPrescriptionPayments[0].amount
+              ? `${parseInt(
+                  prescription.retailPrescriptionPayments[0].amount
+                ).toLocaleString("vi-VN")} VNĐ`
+              : "0 VNĐ",
+            status: prescription.retailPrescriptionPayments[0].status,
+            payment_method:
+              prescription.retailPrescriptionPayments[0].payment_method,
+            payment_date: prescription.retailPrescriptionPayments[0]
+              .payment_date
+              ? dayjs(prescription.retailPrescriptionPayments[0].payment_date)
+                  .tz("Asia/Ho_Chi_Minh")
+                  .format("YYYY-MM-DD HH:mm:ss")
+              : null,
+            note: prescription.retailPrescriptionPayments[0].note,
+          }
+        : null,
+    },
   };
 };
 
@@ -1940,18 +2281,24 @@ export const getRetailPrescriptionDetails = async (retail_prescription_id) => {
  * @param {number} pharmacist_id - ID của dược sĩ thực hiện cập nhật
  * @returns {Promise<Object>} Thông tin đơn thuốc đã cập nhật
  */
-export const updateRetailPrescription = async (retail_prescription_id, data, pharmacist_id) => {
+export const updateRetailPrescription = async (
+  retail_prescription_id,
+  data,
+  pharmacist_id
+) => {
   const t = await db.sequelize.transaction();
 
   try {
     // 1. Kiểm tra dược sĩ tồn tại
     const pharmacist = await db.Pharmacist.findOne({
       where: { user_id: pharmacist_id },
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['username']
-      }]
+      include: [
+        {
+          model: db.User,
+          as: "user",
+          attributes: ["username"],
+        },
+      ],
     });
 
     if (!pharmacist) {
@@ -1959,15 +2306,18 @@ export const updateRetailPrescription = async (retail_prescription_id, data, pha
     }
 
     // 2. Kiểm tra đơn thuốc tồn tại
-    const prescription = await db.RetailPrescription.findByPk(retail_prescription_id, {
-      include: [
-        {
-          model: db.RetailPrescriptionPayment,
-          as: "retailPrescriptionPayments"
-        }
-      ],
-      transaction: t
-    });
+    const prescription = await db.RetailPrescription.findByPk(
+      retail_prescription_id,
+      {
+        include: [
+          {
+            model: db.RetailPrescriptionPayment,
+            as: "retailPrescriptionPayments",
+          },
+        ],
+        transaction: t,
+      }
+    );
 
     if (!prescription) {
       throw new NotFoundError("Không tìm thấy đơn thuốc bán lẻ");
@@ -1990,9 +2340,12 @@ export const updateRetailPrescription = async (retail_prescription_id, data, pha
 
     // 5. Cập nhật ghi chú đơn thuốc nếu có
     if (data.note !== undefined) {
-      await prescription.update({
-        medicine_details: data.note
-      }, { transaction: t });
+      await prescription.update(
+        {
+          medicine_details: data.note,
+        },
+        { transaction: t }
+      );
     }
 
     // 6. Cập nhật danh sách thuốc nếu có
@@ -2000,7 +2353,7 @@ export const updateRetailPrescription = async (retail_prescription_id, data, pha
       // Xóa danh sách thuốc cũ
       await db.RetailPrescriptionMedicine.destroy({
         where: { retail_prescription_id },
-        transaction: t
+        transaction: t,
       });
 
       // Tính tổng tiền mới
@@ -2008,9 +2361,13 @@ export const updateRetailPrescription = async (retail_prescription_id, data, pha
       const prescriptionMedicines = [];
 
       for (const med of data.medicines) {
-        const medicine = await db.Medicine.findByPk(med.medicine_id, { transaction: t });
+        const medicine = await db.Medicine.findByPk(med.medicine_id, {
+          transaction: t,
+        });
         if (!medicine) {
-          throw new NotFoundError(`Không tìm thấy thuốc với ID ${med.medicine_id}`);
+          throw new NotFoundError(
+            `Không tìm thấy thuốc với ID ${med.medicine_id}`
+          );
         }
 
         // Kiểm tra số lượng thuốc trong kho
@@ -2035,42 +2392,52 @@ export const updateRetailPrescription = async (retail_prescription_id, data, pha
           dosage: med.dosage,
           frequency: med.frequency,
           duration: med.duration,
-          instructions: med.instructions
+          instructions: med.instructions,
         });
       }
 
       // Tạo chi tiết đơn thuốc mới
-      await db.RetailPrescriptionMedicine.bulkCreate(prescriptionMedicines, { transaction: t });
+      await db.RetailPrescriptionMedicine.bulkCreate(prescriptionMedicines, {
+        transaction: t,
+      });
 
       // Cập nhật hoặc tạo bản ghi thanh toán
       if (payment) {
-        await payment.update({
-          amount: totalAmount,
-          updated_by: pharmacist.pharmacist_id,
-          updated_at: new Date()
-        }, { transaction: t });
+        await payment.update(
+          {
+            amount: totalAmount,
+            updated_by: pharmacist.pharmacist_id,
+            updated_at: new Date(),
+          },
+          { transaction: t }
+        );
       } else {
-        await db.RetailPrescriptionPayment.create({
-          retail_prescription_id,
-          amount: totalAmount,
-          status: 'pending',  // Thanh toán chờ
-          payment_method: null,  // Chưa chọn phương thức thanh toán
-          created_by: pharmacist.pharmacist_id,  // Dược sĩ tạo đơn thanh toán
-          created_at: new Date(),
-          updated_at: new Date()
-        }, { transaction: t });
+        await db.RetailPrescriptionPayment.create(
+          {
+            retail_prescription_id,
+            amount: totalAmount,
+            status: "pending", // Thanh toán chờ
+            payment_method: null, // Chưa chọn phương thức thanh toán
+            created_by: pharmacist.pharmacist_id, // Dược sĩ tạo đơn thanh toán
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+          { transaction: t }
+        );
       }
     }
 
     await t.commit();
 
     // 7. Lấy thông tin đơn thuốc đã cập nhật
-    const updatedPrescription = await getRetailPrescriptionDetails(retail_prescription_id);
+    const updatedPrescription = await getRetailPrescriptionDetails(
+      retail_prescription_id
+    );
 
     return {
       success: true,
       message: "Cập nhật đơn thuốc bán lẻ thành công",
-      data: updatedPrescription.data
+      data: updatedPrescription.data,
     };
   } catch (error) {
     await t.rollback();
@@ -2085,18 +2452,24 @@ export const updateRetailPrescription = async (retail_prescription_id, data, pha
  * @param {number} pharmacist_id - ID của dược sĩ thực hiện cập nhật
  * @returns {Promise<Object>} Thông tin đơn thuốc đã cập nhật
  */
-export const updateRetailPrescriptionStatus = async (retail_prescription_id, status, pharmacist_id) => {
+export const updateRetailPrescriptionStatus = async (
+  retail_prescription_id,
+  status,
+  pharmacist_id
+) => {
   const t = await db.sequelize.transaction();
 
   try {
     // 1. Kiểm tra dược sĩ tồn tại
     const pharmacist = await db.Pharmacist.findOne({
       where: { user_id: pharmacist_id },
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['username']
-      }]
+      include: [
+        {
+          model: db.User,
+          as: "user",
+          attributes: ["username"],
+        },
+      ],
     });
 
     if (!pharmacist) {
@@ -2104,60 +2477,76 @@ export const updateRetailPrescriptionStatus = async (retail_prescription_id, sta
     }
 
     // 2. Kiểm tra đơn thuốc tồn tại
-    const prescription = await db.RetailPrescription.findByPk(retail_prescription_id, {
-      include: [
-        {
-          model: db.RetailPrescriptionPayment,
-          as: "retailPrescriptionPayments"
-        }
-      ],
-      transaction: t
-    });
+    const prescription = await db.RetailPrescription.findByPk(
+      retail_prescription_id,
+      {
+        include: [
+          {
+            model: db.RetailPrescriptionPayment,
+            as: "retailPrescriptionPayments",
+          },
+        ],
+        transaction: t,
+      }
+    );
 
     if (!prescription) {
       throw new NotFoundError("Không tìm thấy đơn thuốc bán lẻ");
     }
 
     // 3. Kiểm tra trạng thái hợp lệ
-    const validStatuses = ['pending_prepare', 'waiting_payment', 'completed', 'cancelled'];
+    const validStatuses = [
+      "pending_prepare",
+      "waiting_payment",
+      "completed",
+      "cancelled",
+    ];
     if (!validStatuses.includes(status)) {
       throw new BadRequestError("Trạng thái không hợp lệ");
     }
 
     // 4. Kiểm tra điều kiện chuyển trạng thái
-    if (status === 'completed') {
+    if (status === "completed") {
       // Kiểm tra thanh toán
       const payment = prescription.retailPrescriptionPayments?.[0];
-      if (!payment || payment.status !== 'paid') {
-        throw new BadRequestError("Không thể hoàn thành đơn thuốc chưa thanh toán");
+      if (!payment || payment.status !== "paid") {
+        throw new BadRequestError(
+          "Không thể hoàn thành đơn thuốc chưa thanh toán"
+        );
       }
     }
 
-    if (status === 'cancelled') {
+    if (status === "cancelled") {
       // Kiểm tra đơn thuốc chưa hoàn thành
-      if (prescription.status === 'completed') {
+      if (prescription.status === "completed") {
         throw new BadRequestError("Không thể hủy đơn thuốc đã hoàn thành");
       }
     }
 
     // Kiểm tra nếu đơn thuốc đã thanh toán thì không thể quay về trạng thái pending_prepare hoặc waiting_payment
     const payment = prescription.retailPrescriptionPayments?.[0];
-    if (payment && payment.status === 'paid' && (status === 'pending_prepare' || status === 'waiting_payment')) {
-      throw new BadRequestError("Không thể chuyển đơn thuốc đã thanh toán về trạng thái chờ");
+    if (
+      payment &&
+      payment.status === "paid" &&
+      (status === "pending_prepare" || status === "waiting_payment")
+    ) {
+      throw new BadRequestError(
+        "Không thể chuyển đơn thuốc đã thanh toán về trạng thái chờ"
+      );
     }
 
     // 5. Cập nhật trạng thái
     const updateData = {
       status,
-      pharmacist_id: pharmacist.pharmacist_id
+      pharmacist_id: pharmacist.pharmacist_id,
     };
 
     // Thêm thời gian tương ứng với trạng thái
-    if (status === 'waiting_payment') {
+    if (status === "waiting_payment") {
       updateData.confirmed_at = new Date();
-    } else if (status === 'completed') {
+    } else if (status === "completed") {
       updateData.completed_at = new Date();
-    } else if (status === 'cancelled') {
+    } else if (status === "cancelled") {
       updateData.cancelled_at = new Date();
     }
 
@@ -2166,12 +2555,14 @@ export const updateRetailPrescriptionStatus = async (retail_prescription_id, sta
     await t.commit();
 
     // 6. Lấy thông tin đơn thuốc đã cập nhật
-    const updatedPrescription = await getRetailPrescriptionDetails(retail_prescription_id);
+    const updatedPrescription = await getRetailPrescriptionDetails(
+      retail_prescription_id
+    );
 
     return {
       success: true,
       message: "Cập nhật trạng thái đơn thuốc bán lẻ thành công",
-      data: updatedPrescription.data
+      data: updatedPrescription.data,
     };
   } catch (error) {
     await t.rollback();
@@ -2187,18 +2578,25 @@ export const updateRetailPrescriptionStatus = async (retail_prescription_id, sta
  * @param {string} note - Ghi chú (nếu có)
  * @returns {Promise<Object>} - Thông tin thanh toán đã cập nhật
  */
-export const updateRetailPrescriptionPaymentStatus = async (payment_id, payment_method, pharmacist_id, note = '') => {
+export const updateRetailPrescriptionPaymentStatus = async (
+  payment_id,
+  payment_method,
+  pharmacist_id,
+  note = ""
+) => {
   const t = await db.sequelize.transaction();
 
   try {
     // 1. Kiểm tra dược sĩ tồn tại
     const pharmacist = await db.Pharmacist.findOne({
       where: { user_id: pharmacist_id },
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['username']
-      }]
+      include: [
+        {
+          model: db.User,
+          as: "user",
+          attributes: ["username"],
+        },
+      ],
     });
 
     if (!pharmacist) {
@@ -2206,77 +2604,92 @@ export const updateRetailPrescriptionPaymentStatus = async (payment_id, payment_
     }
 
     // 2. Kiểm tra thanh toán tồn tại
-    const retailPrescriptionPayment = await db.RetailPrescriptionPayment.findOne({
-      where: { retail_prescription_payment_id: payment_id },
-      include: [{
-        model: db.RetailPrescription,
-        as: "retailPrescription",
-        include: [{
-          model: db.Patient,
-          as: "patient",
-          include: [{
-            model: db.User,
-            as: "user",
-            attributes: ["username", "email"]
-          }]
-        }]
-      }],
-      transaction: t
-    });
+    const retailPrescriptionPayment =
+      await db.RetailPrescriptionPayment.findOne({
+        where: { retail_prescription_payment_id: payment_id },
+        include: [
+          {
+            model: db.RetailPrescription,
+            as: "retailPrescription",
+            include: [
+              {
+                model: db.Patient,
+                as: "patient",
+                include: [
+                  {
+                    model: db.User,
+                    as: "user",
+                    attributes: ["username", "email"],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        transaction: t,
+      });
 
     if (!retailPrescriptionPayment) {
       throw new NotFoundError("Không tìm thấy thanh toán đơn thuốc bán lẻ");
     }
 
     // 3. Kiểm tra trạng thái hiện tại
-    if (retailPrescriptionPayment.status === 'paid') {
+    if (retailPrescriptionPayment.status === "paid") {
       throw new BadRequestError("Đơn thuốc đã được thanh toán trước đó");
     }
 
-    if (retailPrescriptionPayment.status === 'cancelled') {
+    if (retailPrescriptionPayment.status === "cancelled") {
       throw new BadRequestError("Đơn thuốc đã bị hủy");
     }
 
     // 4. Kiểm tra phương thức thanh toán hợp lệ
-    const validPaymentMethods = ['cash', 'zalopay'];
+    const validPaymentMethods = ["cash", "zalopay"];
     if (!validPaymentMethods.includes(payment_method)) {
       throw new BadRequestError("Phương thức thanh toán không hợp lệ");
     }
 
-    let status = 'pending';
+    let status = "pending";
     let paymentDate = null;
 
     // 5. Xử lý theo phương thức thanh toán
     switch (payment_method) {
-      case 'cash':
+      case "cash":
         // Thanh toán tiền mặt -> tự động chuyển trạng thái thành paid
-        status = 'paid';
+        status = "paid";
         paymentDate = new Date();
         break;
-      
-      case 'zalopay':
+
+      case "zalopay":
         // TODO: Tích hợp ZaloPay trong tương lai
         // Hiện tại throw error vì chưa hỗ trợ
-        throw new BadRequestError("Phương thức thanh toán ZaloPay chưa được hỗ trợ");
+        throw new BadRequestError(
+          "Phương thức thanh toán ZaloPay chưa được hỗ trợ"
+        );
         break;
     }
 
     // 6. Cập nhật thanh toán
-    await retailPrescriptionPayment.update({
-      status,
-      payment_method,
-      note: note || retailPrescriptionPayment.note,
-      payment_date: paymentDate,
-      updated_by: pharmacist.pharmacist_id
-    }, { transaction: t });
+    await retailPrescriptionPayment.update(
+      {
+        status,
+        payment_method,
+        note: note || retailPrescriptionPayment.note,
+        payment_date: paymentDate,
+        updated_by: pharmacist.pharmacist_id,
+      },
+      { transaction: t }
+    );
 
     // 7. Nếu thanh toán thành công, cập nhật trạng thái đơn thuốc
-    if (status === 'paid') {
-      await retailPrescriptionPayment.retailPrescription.update({
-        status: "completed",
-        completed_at: new Date(),
-        pharmacist_id: pharmacist.pharmacist_id
-      }, { transaction: t });
+    if (status === "paid") {
+      await retailPrescriptionPayment.retailPrescription.update(
+        {
+          status: "completed",
+          completed_at: new Date(),
+          pharmacist_id: pharmacist.pharmacist_id,
+        },
+        { transaction: t }
+      );
     }
 
     await t.commit();
@@ -2286,23 +2699,32 @@ export const updateRetailPrescriptionPaymentStatus = async (payment_id, payment_
       success: true,
       message: "Cập nhật trạng thái thanh toán đơn thuốc bán lẻ thành công",
       data: {
-        retail_prescription_payment_id: retailPrescriptionPayment.retail_prescription_payment_id,
-        retail_prescription_id: retailPrescriptionPayment.retail_prescription_id,
-        amount: `${parseInt(retailPrescriptionPayment.amount).toLocaleString('vi-VN')} VNĐ`,
+        retail_prescription_payment_id:
+          retailPrescriptionPayment.retail_prescription_payment_id,
+        retail_prescription_id:
+          retailPrescriptionPayment.retail_prescription_id,
+        amount: `${parseInt(retailPrescriptionPayment.amount).toLocaleString(
+          "vi-VN"
+        )} VNĐ`,
         status: retailPrescriptionPayment.status,
         payment_method: retailPrescriptionPayment.payment_method,
-        payment_date: retailPrescriptionPayment.payment_date ? 
-          dayjs(retailPrescriptionPayment.payment_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
+        payment_date: retailPrescriptionPayment.payment_date
+          ? dayjs(retailPrescriptionPayment.payment_date)
+              .tz("Asia/Ho_Chi_Minh")
+              .format("YYYY-MM-DD HH:mm:ss")
+          : null,
         note: retailPrescriptionPayment.note,
         patient: {
-          name: retailPrescriptionPayment.retailPrescription.patient.user.username,
-          email: retailPrescriptionPayment.retailPrescription.patient.user.email
+          name: retailPrescriptionPayment.retailPrescription.patient.user
+            .username,
+          email:
+            retailPrescriptionPayment.retailPrescription.patient.user.email,
         },
         pharmacist: {
           pharmacist_id: pharmacist.pharmacist_id,
-          name: pharmacist.user.username
-        }
-      }
+          name: pharmacist.user.username,
+        },
+      },
     };
   } catch (error) {
     await t.rollback();
@@ -2310,18 +2732,23 @@ export const updateRetailPrescriptionPaymentStatus = async (payment_id, payment_
   }
 };
 
-export const completeRetailPrescription = async (retail_prescription_id, pharmacist_id) => {
+export const completeRetailPrescription = async (
+  retail_prescription_id,
+  pharmacist_id
+) => {
   const t = await db.sequelize.transaction();
 
   try {
     // 1. Kiểm tra dược sĩ tồn tại
     const pharmacist = await db.Pharmacist.findOne({
       where: { user_id: pharmacist_id },
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['username']
-      }]
+      include: [
+        {
+          model: db.User,
+          as: "user",
+          attributes: ["username"],
+        },
+      ],
     });
 
     if (!pharmacist) {
@@ -2329,49 +2756,59 @@ export const completeRetailPrescription = async (retail_prescription_id, pharmac
     }
 
     // 2. Kiểm tra đơn thuốc tồn tại
-    const prescription = await db.RetailPrescription.findByPk(retail_prescription_id, {
-      include: [
-        {
-          model: db.RetailPrescriptionPayment,
-          as: "retailPrescriptionPayments"
-        },
-        {
-          model: db.RetailPrescriptionMedicine,
-          as: "retailPrescriptionMedicines",
-          include: [
-            {
-              model: db.Medicine,
-              as: "medicine"
-            }
-          ]
-        }
-      ],
-      transaction: t
-    });
+    const prescription = await db.RetailPrescription.findByPk(
+      retail_prescription_id,
+      {
+        include: [
+          {
+            model: db.RetailPrescriptionPayment,
+            as: "retailPrescriptionPayments",
+          },
+          {
+            model: db.RetailPrescriptionMedicine,
+            as: "retailPrescriptionMedicines",
+            include: [
+              {
+                model: db.Medicine,
+                as: "medicine",
+              },
+            ],
+          },
+        ],
+        transaction: t,
+      }
+    );
 
     if (!prescription) {
       throw new NotFoundError("Không tìm thấy đơn thuốc bán lẻ");
     }
 
     // 3. Kiểm tra trạng thái đơn thuốc
-    if (prescription.status !== 'waiting_payment') {
-      throw new BadRequestError("Chỉ có thể hoàn tất đơn thuốc ở trạng thái chờ thanh toán");
+    if (prescription.status !== "waiting_payment") {
+      throw new BadRequestError(
+        "Chỉ có thể hoàn tất đơn thuốc ở trạng thái chờ thanh toán"
+      );
     }
 
     // 4. Kiểm tra thanh toán
     const payment = prescription.retailPrescriptionPayments?.[0];
-    if (!payment || payment.status !== 'paid') {
+    if (!payment || payment.status !== "paid") {
       throw new BadRequestError("Không thể hoàn tất đơn thuốc chưa thanh toán");
     }
 
     // 5. Kiểm tra và cập nhật số lượng tồn kho
-    if (!prescription.retailPrescriptionMedicines || prescription.retailPrescriptionMedicines.length === 0) {
+    if (
+      !prescription.retailPrescriptionMedicines ||
+      prescription.retailPrescriptionMedicines.length === 0
+    ) {
       throw new BadRequestError("Đơn thuốc không có thuốc để xác nhận");
     }
 
     for (const item of prescription.retailPrescriptionMedicines) {
       if (!item.actual_quantity && item.actual_quantity !== 0) {
-        throw new BadRequestError(`Chưa nhập số lượng thực tế cho thuốc ${item.medicine.name}`);
+        throw new BadRequestError(
+          `Chưa nhập số lượng thực tế cho thuốc ${item.medicine.name}`
+        );
       }
 
       // Kiểm tra số lượng tồn kho
@@ -2382,28 +2819,36 @@ export const completeRetailPrescription = async (retail_prescription_id, pharmac
       }
 
       // Cập nhật số lượng tồn kho
-      await item.medicine.update({
-        quantity: item.medicine.quantity - item.actual_quantity,
-        is_out_of_stock: (item.medicine.quantity - item.actual_quantity) === 0
-      }, { transaction: t });
+      await item.medicine.update(
+        {
+          quantity: item.medicine.quantity - item.actual_quantity,
+          is_out_of_stock: item.medicine.quantity - item.actual_quantity === 0,
+        },
+        { transaction: t }
+      );
     }
 
     // 6. Cập nhật trạng thái đơn thuốc
-    await prescription.update({
-      status: 'completed',
-      pharmacist_id: pharmacist.pharmacist_id,
-      completed_at: new Date()
-    }, { transaction: t });
+    await prescription.update(
+      {
+        status: "completed",
+        pharmacist_id: pharmacist.pharmacist_id,
+        completed_at: new Date(),
+      },
+      { transaction: t }
+    );
 
     await t.commit();
 
     // 7. Lấy thông tin đơn thuốc đã cập nhật
-    const updatedPrescription = await getRetailPrescriptionDetails(retail_prescription_id);
+    const updatedPrescription = await getRetailPrescriptionDetails(
+      retail_prescription_id
+    );
 
     return {
       success: true,
       message: "Hoàn tất đơn thuốc bán lẻ thành công",
-      data: updatedPrescription.data
+      data: updatedPrescription.data,
     };
   } catch (error) {
     await t.rollback();
@@ -2426,7 +2871,7 @@ export const getAllRetailPrescriptionPayments = async ({
   start_date,
   end_date,
   page = 1,
-  limit = 10
+  limit = 10,
 }) => {
   const offset = (page - 1) * limit;
   const whereClause = {};
@@ -2440,10 +2885,16 @@ export const getAllRetailPrescriptionPayments = async ({
   if (start_date || end_date) {
     whereClause.created_at = {};
     if (start_date) {
-      whereClause.created_at[Op.gte] = dayjs.tz(start_date, 'Asia/Ho_Chi_Minh').startOf('day').toDate();
+      whereClause.created_at[Op.gte] = dayjs
+        .tz(start_date, "Asia/Ho_Chi_Minh")
+        .startOf("day")
+        .toDate();
     }
     if (end_date) {
-      whereClause.created_at[Op.lte] = dayjs.tz(end_date, 'Asia/Ho_Chi_Minh').endOf('day').toDate();
+      whereClause.created_at[Op.lte] = dayjs
+        .tz(end_date, "Asia/Ho_Chi_Minh")
+        .endOf("day")
+        .toDate();
     }
   }
 
@@ -2463,9 +2914,9 @@ export const getAllRetailPrescriptionPayments = async ({
               {
                 model: db.User,
                 as: "user",
-                attributes: ["username", "email"]
-              }
-            ]
+                attributes: ["username", "email"],
+              },
+            ],
           },
           {
             model: db.Pharmacist,
@@ -2474,58 +2925,70 @@ export const getAllRetailPrescriptionPayments = async ({
               {
                 model: db.User,
                 as: "user",
-                attributes: ["username"]
-              }
-            ]
-          }
-        ]
-      }
+                attributes: ["username"],
+              },
+            ],
+          },
+        ],
+      },
     ],
-    order: [['created_at', 'DESC']],
+    order: [["created_at", "DESC"]],
     limit,
     offset,
-    distinct: true
+    distinct: true,
   });
 
   // Format dữ liệu trả về
-  const payments = rows.map(payment => ({
+  const payments = rows.map((payment) => ({
     payment_id: payment.retail_prescription_payment_id,
-    amount: payment.amount ? `${parseInt(payment.amount).toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
+    amount: payment.amount
+      ? `${parseInt(payment.amount).toLocaleString("vi-VN")} VNĐ`
+      : "0 VNĐ",
     status: payment.status,
     payment_method: payment.payment_method,
-    payment_date: payment.payment_date ? 
-      dayjs(payment.payment_date).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss') : null,
+    payment_date: payment.payment_date
+      ? dayjs(payment.payment_date)
+          .tz("Asia/Ho_Chi_Minh")
+          .format("YYYY-MM-DD HH:mm:ss")
+      : null,
     note: payment.note,
-    created_at: dayjs(payment.created_at).tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss'),
+    created_at: dayjs(payment.created_at)
+      .tz("Asia/Ho_Chi_Minh")
+      .format("YYYY-MM-DD HH:mm:ss"),
     prescription: {
       retail_prescription_id: payment.retailPrescription.retail_prescription_id,
       status: payment.retailPrescription.status,
-      patient: payment.retailPrescription.patient?.user ? {
-        patient_id: payment.retailPrescription.patient.patient_id,
-        name: payment.retailPrescription.patient.user.username,
-        email: payment.retailPrescription.patient.user.email
-      } : null,
-      pharmacist: payment.retailPrescription.pharmacist?.user ? {
-        pharmacist_id: payment.retailPrescription.pharmacist.pharmacist_id,
-        name: payment.retailPrescription.pharmacist.user.username
-      } : null
-    }
+      patient: payment.retailPrescription.patient?.user
+        ? {
+            patient_id: payment.retailPrescription.patient.patient_id,
+            name: payment.retailPrescription.patient.user.username,
+            email: payment.retailPrescription.patient.user.email,
+          }
+        : null,
+      pharmacist: payment.retailPrescription.pharmacist?.user
+        ? {
+            pharmacist_id: payment.retailPrescription.pharmacist.pharmacist_id,
+            name: payment.retailPrescription.pharmacist.user.username,
+          }
+        : null,
+    },
   }));
 
   return {
     success: true,
-    message: payments.length > 0 ? 
-      "Lấy danh sách thanh toán đơn thuốc bán lẻ thành công" : 
-      "Không tìm thấy thanh toán đơn thuốc bán lẻ nào",
+    message:
+      payments.length > 0
+        ? "Lấy danh sách thanh toán đơn thuốc bán lẻ thành công"
+        : "Không tìm thấy thanh toán đơn thuốc bán lẻ nào",
     data: {
       payments,
       pagination: {
         current_page: page,
         total_pages: Math.ceil(count / limit),
         total_records: count,
-        per_page: limit
-      }
-    }
+        per_page: limit,
+      },
+    },
   };
 };
 
@@ -2536,18 +2999,24 @@ export const getAllRetailPrescriptionPayments = async ({
  * @param {number} pharmacist_id - ID của dược sĩ thực hiện hủy
  * @returns {Promise<Object>} - Thông tin đơn thuốc đã hủy
  */
-export const cancelRetailPrescription = async (retail_prescription_id, reason, pharmacist_id) => {
+export const cancelRetailPrescription = async (
+  retail_prescription_id,
+  reason,
+  pharmacist_id
+) => {
   const t = await db.sequelize.transaction();
 
   try {
     // 1. Kiểm tra dược sĩ tồn tại
     const pharmacist = await db.Pharmacist.findOne({
       where: { user_id: pharmacist_id },
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['username']
-      }]
+      include: [
+        {
+          model: db.User,
+          as: "user",
+          attributes: ["username"],
+        },
+      ],
     });
 
     if (!pharmacist) {
@@ -2555,26 +3024,29 @@ export const cancelRetailPrescription = async (retail_prescription_id, reason, p
     }
 
     // 2. Kiểm tra đơn thuốc tồn tại
-    const prescription = await db.RetailPrescription.findByPk(retail_prescription_id, {
-      include: [
-        {
-          model: db.Patient,
-          as: "patient",
-          include: [
-            {
-              model: db.User,
-              as: "user",
-              attributes: ["username", "email"]
-            }
-          ]
-        },
-        {
-          model: db.RetailPrescriptionPayment,
-          as: "retailPrescriptionPayments"
-        }
-      ],
-      transaction: t
-    });
+    const prescription = await db.RetailPrescription.findByPk(
+      retail_prescription_id,
+      {
+        include: [
+          {
+            model: db.Patient,
+            as: "patient",
+            include: [
+              {
+                model: db.User,
+                as: "user",
+                attributes: ["username", "email"],
+              },
+            ],
+          },
+          {
+            model: db.RetailPrescriptionPayment,
+            as: "retailPrescriptionPayments",
+          },
+        ],
+        transaction: t,
+      }
+    );
 
     if (!prescription) {
       throw new NotFoundError("Không tìm thấy đơn thuốc bán lẻ");
@@ -2596,20 +3068,26 @@ export const cancelRetailPrescription = async (retail_prescription_id, reason, p
     }
 
     // 5. Cập nhật trạng thái đơn thuốc
-    await prescription.update({
-      status: "cancelled",
-      cancelled_reason: reason,
-      cancelled_at: new Date(),
-      pharmacist_id: pharmacist.pharmacist_id
-    }, { transaction: t });
+    await prescription.update(
+      {
+        status: "cancelled",
+        cancelled_reason: reason,
+        cancelled_at: new Date(),
+        pharmacist_id: pharmacist.pharmacist_id,
+      },
+      { transaction: t }
+    );
 
     // 6. Nếu có payment, cập nhật trạng thái payment thành cancelled
     if (payment) {
-      await payment.update({
-        status: "cancelled",
-        updated_by: pharmacist.pharmacist_id,
-        note: `Đơn thuốc bị hủy: ${reason}`
-      }, { transaction: t });
+      await payment.update(
+        {
+          status: "cancelled",
+          updated_by: pharmacist.pharmacist_id,
+          note: `Đơn thuốc bị hủy: ${reason}`,
+        },
+        { transaction: t }
+      );
     }
 
     await t.commit();
@@ -2623,19 +3101,148 @@ export const cancelRetailPrescription = async (retail_prescription_id, reason, p
         status: prescription.status,
         cancelled_reason: prescription.cancelled_reason,
         cancelled_at: prescription.cancelled_at,
-        patient: prescription.patient?.user ? {
-          patient_id: prescription.patient.patient_id,
-          name: prescription.patient.user.username,
-          email: prescription.patient.user.email
-        } : null,
+        patient: prescription.patient?.user
+          ? {
+              patient_id: prescription.patient.patient_id,
+              name: prescription.patient.user.username,
+              email: prescription.patient.user.email,
+            }
+          : null,
         pharmacist: {
           pharmacist_id: pharmacist.pharmacist_id,
-          name: pharmacist.user.username
-        }
-      }
+          name: pharmacist.user.username,
+        },
+      },
     };
   } catch (error) {
     await t.rollback();
     throw error;
   }
+};
+
+export const getPrescriptionDetailsWithFIFO = async (
+  prescription_id,
+  fifo = true
+) => {
+  // 1. Lấy prescription & kiểm tra
+  const prescription = await db.Prescription.findOne({
+    where: {
+      prescription_id,
+      status: "pending_prepare",
+      use_hospital_pharmacy: true,
+    },
+    include: [
+      {
+        model: db.Appointment,
+        as: "Appointment",
+        include: [
+          { model: db.FamilyMember, as: "FamilyMember" },
+          {
+            model: db.Doctor,
+            as: "Doctor",
+            include: [{ model: db.User, as: "user" }],
+          },
+        ],
+      },
+      {
+        model: db.PrescriptionMedicine,
+        as: "prescriptionMedicines",
+        include: [{ model: db.Medicine, as: "Medicine" }],
+      },
+    ],
+  });
+
+  if (!prescription) {
+    throw new NotFoundError(
+      "Không tìm thấy đơn thuốc hoặc đơn không ở trạng thái chờ chuẩn bị"
+    );
+  }
+
+  // 2. Duyệt từng dòng thuốc
+  const lines = await Promise.all(
+    prescription.prescriptionMedicines.map(async (pm) => {
+      const requiredQty = pm.quantity;
+      // 2.1. Lấy tất cả lô còn hoạt động
+      const batches = await db.Batch.findAll({
+        where: {
+          medicine_id: pm.medicine_id,
+          status: "Active",
+          quantity: { [Op.gt]: 0 },
+        },
+        order: fifo[["expiry_date", "ASC"]],
+      });
+
+      // 2.2. Tổng tồn kho
+      const totalAvailable = batches.reduce((sum, b) => sum + b.quantity, 0);
+
+      // 2.3. Phân bổ theo FIFO
+      let remaining = requiredQty;
+      let sumAllocated = 0;
+      const allocations = batches.map((b) => {
+        if (remaining <= 0) {
+          return { batch_number: b.batch_number, allocated: 0 };
+        }
+        const take = Math.min(b.quantity, remaining);
+        remaining -= take;
+        sumAllocated += take;
+        return { batch_number: b.batch_number, allocated: take };
+      });
+
+      // 2.4. Tính thiếu hụt
+      const canFulfill = sumAllocated >= requiredQty;
+      const shortage = canFulfill ? 0 : requiredQty - sumAllocated;
+
+      // 2.5. Tính line total
+      const unitPrice = pm.Medicine.price;
+      const lineTotal = sumAllocated * unitPrice;
+
+      return {
+        medicine_id: pm.Medicine.medicine_id,
+        medicine_name: pm.Medicine.name,
+        quantity: requiredQty,
+        unit: pm.Medicine.unit,
+        unit_price: unitPrice,
+        total_available: totalAvailable,
+        canFulfill,
+        shortage,
+        batches: batches.map((b) => ({
+          batch_number: b.batch_number,
+          expiry_date: dayjs(b.expiry_date).format("YYYY-MM-DD"),
+          quantity: b.quantity,
+        })),
+        allocations,
+        sum_allocated: sumAllocated,
+        line_total: lineTotal,
+      };
+    })
+  );
+
+  // 3. Tổng tiền đơn
+  const totalPrice = lines.reduce((sum, l) => sum + l.line_total, 0);
+
+  // 4. Build response
+  return {
+    success: true,
+    data: {
+      prescription_id: prescription.prescription_id,
+      family_member: {
+        family_member_id:
+          prescription.Appointment.FamilyMember.family_member_id,
+        name: prescription.Appointment.FamilyMember.username,
+        dob: dayjs(prescription.Appointment.FamilyMember.date_of_birth).format(
+          "YYYY-MM-DD"
+        ),
+        phone_number: prescription.Appointment.FamilyMember.phone_number,
+      },
+      appointment: {
+        appointment_id: prescription.Appointment.appointment_id,
+        datetime: dayjs(prescription.Appointment.appointment_datetime)
+          .tz("Asia/Ho_Chi_Minh")
+          .format("YYYY-MM-DDTHH:mm:ssZ"),
+        doctor_name: prescription.Appointment.Doctor.user.username,
+      },
+      lines,
+      total_price: totalPrice,
+    },
+  };
 };

@@ -27,6 +27,7 @@ import {
   completeRetailPrescription,
   getAllRetailPrescriptionPayments,
   cancelRetailPrescription,
+  getPrescriptionDetailsWithFIFO,
 } from "../services/pharmacistService.js";
 import BadRequestError from "../errors/bad_request.js";
 import asyncHandler from "express-async-handler";
@@ -88,14 +89,14 @@ export const getPrescriptionDetailsController = asyncHandler(
   }
 );
 export const getAllPrescriptionsController = asyncHandler(async (req, res) => {
-  const { 
+  const {
     start_date,
     end_date,
     date,
     payment_status,
     status,
     page = 1,
-    limit = 10
+    limit = 10,
   } = req.query;
 
   const result = await getAllPrescriptions({
@@ -105,12 +106,11 @@ export const getAllPrescriptionsController = asyncHandler(async (req, res) => {
     payment_status,
     status,
     page: parseInt(page),
-    limit: parseInt(limit)
+    limit: parseInt(limit),
   });
 
   res.status(200).json(result);
 });
-
 
 //     res.status(200).json(result);
 //   } catch (error) {
@@ -139,14 +139,14 @@ export const getAllPrescriptionsController = asyncHandler(async (req, res) => {
 export const updatePrescriptionItemController = asyncHandler(
   async (req, res) => {
     const { prescription_id } = req.params;
-    const { 
-      original_medicine_id, 
-      new_medicine_id, 
+    const {
+      original_medicine_id,
+      new_medicine_id,
       actual_quantity,
       dosage,
       frequency,
       duration,
-      instructions
+      instructions,
     } = req.body;
 
     if (
@@ -181,18 +181,23 @@ export const completePrescriptionController = asyncHandler(async (req, res) => {
   res.status(200).json(result);
 });
 
-export const confirmPrescriptionPreparationController = asyncHandler(async (req, res) => {
-  const { prescription_id } = req.params;
-  const pharmacist_id = req.user.user_id;
-  
-  // Thêm log để debug
-  console.log('User from token:', req.user);
-  console.log('Pharmacist ID:', pharmacist_id);
+export const confirmPrescriptionPreparationController = asyncHandler(
+  async (req, res) => {
+    const { prescription_id } = req.params;
+    const pharmacist_id = req.user.user_id;
 
-  const result = await confirmPrescriptionPreparation(prescription_id, pharmacist_id);
+    // Thêm log để debug
+    console.log("User from token:", req.user);
+    console.log("Pharmacist ID:", pharmacist_id);
 
-  res.status(200).json(result);
-});
+    const result = await confirmPrescriptionPreparation(
+      prescription_id,
+      pharmacist_id
+    );
+
+    res.status(200).json(result);
+  }
+);
 
 // export const getAllMedicinesController = async (req, res, next) => {
 //   try {
@@ -301,35 +306,37 @@ export const changePharmacistPasswordController = asyncHandler(
 /**
  * Controller xử lý cập nhật trạng thái thanh toán đơn thuốc
  */
-export const updatePrescriptionPaymentStatusController = asyncHandler(async (req, res) => {
-  const user_id = req.user.user_id;
-  const { prescription_payment_id } = req.params;
-  const { payment_method, note } = req.body;
+export const updatePrescriptionPaymentStatusController = asyncHandler(
+  async (req, res) => {
+    const user_id = req.user.user_id;
+    const { prescription_payment_id } = req.params;
+    const { payment_method, note } = req.body;
 
-  // Validate input
-  if (!prescription_payment_id) {
-    throw new BadRequestError("Thiếu mã thanh toán đơn thuốc");
+    // Validate input
+    if (!prescription_payment_id) {
+      throw new BadRequestError("Thiếu mã thanh toán đơn thuốc");
+    }
+
+    if (!payment_method) {
+      throw new BadRequestError("Thiếu phương thức thanh toán");
+    }
+
+    // Validate payment method
+    const validPaymentMethods = ["cash", "zalopay"];
+    if (!validPaymentMethods.includes(payment_method)) {
+      throw new BadRequestError("Phương thức thanh toán không hợp lệ");
+    }
+
+    const result = await updatePrescriptionPaymentStatus(
+      user_id,
+      prescription_payment_id,
+      payment_method,
+      note
+    );
+
+    res.status(200).json(result);
   }
-
-  if (!payment_method) {
-    throw new BadRequestError("Thiếu phương thức thanh toán");
-  }
-
-  // Validate payment method
-  const validPaymentMethods = ['cash', 'zalopay'];
-  if (!validPaymentMethods.includes(payment_method)) {
-    throw new BadRequestError("Phương thức thanh toán không hợp lệ");
-  }
-
-  const result = await updatePrescriptionPaymentStatus(
-    user_id,
-    prescription_payment_id,
-    payment_method,
-    note
-  );
-
-  res.status(200).json(result);
-});
+);
 
 /**
  * Controller xử lý từ chối đơn thuốc
@@ -340,215 +347,238 @@ export const rejectPrescriptionController = asyncHandler(async (req, res) => {
   const user_id = req.user.user_id;
 
   const result = await rejectPrescription(prescription_id, reason, user_id);
-  
+
   res.status(200).json(result);
 });
 
 /**
  * Controller xử lý lấy danh sách thanh toán đơn thuốc
  */
-export const getAllPrescriptionPaymentsController = asyncHandler(async (req, res) => {
-  const { 
-    status,
-    start_date,
-    end_date,
-    page = 1,
-    limit = 10
-  } = req.query;
+export const getAllPrescriptionPaymentsController = asyncHandler(
+  async (req, res) => {
+    const { status, start_date, end_date, page = 1, limit = 10 } = req.query;
 
-  const result = await getAllPrescriptionPayments({
-    status,
-    start_date,
-    end_date,
-    page: parseInt(page),
-    limit: parseInt(limit)
-  });
+    const result = await getAllPrescriptionPayments({
+      status,
+      start_date,
+      end_date,
+      page: parseInt(page),
+      limit: parseInt(limit),
+    });
 
-  res.status(200).json(result);
-});
-
-export const createRetailPrescriptionController = asyncHandler(async (req, res) => {
-  try {
-    const { patient_id, medicines, note } = req.body;
-    const pharmacist_id = req.user.user_id;  // Giả sử dược sĩ đã được xác thực qua middleware
-
-    // Gọi service createRetailPrescription để tạo đơn thuốc
-    const result = await createRetailPrescription({ patient_id, medicines, note }, pharmacist_id);
-    
-    // Trả về kết quả cho client
     res.status(200).json(result);
-  } catch (error) {
-    // Nếu có lỗi, trả lại thông báo lỗi cho client
-    res.status(error.status || 500).json({ message: error.message });
   }
-});
+);
+
+export const createRetailPrescriptionController = asyncHandler(
+  async (req, res) => {
+    try {
+      const { patient_id, medicines, note } = req.body;
+      const pharmacist_id = req.user.user_id; // Giả sử dược sĩ đã được xác thực qua middleware
+
+      // Gọi service createRetailPrescription để tạo đơn thuốc
+      const result = await createRetailPrescription(
+        { patient_id, medicines, note },
+        pharmacist_id
+      );
+
+      // Trả về kết quả cho client
+      res.status(200).json(result);
+    } catch (error) {
+      // Nếu có lỗi, trả lại thông báo lỗi cho client
+      res.status(error.status || 500).json({ message: error.message });
+    }
+  }
+);
 
 /**
  * Controller xử lý lấy danh sách đơn thuốc bán lẻ
  */
-export const getAllRetailPrescriptionsController = asyncHandler(async (req, res) => {
-  const { 
-    status,
-    start_date,
-    end_date,
-    page = 1,
-    limit = 10
-  } = req.query;
+export const getAllRetailPrescriptionsController = asyncHandler(
+  async (req, res) => {
+    const { status, start_date, end_date, page = 1, limit = 10 } = req.query;
 
-  const result = await getAllRetailPrescriptions({
-    status,
-    start_date,
-    end_date,
-    page: parseInt(page),
-    limit: parseInt(limit)
-  });
+    const result = await getAllRetailPrescriptions({
+      status,
+      start_date,
+      end_date,
+      page: parseInt(page),
+      limit: parseInt(limit),
+    });
 
-  res.status(200).json(result);
-});
+    res.status(200).json(result);
+  }
+);
 
 /**
  * Controller xử lý lấy chi tiết đơn thuốc bán lẻ
  */
-export const getRetailPrescriptionDetailsController = asyncHandler(async (req, res) => {
-  const { retail_prescription_id } = req.params;
+export const getRetailPrescriptionDetailsController = asyncHandler(
+  async (req, res) => {
+    const { retail_prescription_id } = req.params;
 
-  // Validate input
-  if (!retail_prescription_id) {
-    throw new BadRequestError("Thiếu mã đơn thuốc bán lẻ");
+    // Validate input
+    if (!retail_prescription_id) {
+      throw new BadRequestError("Thiếu mã đơn thuốc bán lẻ");
+    }
+
+    const result = await getRetailPrescriptionDetails(retail_prescription_id);
+
+    res.status(200).json(result);
   }
-
-  const result = await getRetailPrescriptionDetails(retail_prescription_id);
-  
-  res.status(200).json(result);
-});
+);
 
 /**
  * Controller xử lý cập nhật đơn thuốc bán lẻ
  */
-export const updateRetailPrescriptionController = asyncHandler(async (req, res) => {
-  const { retail_prescription_id } = req.params;
-  const { note, medicines } = req.body;
-  const pharmacist_id = req.user.user_id;
+export const updateRetailPrescriptionController = asyncHandler(
+  async (req, res) => {
+    const { retail_prescription_id } = req.params;
+    const { note, medicines } = req.body;
+    const pharmacist_id = req.user.user_id;
 
-  // Validate input
-  if (!retail_prescription_id) {
-    throw new BadRequestError("Thiếu mã đơn thuốc bán lẻ");
-  }
+    // Validate input
+    if (!retail_prescription_id) {
+      throw new BadRequestError("Thiếu mã đơn thuốc bán lẻ");
+    }
 
-  // Validate medicines nếu có
-  if (medicines && medicines.length > 0) {
-    for (const med of medicines) {
-      if (!med.medicine_id) {
-        throw new BadRequestError("Thiếu ID thuốc");
-      }
-      if (!med.quantity || med.quantity <= 0) {
-        throw new BadRequestError("Số lượng thuốc phải lớn hơn 0");
-      }
-      if (!med.dosage) {
-        throw new BadRequestError("Thiếu liều dùng");
-      }
-      if (!med.frequency) {
-        throw new BadRequestError("Thiếu tần suất sử dụng");
-      }
-      if (!med.duration) {
-        throw new BadRequestError("Thiếu thời gian sử dụng");
-      }
-      if (!med.instructions) {
-        throw new BadRequestError("Thiếu hướng dẫn sử dụng");
+    // Validate medicines nếu có
+    if (medicines && medicines.length > 0) {
+      for (const med of medicines) {
+        if (!med.medicine_id) {
+          throw new BadRequestError("Thiếu ID thuốc");
+        }
+        if (!med.quantity || med.quantity <= 0) {
+          throw new BadRequestError("Số lượng thuốc phải lớn hơn 0");
+        }
+        if (!med.dosage) {
+          throw new BadRequestError("Thiếu liều dùng");
+        }
+        if (!med.frequency) {
+          throw new BadRequestError("Thiếu tần suất sử dụng");
+        }
+        if (!med.duration) {
+          throw new BadRequestError("Thiếu thời gian sử dụng");
+        }
+        if (!med.instructions) {
+          throw new BadRequestError("Thiếu hướng dẫn sử dụng");
+        }
       }
     }
-  }
 
-  // Gọi service để cập nhật đơn thuốc
-  const result = await updateRetailPrescription(retail_prescription_id, { note, medicines }, pharmacist_id);
-  
-  // Trả về kết quả
-  res.status(200).json(result);
-});
+    // Gọi service để cập nhật đơn thuốc
+    const result = await updateRetailPrescription(
+      retail_prescription_id,
+      { note, medicines },
+      pharmacist_id
+    );
+
+    // Trả về kết quả
+    res.status(200).json(result);
+  }
+);
 
 /**
  * Controller xử lý cập nhật trạng thái đơn thuốc bán lẻ
  */
-export const updateRetailPrescriptionStatusController = asyncHandler(async (req, res) => {
-  const { retail_prescription_id } = req.params;
-  const { status } = req.body;
-  const pharmacist_id = req.user.user_id;
+export const updateRetailPrescriptionStatusController = asyncHandler(
+  async (req, res) => {
+    const { retail_prescription_id } = req.params;
+    const { status } = req.body;
+    const pharmacist_id = req.user.user_id;
 
-  // Validate input
-  if (!retail_prescription_id) {
-    throw new BadRequestError("Thiếu mã đơn thuốc bán lẻ");
+    // Validate input
+    if (!retail_prescription_id) {
+      throw new BadRequestError("Thiếu mã đơn thuốc bán lẻ");
+    }
+
+    if (!status) {
+      throw new BadRequestError("Thiếu trạng thái mới");
+    }
+
+    // Validate status
+    const validStatuses = [
+      "pending_prepare",
+      "waiting_payment",
+      "completed",
+      "cancelled",
+    ];
+    if (!validStatuses.includes(status)) {
+      throw new BadRequestError("Trạng thái không hợp lệ");
+    }
+
+    // Gọi service để cập nhật trạng thái
+    const result = await updateRetailPrescriptionStatus(
+      retail_prescription_id,
+      status,
+      pharmacist_id
+    );
+
+    // Trả về kết quả
+    res.status(200).json(result);
   }
-
-  if (!status) {
-    throw new BadRequestError("Thiếu trạng thái mới");
-  }
-
-  // Validate status
-  const validStatuses = ['pending_prepare', 'waiting_payment', 'completed', 'cancelled'];
-  if (!validStatuses.includes(status)) {
-    throw new BadRequestError("Trạng thái không hợp lệ");
-  }
-
-  // Gọi service để cập nhật trạng thái
-  const result = await updateRetailPrescriptionStatus(retail_prescription_id, status, pharmacist_id);
-  
-  // Trả về kết quả
-  res.status(200).json(result);
-});
+);
 
 /**
  * Controller xử lý cập nhật trạng thái thanh toán đơn thuốc bán lẻ
  */
-export const updateRetailPrescriptionPaymentStatusController = asyncHandler(async (req, res) => {
-  const { payment_id } = req.params;
-  const { payment_method, note } = req.body;
-  const pharmacist_id = req.user.user_id;
+export const updateRetailPrescriptionPaymentStatusController = asyncHandler(
+  async (req, res) => {
+    const { payment_id } = req.params;
+    const { payment_method, note } = req.body;
+    const pharmacist_id = req.user.user_id;
 
-  // Validate input
-  if (!payment_id) {
-    throw new BadRequestError("Thiếu mã thanh toán đơn thuốc");
+    // Validate input
+    if (!payment_id) {
+      throw new BadRequestError("Thiếu mã thanh toán đơn thuốc");
+    }
+
+    if (!payment_method) {
+      throw new BadRequestError("Thiếu phương thức thanh toán");
+    }
+
+    // Validate payment method
+    const validPaymentMethods = ["cash", "zalopay"];
+    if (!validPaymentMethods.includes(payment_method)) {
+      throw new BadRequestError("Phương thức thanh toán không hợp lệ");
+    }
+
+    // Gọi service để cập nhật trạng thái thanh toán
+    const result = await updateRetailPrescriptionPaymentStatus(
+      payment_id,
+      payment_method,
+      pharmacist_id,
+      note
+    );
+
+    // Trả về kết quả
+    res.status(200).json(result);
   }
-
-  if (!payment_method) {
-    throw new BadRequestError("Thiếu phương thức thanh toán");
-  }
-
-  // Validate payment method
-  const validPaymentMethods = ['cash', 'zalopay'];
-  if (!validPaymentMethods.includes(payment_method)) {
-    throw new BadRequestError("Phương thức thanh toán không hợp lệ");
-  }
-
-  // Gọi service để cập nhật trạng thái thanh toán
-  const result = await updateRetailPrescriptionPaymentStatus(
-    payment_id,
-    payment_method,
-    pharmacist_id,
-    note
-  );
-  
-  // Trả về kết quả
-  res.status(200).json(result);
-});
+);
 
 /**
  * Controller xử lý hoàn tất đơn thuốc bán lẻ
  */
-export const completeRetailPrescriptionController = asyncHandler(async (req, res) => {
-  const { retail_prescription_id } = req.params;
-  const pharmacist_id = req.user.user_id;
+export const completeRetailPrescriptionController = asyncHandler(
+  async (req, res) => {
+    const { retail_prescription_id } = req.params;
+    const pharmacist_id = req.user.user_id;
 
-  // Validate input
-  if (!retail_prescription_id) {
-    throw new BadRequestError("Thiếu mã đơn thuốc bán lẻ");
+    // Validate input
+    if (!retail_prescription_id) {
+      throw new BadRequestError("Thiếu mã đơn thuốc bán lẻ");
+    }
+
+    // Gọi service để hoàn tất đơn thuốc
+    const result = await completeRetailPrescription(
+      retail_prescription_id,
+      pharmacist_id
+    );
+
+    // Trả về kết quả
+    res.status(200).json(result);
   }
-
-  // Gọi service để hoàn tất đơn thuốc
-  const result = await completeRetailPrescription(retail_prescription_id, pharmacist_id);
-  
-  // Trả về kết quả
-  res.status(200).json(result);
-});
+);
 
 /**
  * Lấy danh sách thanh toán đơn thuốc bán lẻ
@@ -556,19 +586,21 @@ export const completeRetailPrescriptionController = asyncHandler(async (req, res
  * @param {Object} res - Response object
  * @param {Function} next - Next middleware function
  */
-export const getAllRetailPrescriptionPaymentsController = asyncHandler(async (req, res, next) => {
-  const { status, start_date, end_date, page, limit } = req.query;
+export const getAllRetailPrescriptionPaymentsController = asyncHandler(
+  async (req, res, next) => {
+    const { status, start_date, end_date, page, limit } = req.query;
 
-  const result = await getAllRetailPrescriptionPayments({
-    status,
-    start_date,
-    end_date,
-    page: parseInt(page) || 1,
-    limit: parseInt(limit) || 10
-  });
+    const result = await getAllRetailPrescriptionPayments({
+      status,
+      start_date,
+      end_date,
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 10,
+    });
 
-  res.status(200).json(result);
-});
+    res.status(200).json(result);
+  }
+);
 
 /**
  * Hủy đơn thuốc bán lẻ
@@ -594,6 +626,36 @@ export const cancelRetailPrescriptionController = async (req, res, next) => {
     );
 
     res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @route GET /api/pharmacy/prescriptions/:prescription_id
+ * @description Lấy chi tiết đơn thuốc với phân bổ FIFO
+ * @access Private - Chỉ dược sĩ
+ */
+export const getPrescriptionDetailsWithFIFOController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const { prescription_id } = req.params;
+    const fifo = req.query.fifo !== "false"; // mặc định là true nếu không có query param hoặc khác "false"
+
+    // Validate prescription_id
+    if (!prescription_id || isNaN(prescription_id)) {
+      throw new BadRequestError("ID đơn thuốc không hợp lệ");
+    }
+
+    const result = await getPrescriptionDetailsWithFIFO(
+      parseInt(prescription_id),
+      fifo
+    );
+
+    return res.status(200).json(result);
   } catch (error) {
     next(error);
   }

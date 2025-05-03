@@ -23,6 +23,7 @@ import RetailPrescriptionPayment from "./retailPrescriptionPayments.js";
 import FamilyMember from "./familyMember.js";
 import Symptom from "./symptom.js";
 import SymptomSpecializationMapping from "./symptomSpecializationMapping.js";
+import Batch from "./batch.js";
 
 const sequelize = new Sequelize(dbConfig.development);
 
@@ -47,7 +48,7 @@ const db = {
   Schedule: Schedule(sequelize, Sequelize.DataTypes),
   CompensationCode: CompensationCode(sequelize, Sequelize.DataTypes),
   RetailPrescription: RetailPrescription(sequelize, Sequelize.DataTypes),
-
+  Batch: Batch(sequelize, Sequelize.DataTypes),
   RetailPrescriptionMedicine: RetailPrescriptionMedicine(
     sequelize,
     Sequelize.DataTypes
