@@ -28,6 +28,7 @@ import {
   getAllRetailPrescriptionPayments,
   cancelRetailPrescription,
   getPrescriptionDetailsWithFIFO,
+  prepareAndPayPrescription,
 } from "../services/pharmacistService.js";
 import BadRequestError from "../errors/bad_request.js";
 import asyncHandler from "express-async-handler";
@@ -658,5 +659,33 @@ export const getPrescriptionDetailsWithFIFOController = async (
     return res.status(200).json(result);
   } catch (error) {
     next(error);
+  }
+};
+
+export const preparePrescriptionController = async (req, res, next) => {
+  try {
+    const prescription_id = req.params.prescription_id;
+    if (isNaN(prescription_id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid prescription ID" });
+    }
+
+    const { lines, payment_method } = req.body;
+    if (!Array.isArray(lines) || !payment_method) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing lines or payment_method" });
+    }
+
+    const result = await prepareAndPayPrescription(
+      prescription_id,
+      lines,
+      payment_method
+    );
+
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
   }
 };

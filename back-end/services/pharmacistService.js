@@ -3246,3 +3246,133 @@ export const getPrescriptionDetailsWithFIFO = async (
     },
   };
 };
+
+/**
+ * Chuẩn bị và thanh toán đơn thuốc với phân bổ FIFO tự động
+ * @param {number} prescription_id - ID của đơn thuốc
+ * @param {Array} lines - Danh sách thuốc cần cấp
+ * @param {string} payment_method - Phương thức thanh toán (cash/online)
+ */
+export const prepareAndPayPrescription = async (
+  prescription_id,
+  lines,
+  payment_method
+) => {
+  const t = await db.sequelize.transaction();
+  try {
+    // 1. Lấy đơn thuốc chờ prepare
+    const prescription = await db.Prescription.findOne({
+      where: { prescription_id, status: "pending_prepare" },
+      include: [
+        { model: db.PrescriptionMedicine, as: "prescriptionMedicines" },
+      ],
+      transaction: t,
+    });
+    if (!prescription) {
+      throw new NotFoundError("Đơn không tồn tại hoặc không chờ chuẩn bị");
+    }
+
+    const invoiceLines = [];
+
+    // 2. Với mỗi line request
+    for (const { medicine_id, allocated } of lines) {
+      const pm = prescription.prescriptionMedicines.find(
+        (pm) => pm.medicine_id === medicine_id
+      );
+      if (!pm)
+        throw new BadRequestError(`Medicine ${medicine_id} không có trong đơn`);
+      if (allocated > pm.quantity) {
+        throw new BadRequestError(
+          `Yêu cầu ${allocated} vượt quá kê ${pm.quantity}`
+        );
+      }
+
+      // 3. Lấy các batch Active có đủ hàng, theo FIFO (expiry_date ASC)
+      const batches = await db.Batch.findAll({
+        where: {
+          medicine_id,
+          status: "Active",
+          quantity: { [Op.gt]: 0 },
+        },
+        order: [["expiry_date", "ASC"]],
+        transaction: t,
+      });
+
+      let remaining = allocated;
+      const allocations = [];
+
+      // 4. Tự động phân bổ FIFO
+      for (const batch of batches) {
+        if (remaining <= 0) break;
+        const take = Math.min(batch.quantity, remaining);
+        allocations.push({ batch_number: batch.batch_number, allocated: take });
+        // Trừ tồn kho
+        await batch.decrement("quantity", { by: take, transaction: t });
+        remaining -= take;
+      }
+
+      if (remaining > 0) {
+        throw new BadRequestError(`Không đủ hàng cho medicine ${medicine_id}`);
+      }
+
+      // 5. Cập nhật actual_quantity
+      await pm.update({ actual_quantity: allocated }, { transaction: t });
+
+      // 6. Chuẩn bị dòng hoá đơn
+      const med = await db.Medicine.findByPk(medicine_id, { transaction: t });
+      invoiceLines.push({
+        medicine_id,
+        medicine_name: med.name,
+        allocated,
+        unit_price: med.price,
+        line_total: allocated * med.price,
+        allocations,
+      });
+    }
+
+    // 7. Đánh dấu đơn completed
+    await prescription.update(
+      {
+        status: "completed",
+        completed_at: new Date(),
+      },
+      { transaction: t }
+    );
+
+    // 8. Tạo bản ghi payment
+    const total_price = invoiceLines.reduce((sum, l) => sum + l.line_total, 0);
+    const payment = await db.PrescriptionPayment.create(
+      {
+        prescription_id,
+        amount: total_price,
+        payment_method,
+        status: "paid",
+        payment_date: new Date(),
+      },
+      { transaction: t }
+    );
+
+    await t.commit();
+
+    return {
+      success: true,
+      data: {
+        prescription_id,
+        invoice: {
+          lines: invoiceLines,
+          total_price,
+        },
+        payment: {
+          prescription_payment_id: payment.prescription_payment_id,
+          amount: payment.amount,
+          status: payment.status,
+          payment_method: payment.payment_method,
+          payment_date: payment.payment_date,
+        },
+      },
+    };
+  } catch (error) {
+    await t.rollback();
+    throw error;
+  }
+};

@@ -29,6 +29,7 @@ import {
   getAllRetailPrescriptionPaymentsController,
   cancelRetailPrescriptionController,
   getPrescriptionDetailsWithFIFOController,
+  preparePrescriptionController,
 } from "../controllers/pharmacistController.js";
 import validate from "../middleware/validate.js";
 import { body, query, param } from "express-validator";
@@ -394,5 +395,11 @@ router.get(
   authenticateUser,
   authorize(["pharmacist"]),
   getPrescriptionDetailsWithFIFOController
+);
+router.post(
+  "/prescriptions/:prescription_id/prepare-and-pay",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  preparePrescriptionController
 );
 export default router;
