@@ -7,9 +7,6 @@ const Home = () => {
   return (
     <div>
       <Header />
-      <SpecialityMenu />
-      <TopDoctors />
-      <Banner />
       <Footer />
     </div>
   );

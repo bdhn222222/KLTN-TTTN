@@ -35,8 +35,8 @@ app.get("/", (req, res) => {
 app.use("/user", userRoutes);
 app.use("/doctor", doctorRoutes);
 app.use("/admin", adminRoutes);
-app.use("/pharmacist", pharmacistRoutes);
 app.use("/patient", patientRoutes);
+app.use("/pharmacist", pharmacistRoutes);
 
 // Logger & error handler
 app.use(requestLogger);

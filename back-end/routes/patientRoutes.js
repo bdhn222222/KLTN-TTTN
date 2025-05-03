@@ -45,7 +45,7 @@ router.post(
     body("email").isEmail().withMessage("Email không hợp lệ"),
     body("password").notEmpty().withMessage("Mật khẩu không được để trống"),
   ]),
-  // loginLimiter,
+  loginLimiter,
   loginPatientController
 );
 router.get("/specializations", getAllSpecializationsController);

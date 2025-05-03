@@ -7,7 +7,7 @@ import {
   LogoutOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
-import { AppContext } from "/Users/hanhnguyen/Documents/KLTN-TTTN/front-end/src/context/AppContext.jsx";
+import { AppContext } from "../../context/AppContext";
 
 function NavbarPhar() {
   const navigate = useNavigate();

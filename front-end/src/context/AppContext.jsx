@@ -5,9 +5,9 @@ export const AppContext = createContext();
 
 const AppContextProvider = (props) => {
   const [user, setUser] = useState(null);
-  const currencySymbol = "$";
   const url1 = "http://localhost:5001";
   const navigate = useNavigate();
+  const currencySymbol = "$";
 
   // Restore user state from localStorage on mount
   useEffect(() => {

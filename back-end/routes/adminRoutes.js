@@ -32,8 +32,8 @@ import {
   getDoctorStatsController,
   updateDoctorController,
 } from "../controllers/adminController.js";
-import { authenticateUser } from "../middleware/authentication.js";
-import authorize from "../middleware/authorization.js";
+// import { authenticateUser } from "../middleware/authentication.js";
+// import authorize from "../middleware/authorization.js";
 import validate from "../middleware/validate.js";
 import { body } from "express-validator";
 import {
@@ -42,7 +42,10 @@ import {
   forgotPasswordLimiter,
 } from "../middleware/rateLimiter.js";
 
+import { authenticateUser } from "../middleware/authentication.js";
+import authorize from "../middleware/authorization.js";
 const router = express.Router();
+
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
@@ -69,6 +72,18 @@ router.post(
   ]),
   loginLimiter,
   loginAdminController
+);
+router.get(
+  "/appointments",
+  authenticateUser,
+  authorize(["admin"]),
+  getAllAppointmentsController
+);
+router.patch(
+  "/payments/:payment_id/status",
+  authenticateUser,
+  authorize(["admin"]),
+  updatePaymentStatusController
 );
 router.get(
   "/appointments/stats_by_status",
