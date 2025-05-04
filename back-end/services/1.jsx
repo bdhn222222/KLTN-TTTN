@@ -1,5 +1,6 @@
-router.post(
-  "/patient/doctor-by-symptoms",
+router.patch(
+  "/payments/:payment_id/status",
   authenticateUser,
-  getDoctorBySymptomsController
+  authorize(["admin"]),
+  updatePaymentStatusController
 );

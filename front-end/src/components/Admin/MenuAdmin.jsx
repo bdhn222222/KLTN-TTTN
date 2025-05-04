@@ -23,18 +23,18 @@ const MenuAdmin = ({ collapsed }) => {
     {
       key: "appointments",
       icon: <CalendarOutlined className="!text-blue-900" />,
-      label: <span className="text-blue-900">Appointments</span>,
+      label: <span className="text-blue-900">Quản lý lịch hẹn</span>,
       children: [
         {
           key: "waiting",
           icon: <ClockCircleOutlined className="text-blue-900" />,
-          label: "Unconfirmed",
+          label: "Chờ xác nhận",
           onClick: () => navigate("/admin/appointments/waiting-to-confirm"),
         },
         {
           key: "accepted",
           icon: <CheckCircleOutlined className="text-blue-900" />,
-          label: "Confirmed",
+          label: "Đã xác nhận",
           onClick: () => navigate("/admin/appointments/accepted"),
         },
         // {
@@ -46,13 +46,13 @@ const MenuAdmin = ({ collapsed }) => {
         {
           key: "cancelled",
           icon: <CloseCircleOutlined className="text-blue-900" />,
-          label: "Cancelled",
+          label: "Đã hủy",
           onClick: () => navigate("/admin/appointments/cancelled"),
         },
         {
           key: "mark-patient-not-coming",
           icon: <CloseCircleOutlined className="text-blue-900" />,
-          label: "Patient Not Coming",
+          label: "Bệnh nhân không đến",
           onClick: () => navigate("/admin/appointments/patient-not-coming"),
         },
       ],
