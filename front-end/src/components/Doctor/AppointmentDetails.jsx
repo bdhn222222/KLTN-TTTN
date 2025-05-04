@@ -415,6 +415,34 @@ const AppointmentDetails = ({ open, onClose, appointmentData, onUpdate }) => {
                   Bác sĩ có lịch nghỉ
                 </Descriptions.Item>
               )}
+              {appointmentStatus === "cancelled" && (
+                <>
+                  <Descriptions.Item label="Lý do hủy">
+                    {safeAccess(
+                      appointmentData,
+                      "appointment_info.cancel_reason"
+                    ) ||
+                      safeAccess(appointmentData, "cancel_reason") ||
+                      "Không có lý do"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Người hủy">
+                    {safeAccess(
+                      appointmentData,
+                      "appointment_info.cancelled_by"
+                    ) ||
+                      safeAccess(appointmentData, "cancelled_by") ||
+                      "Không có thông tin"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Thời gian hủy">
+                    {formatDate(
+                      safeAccess(
+                        appointmentData,
+                        "appointment_info.cancelled_at"
+                      ) || safeAccess(appointmentData, "cancelled_at")
+                    )}
+                  </Descriptions.Item>
+                </>
+              )}
             </Descriptions>
           </Card>
 

@@ -511,6 +511,13 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
         fees: appointment.fees,
         createdAt: appointment.createdAt,
         updatedAt: appointment.updatedAt,
+        ...(["cancelled", "doctor_day_off", "patient_not_coming"].includes(
+          appointment.status
+        ) && {
+          cancel_reason: appointment.cancel_reason,
+          cancelled_by: appointment.cancelled_by,
+          cancelled_at: appointment.cancelled_at,
+        }),
       },
       // patient: {
       //   id: appointment.FamilyMember?.Patient.patient_id,

@@ -1,20 +1,33 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { Layout, Card, Table, Button, Avatar, Space, Tag, Flex, notification } from 'antd';
+import React, { useState, useEffect, useContext } from "react";
+import {
+  Layout,
+  Card,
+  Table,
+  Button,
+  Avatar,
+  Space,
+  Tag,
+  Flex,
+  notification,
+} from "antd";
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   UserOutlined,
   EyeOutlined,
   CheckOutlined,
-  CloseCircleOutlined
-} from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import NavbarDoctor from '../../components/Doctor/NavbarDoctor';
-import MenuDoctor from '../../components/Doctor/MenuDoctor';
-import AppointmentDetails from '../../components/Doctor/AppointmentDetails';
-import axios from 'axios';
-import { AppContext } from '../../context/AppContext';
-import dayjs from 'dayjs';
+  CloseCircleOutlined,
+  ClockCircleOutlined,
+  ExclamationCircleOutlined,
+  MedicineBoxOutlined,
+} from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
+import NavbarDoctor from "../../components/Doctor/NavbarDoctor";
+import MenuDoctor from "../../components/Doctor/MenuDoctor";
+import AppointmentDetails from "../../components/Doctor/AppointmentDetails";
+import axios from "axios";
+import { AppContext } from "../../context/AppContext";
+import dayjs from "dayjs";
 
 const { Sider, Content } = Layout;
 
@@ -33,7 +46,7 @@ const AppointmentCanDoctor = () => {
     api[type]({
       message: message,
       description: description,
-      placement: 'topRight',
+      placement: "topRight",
       duration: 3,
     });
   };
@@ -43,26 +56,26 @@ const AppointmentCanDoctor = () => {
       setLoading(true);
       const response = await axios.get(`${url1}/doctor/appointments`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         params: {
-          status: ['cancelled', 'patient_not_coming', 'doctor_day_off']
-        }
+          status: ["cancelled", "patient_not_coming", "doctor_day_off"],
+        },
       });
-      
+
       if (response.data && response.data.data) {
         setAppointments(response.data.data);
       } else {
-        console.error('Invalid data format from API:', response.data);
+        console.error("Invalid data format from API:", response.data);
         setAppointments([]);
       }
     } catch (error) {
-      console.error('Error fetching appointments:', error);
+      console.error("Error fetching appointments:", error);
       setAppointments([]);
       showNotification(
-        'error',
-        'Tải dữ liệu thất bại',
-        'Không thể tải danh sách cuộc hẹn, vui lòng thử lại sau'
+        "error",
+        "Tải dữ liệu thất bại",
+        "Không thể tải danh sách cuộc hẹn, vui lòng thử lại sau"
       );
     } finally {
       setLoading(false);
@@ -75,15 +88,22 @@ const AppointmentCanDoctor = () => {
 
   const getAppointmentDetails = async (appointmentId) => {
     try {
-      const response = await axios.get(`${url1}/doctor/appointments/${appointmentId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      const response = await axios.get(
+        `${url1}/doctor/appointments/${appointmentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         }
-      });
+      );
       setSelectedAppointment(response.data.data);
       setIsDrawerVisible(true);
     } catch (error) {
-      showNotification('error', 'Lỗi', 'Không thể tải thông tin chi tiết cuộc hẹn');
+      showNotification(
+        "error",
+        "Lỗi",
+        "Không thể tải thông tin chi tiết cuộc hẹn"
+      );
     }
   };
 
@@ -93,87 +113,118 @@ const AppointmentCanDoctor = () => {
 
   const getStatusTag = (status) => {
     const statusConfig = {
-        waiting_for_confirmation: { color: 'gold', text: 'unconfirmed' },
-        accepted: { color: 'green', text: 'confirmed' },
-        completed: { color: 'blue', text: 'completed' },
-        cancelled: { color: 'red', text: 'cancelled' },
-        doctor_day_off: { color: 'red', text: 'cancelled' },
-        patient_not_coming: { color: 'red', text: 'cancelled' }
-         // Đảm bảo text là 'cancelled'
-      };
+      waiting_for_confirmation: {
+        color: "gold",
+        text: "Chờ xác nhận",
+        icon: <ClockCircleOutlined />,
+      },
+      accepted: {
+        color: "green",
+        text: "Đã tiếp nhận",
+        icon: <CheckOutlined />,
+      },
+      completed: {
+        color: "blue",
+        text: "Đã hoàn thành",
+        icon: <CheckOutlined />,
+      },
+      cancelled: {
+        color: "red",
+        text: "Đã hủy",
+        icon: <CloseCircleOutlined />,
+      },
+      doctor_day_off: {
+        color: "orange",
+        text: "Bác sĩ nghỉ",
+        icon: <MedicineBoxOutlined />,
+      },
+      patient_not_coming: {
+        color: "red",
+        text: "Bệnh nhân không đến",
+        icon: <ExclamationCircleOutlined />,
+      },
+    };
 
-    const config = statusConfig[status] || { color: 'default', text: status };
-    return <Tag color={config.color}>{config.text}</Tag>;
+    const config = statusConfig[status] || {
+      color: "default",
+      text: status,
+      icon: null,
+    };
+    return (
+      <Tag color={config.color}>
+        {config.icon && <span className="mr-1">{config.icon}</span>}
+        {config.text}
+      </Tag>
+    );
   };
 
   const columns = [
     {
-      title: 'ID',
-      dataIndex: 'appointment_id',
-      key: 'appointment_id',
+      title: "ID",
+      dataIndex: "appointment_id",
+      key: "appointment_id",
     },
     {
-      title: 'Patient',
-      dataIndex: 'patient_name',
-      key: 'patient_name',
-      render: (text) => (
+      title: "Bệnh nhân",
+      dataIndex: "family_name",
+      key: "family_name",
+      render: (text, record) => (
         <div className="flex items-center gap-2">
           <Avatar icon={<UserOutlined />} className="bg-blue-900" />
-          <span>{text}</span>
+          <span>{text || record.family_name || "N/A"}</span>
         </div>
       ),
     },
     {
-      title: 'Appointment Time',
-      dataIndex: 'appointment_datetime',
-      key: 'appointment_datetime',
-      render: (datetime) => dayjs(datetime).format('DD/MM/YYYY HH:mm'),
+      title: "Thời gian khám",
+      dataIndex: "appointment_datetime",
+      key: "appointment_datetime",
+      render: (datetime) => dayjs(datetime).format("DD/MM/YYYY HH:mm"),
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
       render: (status) => getStatusTag(status),
     },
     {
-      title: 'Fees',
-      dataIndex: 'fees',
-      key: 'fees',
-      render: (fees) => fees?.toLocaleString('vi-VN') + ' VNĐ',
+      title: "Phí khám",
+      dataIndex: "fees",
+      key: "fees",
+      render: (fees) => fees?.toLocaleString("vi-VN") + " VNĐ",
     },
     {
-      title: 'More',
-      key: 'action',
+      title: "Thao tác",
+      key: "action",
       render: (_, record) => (
-        <Space>
-          <Button
-            icon={<EyeOutlined />}
-            onClick={() => getAppointmentDetails(record.appointment_id)}
-            className="!text-blue-900 hover:text-blue-800 px-6 py-2 rounded-full font-light hidden md:block hover:opacity-90 transition duration-300"
-          >
-            Details
-          </Button>
-        </Space>
+        <Button
+          type="primary"
+          icon={<EyeOutlined />}
+          onClick={() => getAppointmentDetails(record.appointment_id)}
+          className="!bg-blue-900 !text-white px-6 py-2 rounded-full font-light hover:!bg-blue-800 hover:!text-white border border-blue-800 transition duration-300"
+        >
+          Xem chi tiết
+        </Button>
       ),
     },
   ];
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: "100vh" }}>
       {contextHolder}
       <NavbarDoctor />
       <Layout>
-        <Sider 
-          width={250} 
-          collapsible 
+        <Sider
+          width={250}
+          collapsible
           collapsed={collapsed}
           onCollapse={setCollapsed}
           trigger={null}
           theme="light"
           style={{
-            overflow: 'auto',
-            height: '100vh',
-            position: 'fixed',
+            overflow: "auto",
+            height: "100vh",
+            position: "fixed",
             left: 0,
             top: 64,
             bottom: 0,
@@ -182,23 +233,37 @@ const AppointmentCanDoctor = () => {
           <div className="logo" />
           <div className="flex justify-end p-4">
             {collapsed ? (
-              <MenuUnfoldOutlined className="text-xl" onClick={() => setCollapsed(false)} />
+              <MenuUnfoldOutlined
+                className="text-xl"
+                onClick={() => setCollapsed(false)}
+              />
             ) : (
-              <MenuFoldOutlined className="text-xl" onClick={() => setCollapsed(true)} />
+              <MenuFoldOutlined
+                className="text-xl"
+                onClick={() => setCollapsed(true)}
+              />
             )}
           </div>
           <MenuDoctor collapsed={collapsed} />
         </Sider>
 
         <Layout style={{ marginLeft: collapsed ? 80 : 250, marginTop: 64 }}>
-          <Content style={{ margin: '24px 16px', overflow: 'initial' }}>
-            <Card title="Cancelled Appointments" className="shadow-sm">
+          <Content style={{ margin: "24px 16px", overflow: "initial" }}>
+            <Card title="Danh sách cuộc hẹn đã hủy" className="shadow-sm">
               <Flex gap="middle" vertical>
                 <Table
                   columns={columns}
                   dataSource={appointments}
                   rowKey="appointment_id"
                   loading={loading}
+                  // rowClassName={(record) => {
+                  //   if (record.status === "cancelled") return "bg-red-50";
+                  //   if (record.status === "doctor_day_off")
+                  //     return "bg-orange-50";
+                  //   if (record.status === "patient_not_coming")
+                  //     return "bg-yellow-50";
+                  //   return "";
+                  // }}
                   pagination={{
                     pageSize: 10,
                     showSizeChanger: true,
@@ -212,11 +277,10 @@ const AppointmentCanDoctor = () => {
       </Layout>
 
       <AppointmentDetails
-        isDrawerVisible={isDrawerVisible}
-        setIsDrawerVisible={setIsDrawerVisible}
-        selectedAppointment={selectedAppointment}
-        onRefresh={fetchAppointments}
-        onNavigateToCreateRecord={handleNavigateToCreateRecord}
+        open={isDrawerVisible}
+        onClose={() => setIsDrawerVisible(false)}
+        appointmentData={selectedAppointment}
+        onUpdate={fetchAppointments}
       />
     </Layout>
   );
