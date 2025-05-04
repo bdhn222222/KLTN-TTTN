@@ -69,7 +69,7 @@ const Login = () => {
       // Chuyển hướng dựa trên role
       const roleRoutes = {
         patient: "/",
-        doctor: "/doctor/appointments/waiting-to-confirm",
+        doctor: "/doctor/appointments/accepted",
         pharmacist: "/pharmacists/prescription/pending_prepare",
         admin: "/admin/appointments/waiting-to-confirm",
       };

@@ -23,6 +23,7 @@ import {
   getPatientAppointmentsController,
   getDoctorProfileController,
   updateDoctorProfileController,
+  getFamilyMemberDetailsController,
 } from "../controllers/doctorController.js";
 import validate from "../middleware/validate.js";
 import { body, param } from "express-validator";
@@ -220,6 +221,13 @@ router.get(
   authenticateUser,
   authorize(["doctor"]),
   getAllPatient_FamilyMemberController
+);
+
+router.get(
+  "/patients/:family_member_id",
+  authenticateUser,
+  authorize(["doctor"]),
+  getFamilyMemberDetailsController
 );
 
 router.get(

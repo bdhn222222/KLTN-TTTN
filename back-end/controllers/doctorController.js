@@ -21,6 +21,7 @@ import {
   getAllPatient_FamilyMember,
   getPatientAppointment,
   getDoctorProfile,
+  getFamilyMemberDetails,
 } from "../services/doctorService.js";
 import BadRequestError from "../errors/bad_request.js";
 import InternalServerError from "../errors/internalServerError.js";
@@ -890,5 +891,41 @@ export const updateDoctorProfileController = async (req, res) => {
       message: "Có lỗi xảy ra khi cập nhật thông tin",
       error: error.message,
     });
+  }
+};
+
+/**
+ * Lấy thông tin chi tiết của một FamilyMember
+ */
+export const getFamilyMemberDetailsController = async (req, res) => {
+  try {
+    const user_id = req.user.user_id;
+    const { family_member_id } = req.params;
+
+    const doctor = await db.Doctor.findOne({
+      where: { user_id: user_id },
+      attributes: ["doctor_id"],
+    });
+
+    if (!doctor) {
+      throw new NotFoundError("Không tìm thấy bác sĩ");
+    }
+
+    const result = await getFamilyMemberDetails(
+      doctor.doctor_id,
+      parseInt(family_member_id)
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error in getFamilyMemberDetailsController:", error);
+    if (error instanceof NotFoundError) {
+      res.status(404).json({ success: false, message: error.message });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: "Có lỗi xảy ra khi lấy thông tin chi tiết bệnh nhân",
+        error: error.message,
+      });
+    }
   }
 };

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu } from 'antd';
+import React, { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Menu } from "antd";
 import {
   CalendarOutlined,
   TeamOutlined,
@@ -10,13 +10,13 @@ import {
   CloseCircleOutlined,
   CheckSquareOutlined,
   ScheduleOutlined,
-} from '@ant-design/icons';
+} from "@ant-design/icons";
 
 const MenuDoctor = ({ collapsed, selectedKey: propSelectedKey }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [selectedKey, setSelectedKey] = useState('waiting');
-  const [openKeys, setOpenKeys] = useState(['appointments']);
+  const [selectedKey, setSelectedKey] = useState("waiting");
+  const [openKeys, setOpenKeys] = useState(["appointments"]);
 
   useEffect(() => {
     // Nếu có selectedKey từ prop, ưu tiên sử dụng nó
@@ -27,78 +27,78 @@ const MenuDoctor = ({ collapsed, selectedKey: propSelectedKey }) => {
 
     const path = location.pathname;
     // Map URL patterns to menu keys
-    if (path.includes('waiting-to-confirm')) {
-      setSelectedKey('waiting');
-    } else if (path.includes('accepted')) {
-      setSelectedKey('accepted');
-    } else if (path.includes('completed')) {
-      setSelectedKey('completed');
-    } else if (path.includes('cancelled')) {
-      setSelectedKey('cancelled');
-    } else if (path.includes('patients')) {
-      setSelectedKey('patients');
-    } else if (path.includes('profile')) {
-      setSelectedKey('profile');
-    } else if (path.includes('schedule')) {
-      setSelectedKey('schedule');
+    // if (path.includes('waiting-to-confirm')) {
+    //   setSelectedKey('waiting');
+    if (path.includes("accepted")) {
+      setSelectedKey("accepted");
+    } else if (path.includes("completed")) {
+      setSelectedKey("completed");
+    } else if (path.includes("cancelled")) {
+      setSelectedKey("cancelled");
+    } else if (path.includes("patients")) {
+      setSelectedKey("patients");
+    } else if (path.includes("profile")) {
+      setSelectedKey("profile");
+    } else if (path.includes("schedule")) {
+      setSelectedKey("schedule");
     }
 
     // Keep appointments submenu open when in appointments section
-    if (path.includes('appointments')) {
-      setOpenKeys(['appointments']);
+    if (path.includes("appointments")) {
+      setOpenKeys(["appointments"]);
     }
   }, [location.pathname, propSelectedKey]);
 
   const items = [
     {
-      key: 'appointments',
+      key: "appointments",
       icon: <CalendarOutlined className="!text-blue-900" />,
       label: <span className="text-blue-900">Appointments</span>,
       children: [
+        // {
+        //   key: "waiting",
+        //   icon: <ClockCircleOutlined className="text-blue-900" />,
+        //   label: "Unconfirmed",
+        //   onClick: () => navigate("/doctor/appointments/waiting-to-confirm"),
+        // },
         {
-          key: 'waiting',
-          icon: <ClockCircleOutlined className="text-blue-900" />,
-          label: 'Unconfirmed',
-          onClick: () => navigate('/doctor/appointments/waiting-to-confirm')
-        },
-        {
-          key: 'accepted',
+          key: "accepted",
           icon: <CheckCircleOutlined className="text-blue-900" />,
-          label: 'Comfirmed',
-          onClick: () => navigate('/doctor/appointments/accepted')
+          label: "Comfirmed",
+          onClick: () => navigate("/doctor/appointments/accepted"),
         },
         {
-          key: 'completed',
+          key: "completed",
           icon: <CheckSquareOutlined className="text-blue-900" />,
-          label: 'Completed',
-          onClick: () => navigate('/doctor/appointments/completed')
+          label: "Completed",
+          onClick: () => navigate("/doctor/appointments/completed"),
         },
         {
-          key: 'cancelled',
+          key: "cancelled",
           icon: <CloseCircleOutlined className="text-blue-900" />,
-          label: 'Cancelled',
-          onClick: () => navigate('/doctor/appointments/cancelled')
+          label: "Cancelled",
+          onClick: () => navigate("/doctor/appointments/cancelled"),
         },
-      ]
+      ],
     },
     {
-      key: 'patients',
+      key: "patients",
       icon: <TeamOutlined className="text-blue-900" />,
-      label: 'Patients',
-      onClick: () => navigate('/doctor/patients')
+      label: "Patients",
+      onClick: () => navigate("/doctor/patients"),
     },
     {
-      key: 'profile',
+      key: "profile",
       icon: <UserOutlined className="text-blue-900" />,
-      label: 'Profile',
-      onClick: () => navigate('/doctor/profile')
+      label: "Profile",
+      onClick: () => navigate("/doctor/profile"),
     },
     {
-      key: 'schedule',
+      key: "schedule",
       icon: <ScheduleOutlined className="text-blue-900" />,
-      label: 'Schedule',
-      onClick: () => navigate('/doctor/schedule')
-    }
+      label: "Schedule",
+      onClick: () => navigate("/doctor/schedule"),
+    },
   ];
 
   const onOpenChange = (keys) => {

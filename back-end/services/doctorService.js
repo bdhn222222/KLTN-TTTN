@@ -1632,76 +1632,6 @@ export const createMedicalRecord = async (
   };
 };
 
-// /**
-//  * Tạo file PDF cho đơn thuốc
-//  * @param {number} prescription_id - ID của đơn thuốc
-//  * @returns {Promise<string>} - URL của file PDF
-//  */
-// const generatePrescriptionPDF = async (prescription_id) => {
-//   // Lấy thông tin đơn thuốc
-//   const prescription = await db.Prescription.findOne({
-//     where: { prescription_id },
-//     include: [
-//       {
-//         model: db.Appointment,
-//         as: "Appointment",
-//         include: [
-//           {
-//             model: db.FamilyMember,
-//             as: "FamilyMember",
-//             include: [
-//               {
-//                 model: db.User,
-//                 as: "user",
-//                 attributes: ["username", "email"],
-//               },
-//             ],
-//           },
-//           {
-//             model: db.Doctor,
-//             as: "Doctor",
-//             include: [
-//               {
-//                 model: db.Specialization,
-//                 as: "Specialization",
-//                 attributes: ["name"],
-//               },
-//               {
-//                 model: db.User,
-//                 as: "user",
-//                 attributes: ["username"],
-//               },
-//             ],
-//           },
-//         ],
-//       },
-//       {
-//         model: db.PrescriptionMedicine,
-//         as: "prescriptionMedicines",
-//         include: [
-//           {
-//             model: db.Medicine,
-//             as: "Medicine",
-//             attributes: ["name", "unit"],
-//           },
-//         ],
-//       },
-//     ],
-//   });
-
-//   if (!prescription) {
-//     throw new NotFoundError("Không tìm thấy đơn thuốc");
-//   }
-
-//   // Tạo tên file PDF
-//   const fileName = `prescription_${prescription_id}_${Date.now()}.pdf`;
-//   const filePath = `uploads/prescriptions/${fileName}`;
-
-//   // TODO: Implement PDF generation logic here
-//   // For now, return a dummy URL
-//   return `/prescriptions/${fileName}`;
-// };
-
 export const createPrescriptions = async (
   appointment_id,
   doctor_id,
@@ -2365,4 +2295,136 @@ export const getDoctorProfile = async (user_id) => {
   } catch (error) {
     throw new Error(error.message);
   }
+};
+
+/**
+ * Lấy thông tin chi tiết của một FamilyMember
+ */
+export const getFamilyMemberDetails = async (doctor_id, family_member_id) => {
+  // Kiểm tra xem bác sĩ có từng khám cho family member này chưa
+  const hasAppointment = await db.Appointment.findOne({
+    where: {
+      doctor_id,
+      family_member_id,
+      status: { [Op.in]: ["accepted", "completed"] },
+    },
+  });
+
+  if (!hasAppointment) {
+    throw new NotFoundError("Không tìm thấy thông tin bệnh nhân này");
+  }
+
+  // Lấy thông tin chi tiết
+  const familyMember = await db.FamilyMember.findOne({
+    where: { family_member_id },
+    attributes: [
+      "family_member_id",
+      "username",
+      "email",
+      "phone_number",
+      "gender",
+      "date_of_birth",
+      "relationship",
+      "avatar",
+    ],
+  });
+
+  if (!familyMember) {
+    throw new NotFoundError("Không tìm thấy thông tin bệnh nhân");
+  }
+
+  // Lấy thống kê cuộc hẹn
+  const appointmentStats = await db.Appointment.findAll({
+    where: {
+      doctor_id,
+      family_member_id,
+      status: { [Op.in]: ["accepted", "completed"] },
+    },
+    attributes: ["status", [fn("COUNT", col("appointment_id")), "count"]],
+    group: ["status"],
+  });
+
+  // Lấy lịch sử bệnh án
+  const medicalHistory = await db.MedicalRecord.findAll({
+    where: {
+      family_member_id,
+    },
+    include: [
+      {
+        model: db.Appointment,
+        as: "Appointment",
+        where: { doctor_id },
+        attributes: ["appointment_datetime"],
+      },
+    ],
+    order: [[col("Appointment.appointment_datetime"), "DESC"]],
+    limit: 5,
+  });
+
+  // Lấy đơn thuốc gần đây
+  const recentPrescriptions = await db.Prescription.findAll({
+    include: [
+      {
+        model: db.Appointment,
+        as: "Appointment",
+        where: {
+          doctor_id,
+          family_member_id,
+        },
+        attributes: ["appointment_datetime"],
+      },
+      {
+        model: db.PrescriptionMedicine,
+        as: "prescriptionMedicines",
+        include: [
+          {
+            model: db.Medicine,
+            as: "Medicine",
+            attributes: ["name"],
+          },
+        ],
+      },
+    ],
+    order: [[col("Appointment.appointment_datetime"), "DESC"]],
+    limit: 3,
+  });
+
+  return {
+    success: true,
+    message: "Lấy thông tin chi tiết bệnh nhân thành công",
+    data: {
+      patient_info: {
+        ...familyMember.toJSON(),
+        date_of_birth: dayjs(familyMember.date_of_birth).format("YYYY-MM-DD"),
+      },
+      stats: {
+        total_visits: appointmentStats.reduce(
+          (sum, stat) => sum + parseInt(stat.getDataValue("count")),
+          0
+        ),
+        appointment_stats: appointmentStats.map((stat) => ({
+          status: stat.status,
+          count: parseInt(stat.getDataValue("count")),
+        })),
+      },
+      medical_history: medicalHistory.map((record) => ({
+        record_id: record.record_id,
+        diagnosis: record.diagnosis,
+        treatment: record.treatment,
+        date: dayjs(record.Appointment.appointment_datetime).format(
+          "YYYY-MM-DD"
+        ),
+      })),
+      recent_prescriptions: recentPrescriptions.map((prescription) => ({
+        prescription_id: prescription.prescription_id,
+        date: dayjs(prescription.Appointment.appointment_datetime).format(
+          "YYYY-MM-DD"
+        ),
+        medicines: prescription.prescriptionMedicines
+          .map((pm) => pm.Medicine.name)
+          .join(", "),
+        status: prescription.status,
+      })),
+    },
+  };
 };

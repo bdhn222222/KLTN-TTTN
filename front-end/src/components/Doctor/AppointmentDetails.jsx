@@ -1,78 +1,110 @@
-import React, { useContext, useState } from 'react';
-import { Drawer, Button, Space, Tag, Divider, Descriptions, Modal, Flex, Input, Form, notification } from 'antd';
-import { ArrowLeftOutlined, CloseCircleOutlined, CheckOutlined, FileAddOutlined, CheckCircleOutlined, WalletOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
-import axios from 'axios';
-import { AppContext } from '../../context/AppContext';
+import React, { useContext, useState } from "react";
+import {
+  Drawer,
+  Button,
+  Space,
+  Tag,
+  Divider,
+  Descriptions,
+  Modal,
+  Flex,
+  Input,
+  Form,
+  notification,
+  Empty,
+} from "antd";
+import {
+  ArrowLeftOutlined,
+  CloseCircleOutlined,
+  CheckOutlined,
+  FileAddOutlined,
+  CheckCircleOutlined,
+  WalletOutlined,
+} from "@ant-design/icons";
+import dayjs from "dayjs";
+import axios from "axios";
+import { AppContext } from "../../context/AppContext";
 
 const { TextArea } = Input;
 
-const AppointmentDetails = ({ 
-  isDrawerVisible, 
-  setIsDrawerVisible, 
-  selectedAppointment, 
-  onRefresh,
-  onNavigateToCreateRecord,
-  onNavigateToPayment 
-}) => {
+const AppointmentDetails = ({ open, onClose, appointmentData, onUpdate }) => {
   const { url1 } = useContext(AppContext);
   const [isConfirmCancelVisible, setIsConfirmCancelVisible] = useState(false);
-  const [isConfirmCompleteVisible, setIsConfirmCompleteVisible] = useState(false);
+  const [isConfirmCompleteVisible, setIsConfirmCompleteVisible] =
+    useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
+  const [cancelReason, setCancelReason] = useState("");
   const [form] = Form.useForm();
   const [api, contextHolder] = notification.useNotification();
 
   const statusConfig = {
-    waiting_for_confirmation: { color: 'gold', text: 'unconfirmed' },
-    accepted: { color: 'green', text: 'confirmed' },
-    completed: { color: 'blue', text: 'completed' },
-    cancelled: { color: 'red', text: 'cancelled' },
-    doctor_day_off: { color: 'red', text: 'cancelled' },
-    patient_not_coming: { color: 'red', text: 'cancelled' } // Đảm bảo text là 'cancelled'
+    waiting_for_confirmation: { color: "gold", text: "Chờ xác nhận" },
+    accepted: { color: "green", text: "Đã tiếp nhận" },
+    completed: { color: "blue", text: "Đã hoàn thành" },
+    cancelled: { color: "red", text: "Đã hủy" },
+    doctor_day_off: { color: "red", text: "Bác sĩ nghỉ" },
+    patient_not_coming: { color: "red", text: "Bệnh nhân không đến" },
+  };
+
+  // Safe accessor functions
+  const safeAccess = (obj, path, defaultValue = "N/A") => {
+    try {
+      const result = path.split(".").reduce((o, p) => o && o[p], obj);
+      return result !== undefined && result !== null ? result : defaultValue;
+    } catch (e) {
+      return defaultValue;
+    }
+  };
+
+  const formatCurrency = (value) => {
+    if (value === undefined || value === null) return "N/A";
+    return value.toLocaleString("vi-VN") + " VNĐ";
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = dayjs(dateString);
+    return date.isValid() ? date.format("DD/MM/YYYY HH:mm") : "N/A";
   };
 
   const getStatusTag = (status) => {
-    const config = statusConfig[status] || { color: 'default', text: status };
-    return <Tag color={config.color} style={{ fontWeight: 'normal' }}>{config.text}</Tag>;
+    const config = statusConfig[status] || {
+      color: "default",
+      text: status || "N/A",
+    };
+    return (
+      <Tag color={config.color} style={{ fontWeight: "normal" }}>
+        {config.text}
+      </Tag>
+    );
   };
 
   const showNotification = (type, message, description) => {
     api[type]({
       message: message,
       description: description,
-      placement: 'topRight',
+      placement: "topRight",
       duration: 5,
     });
   };
 
   const handleCancelAppointment = async () => {
-    if (!cancelReason || cancelReason.trim() === '') {
-      showNotification(
-        'error', 
-        'Lỗi', 
-        'Vui lòng nhập lý do hủy cuộc hẹn'
-      );
+    if (!cancelReason || cancelReason.trim() === "") {
+      showNotification("error", "Lỗi", "Vui lòng nhập lý do hủy cuộc hẹn");
       return;
     }
 
-    if (!selectedAppointment) {
-      showNotification(
-        'error',
-        'Lỗi',
-        'Không tìm thấy thông tin cuộc hẹn'
-      );
+    if (!appointmentData) {
+      showNotification("error", "Lỗi", "Không tìm thấy thông tin cuộc hẹn");
       return;
     }
 
-    const appointmentId = selectedAppointment.appointment_info?.id || selectedAppointment.appointment_id;
+    const appointmentId =
+      safeAccess(appointmentData, "appointment_info.id") ||
+      safeAccess(appointmentData, "appointment_id");
 
-    if (!appointmentId) {
-      showNotification(
-        'error',
-        'Lỗi',
-        'Mã cuộc hẹn không hợp lệ'
-      );
+    if (!appointmentId || appointmentId === "N/A") {
+      showNotification("error", "Lỗi", "Mã cuộc hẹn không hợp lệ");
       return;
     }
 
@@ -80,83 +112,112 @@ const AppointmentDetails = ({
 
     try {
       setIsCancelling(true);
-      await axios.post(`${url1}/doctor/appointments/${appointmentId}/cancel`, {
-        reason: cancelReason.trim()
-      }, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      await axios.post(
+        `${url1}/doctor/appointments/${appointmentId}/cancel`,
+        {
+          reason: cancelReason.trim(),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         }
-      });
-      
-      showNotification(
-        'success',
-        'Hủy thành công',
-        'Đã hủy cuộc hẹn thành công'
       );
-      
-      setIsConfirmCancelVisible(false);
-      setCancelReason('');
-      form.resetFields();
-      setIsDrawerVisible(false);
-      onRefresh();
-    } catch (error) {
-      console.error('Error cancelling appointment:', error);
-      
-      let errorMessage = '';
-      if (error.response?.status === 401) {
-        errorMessage = 'Bạn không có quyền thực hiện thao tác này';
-      } else if (error.response?.status === 404) {
-        errorMessage = 'Không tìm thấy cuộc hẹn';
-      } else if (error.response?.status === 400) {
-        errorMessage = error.response?.data?.message || error.response?.data?.error || 'Cuộc hẹn không thể hủy';
-      } else {
-        errorMessage = 'Có lỗi xảy ra, vui lòng thử lại sau';
-      }
 
       showNotification(
-        'error',
-        'Hủy thất bại',
-        errorMessage
+        "success",
+        "Hủy thành công",
+        "Đã hủy cuộc hẹn thành công"
       );
+
+      setIsConfirmCancelVisible(false);
+      setCancelReason("");
+      form.resetFields();
+      onClose();
+      onUpdate();
+    } catch (error) {
+      console.error("Error cancelling appointment:", error);
+
+      let errorMessage = "";
+      if (error.response?.status === 401) {
+        errorMessage = "Bạn không có quyền thực hiện thao tác này";
+      } else if (error.response?.status === 404) {
+        errorMessage = "Không tìm thấy cuộc hẹn";
+      } else if (error.response?.status === 400) {
+        errorMessage =
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          "Cuộc hẹn không thể hủy";
+      } else {
+        errorMessage = "Có lỗi xảy ra, vui lòng thử lại sau";
+      }
+
+      showNotification("error", "Hủy thất bại", errorMessage);
     } finally {
       setIsCancelling(false);
     }
   };
 
   const handleAcceptAppointment = async (appointmentId) => {
+    if (!appointmentId || appointmentId === "N/A") {
+      showNotification("error", "Lỗi", "Mã cuộc hẹn không hợp lệ");
+      return;
+    }
+
     try {
-      await axios.patch(`${url1}/doctor/appointments/${appointmentId}/accept`, null, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      await axios.patch(
+        `${url1}/doctor/appointments/${appointmentId}/accept`,
+        null,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         }
-      });
-      
-      setIsDrawerVisible(false);
-      onRefresh();
+      );
+
+      onClose();
+      onUpdate();
     } catch (error) {
-      console.error('Error accepting appointment:', error);
+      console.error("Error accepting appointment:", error);
+      showNotification("error", "Lỗi", "Không thể xác nhận cuộc hẹn");
     }
   };
 
   const handleCompleteAppointment = async (appointmentId) => {
+    if (!appointmentId || appointmentId === "N/A") {
+      showNotification("error", "Lỗi", "Mã cuộc hẹn không hợp lệ");
+      return;
+    }
+
     try {
-      await axios.post(`${url1}/doctor/appointments/${appointmentId}/complete`, null, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      await axios.post(
+        `${url1}/doctor/appointments/complete`,
+        {
+          appointment_id: appointmentId,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         }
-      });
-      
+      );
+
       setIsConfirmCompleteVisible(false);
-      setIsDrawerVisible(false);
-      onRefresh();
+      onClose();
+      onUpdate();
     } catch (error) {
-      console.error('Error completing appointment:', error);
+      console.error("Error completing appointment:", error);
+      showNotification("error", "Lỗi", "Không thể hoàn thành cuộc hẹn");
     }
   };
 
   const renderActionButtons = (status, appointmentId) => {
+    if (!status || !appointmentId || appointmentId === "N/A") {
+      return null;
+    }
+
     switch (status) {
-      case 'waiting_for_confirmation':
+      case "waiting_for_confirmation":
         return (
           <Flex justify="center" gap="middle">
             <Button
@@ -165,7 +226,7 @@ const AppointmentDetails = ({
               onClick={() => setIsConfirmCancelVisible(true)}
               className="!bg-red-700 !text-white px-6 py-2 h-auto rounded-full hover:!bg-red-600"
             >
-              Cancel
+              Từ chối
             </Button>
             <Button
               type="primary"
@@ -173,25 +234,18 @@ const AppointmentDetails = ({
               onClick={() => handleAcceptAppointment(appointmentId)}
               className="!bg-blue-900 !text-white px-6 py-2 h-auto rounded-full hover:!bg-blue-800"
             >
-              Confirm
+              Xác nhận
             </Button>
           </Flex>
         );
-      case 'accepted':
-        // Kiểm tra nếu có thông tin về medical_record hoặc prescription trong dữ liệu
-        const hasMedicalRecord = selectedAppointment.medical_record || selectedAppointment.medical_record_id;
-        const hasPrescription = selectedAppointment.prescription || selectedAppointment.prescription_id;
-        
-        console.log('AppointmentDetails - Check medical record and prescription:', {
-          appointmentId,
-          hasMedicalRecord,
-          hasPrescription,
-          medicalRecord: selectedAppointment.medical_record,
-          medicalRecordId: selectedAppointment.medical_record_id,
-          prescription: selectedAppointment.prescription,
-          prescriptionId: selectedAppointment.prescription_id
-        });
-        
+      case "accepted":
+        const hasMedicalRecord =
+          safeAccess(appointmentData, "medical_record") ||
+          safeAccess(appointmentData, "medical_record_id");
+        const hasPrescription =
+          safeAccess(appointmentData, "prescription") ||
+          safeAccess(appointmentData, "prescription_id");
+
         return (
           <Flex justify="center" gap="middle">
             <Button
@@ -200,198 +254,223 @@ const AppointmentDetails = ({
               onClick={() => setIsConfirmCancelVisible(true)}
               className="!bg-red-700 !text-white px-6 py-2 h-auto rounded-full hover:!bg-red-600"
             >
-              Cancel
+              Hủy
             </Button>
-            
-            {(hasMedicalRecord && hasPrescription) ? (
-              // Nếu đã có medical record và prescription -> hiển thị nút "Hoàn thành"
+
+            {hasMedicalRecord &&
+            hasPrescription &&
+            hasMedicalRecord !== "N/A" &&
+            hasPrescription !== "N/A" ? (
               <Button
                 type="primary"
-                icon={<WalletOutlined />}
-                onClick={() => {
-                  console.log(`Navigating to payment page for appointment ID: ${appointmentId}`);
-                  onNavigateToPayment(appointmentId);
-                }}
+                icon={<CheckCircleOutlined />}
+                onClick={() => setIsConfirmCompleteVisible(true)}
                 className="!bg-blue-900 !text-white px-6 py-2 h-auto rounded-full hover:!bg-blue-800"
               >
-                Payment
+                Hoàn thành
               </Button>
             ) : (
-              // Nếu chưa có medical record và prescription -> hiển thị nút "Tạo hồ sơ"
               <Button
                 type="primary"
                 icon={<FileAddOutlined />}
                 onClick={() => {
-                  console.log(`Navigating to create medical record for appointment ID: ${appointmentId}`);
-                  onNavigateToCreateRecord(appointmentId);
+                  console.log(
+                    `Creating medical record for appointment ID: ${appointmentId}`
+                  );
+                  // Thêm phương thức tạo hồ sơ ở đây nếu cần
+                  onClose();
                 }}
                 className="!bg-blue-900 !text-white px-6 py-2 h-auto rounded-full hover:!bg-blue-800"
               >
-                Create Medical Record
+                Tạo hồ sơ
               </Button>
             )}
           </Flex>
         );
-      case 'completed':
-        return (
-          <Flex justify="center" gap="middle">
-            {/* <Button
-              type="primary"
-              icon={<FileAddOutlined />}
-              onClick={() => onNavigateToCreateRecord(appointmentId)}
-              className="!bg-blue-900 !text-white px-6 py-2 h-auto rounded-full hover:!bg-blue-800"
-            >
-              Xem hồ sơ
-            </Button> */}
-          </Flex>
-        );
+      case "completed":
+        return null;
       default:
         return null;
     }
   };
 
+  if (!appointmentData) {
+    return (
+      <Drawer
+        open={open}
+        onClose={onClose}
+        width="50%"
+        title="Chi tiết cuộc hẹn"
+      >
+        <Empty description="Không có dữ liệu" />
+      </Drawer>
+    );
+  }
+
+  // Extract all needed data with safe accessors
+  const appointmentId = safeAccess(appointmentData, "appointment_info.id");
+  const appointmentDateTime = safeAccess(
+    appointmentData,
+    "appointment_info.datetime"
+  );
+  const appointmentStatus = safeAccess(
+    appointmentData,
+    "appointment_info.status"
+  );
+  const appointmentFees = safeAccess(appointmentData, "appointment_info.fees");
+
+  const patientName = safeAccess(appointmentData, "familyMember.name");
+  const patientEmail = safeAccess(appointmentData, "familyMember.email");
+  const patientGender = safeAccess(appointmentData, "familyMember.gender");
+  const patientDob = safeAccess(appointmentData, "familyMember.dob");
+
   return (
     <>
       {contextHolder}
       <Drawer
-        open={isDrawerVisible}
-        onClose={() => setIsDrawerVisible(false)}
+        open={open}
+        onClose={onClose}
         width="50%"
-        extra={
-          <Space>
-            {/* <Button 
-              icon={<ArrowLeftOutlined />}
-              onClick={() => setIsDrawerVisible(false)}
-              type="text"
-              className="!text-blue-900 hover:!text-blue-700"
-            >
-              Back
-            </Button> */}
-          </Space>
-        }
         title={
           <Flex justify="space-between" align="center">
-  <span>Appointment Details</span>
-  {selectedAppointment && (
-    <Tag color={getStatusTag(selectedAppointment.appointment_info.status).props.color}>
-      {getStatusTag(selectedAppointment.appointment_info.status).props.children}
-    </Tag>
-  )}
-</Flex>
+            <span>Chi tiết cuộc hẹn</span>
+            {appointmentStatus && (
+              <Tag color={getStatusTag(appointmentStatus).props.color}>
+                {getStatusTag(appointmentStatus).props.children}
+              </Tag>
+            )}
+          </Flex>
         }
       >
-        {selectedAppointment && (
+        <Descriptions title="Thông tin cuộc hẹn" column={1}>
+          <Descriptions.Item label="Mã cuộc hẹn">
+            {appointmentId}
+          </Descriptions.Item>
+          <Descriptions.Item label="Thời gian">
+            {formatDate(appointmentDateTime)}
+          </Descriptions.Item>
+          <Descriptions.Item label="Phí khám">
+            {appointmentFees !== "N/A"
+              ? formatCurrency(appointmentFees)
+              : "N/A"}
+          </Descriptions.Item>
+          {appointmentStatus === "patient_not_coming" && (
+            <Descriptions.Item label="Lý do hủy">
+              Bệnh nhân không đến
+            </Descriptions.Item>
+          )}
+          {appointmentStatus === "doctor_day_off" && (
+            <Descriptions.Item label="Lý do hủy">
+              Bác sĩ có lịch nghỉ
+            </Descriptions.Item>
+          )}
+        </Descriptions>
+
+        <Divider />
+
+        <Descriptions title="Thông tin bệnh nhân" column={1}>
+          <Descriptions.Item label="Họ tên">{patientName}</Descriptions.Item>
+          <Descriptions.Item label="Email">{patientEmail}</Descriptions.Item>
+          <Descriptions.Item label="Giới tính">
+            {patientGender === "male"
+              ? "Nam"
+              : patientGender === "female"
+              ? "Nữ"
+              : patientGender}
+          </Descriptions.Item>
+          <Descriptions.Item label="Ngày sinh">
+            {patientDob !== "N/A"
+              ? dayjs(patientDob).format("DD/MM/YYYY")
+              : "N/A"}
+          </Descriptions.Item>
+        </Descriptions>
+
+        {safeAccess(appointmentData, "medical_record") !== "N/A" && (
           <>
-            <Descriptions title="Appointment Information" column={1}>
-              <Descriptions.Item label="Mã cuộc hẹn">
-                {selectedAppointment.appointment_info.id}
+            <Divider />
+            <Descriptions title="Hồ sơ bệnh án" column={1}>
+              <Descriptions.Item label="Chẩn đoán">
+                {safeAccess(appointmentData, "medical_record.diagnosis")}
               </Descriptions.Item>
-              <Descriptions.Item label="Thời gian">
-                {dayjs(selectedAppointment.appointment_info.datetime).format('DD/MM/YYYY HH:mm')}
+              <Descriptions.Item label="Phương pháp điều trị">
+                {safeAccess(appointmentData, "medical_record.treatment")}
               </Descriptions.Item>
-              <Descriptions.Item label="Phí khám">
-                {selectedAppointment.appointment_info.fees?.toLocaleString('vi-VN')} VNĐ
-              </Descriptions.Item>
-              {selectedAppointment.appointment_info.status === 'patient_not_coming' && (
-                <Descriptions.Item label="Lý do hủy">
-                  Patient not coming
-                </Descriptions.Item>
-              )}
-              {selectedAppointment.appointment_info.status === 'doctor_day_off' && (
-                <Descriptions.Item label="Lý do hủy">
-                  Bác sĩ có lịch nghỉ.
+              {safeAccess(appointmentData, "medical_record.notes") !==
+                "N/A" && (
+                <Descriptions.Item label="Ghi chú">
+                  {safeAccess(appointmentData, "medical_record.notes")}
                 </Descriptions.Item>
               )}
             </Descriptions>
-
-            <Divider />
-
-            <Descriptions title="Thông tin bệnh nhân" column={1}>
-              <Descriptions.Item label="Họ tên">
-                {selectedAppointment.patient.name}
-              </Descriptions.Item>
-              <Descriptions.Item label="Email">
-                {selectedAppointment.patient.email}
-              </Descriptions.Item>
-            </Descriptions>
-
-            {selectedAppointment.medical_record && (
-              <>
-                <Divider />
-                <Descriptions title="Hồ sơ bệnh án" column={1}>
-                  <Descriptions.Item label="Chẩn đoán">
-                    {selectedAppointment.medical_record.diagnosis}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Phương pháp điều trị">
-                    {selectedAppointment.medical_record.treatment}
-                  </Descriptions.Item>
-                  {selectedAppointment.medical_record.notes && (
-                    <Descriptions.Item label="Ghi chú">
-                      {selectedAppointment.medical_record.notes}
-                    </Descriptions.Item>
-                  )}
-                </Descriptions>
-              </>
-            )}
-
-            {selectedAppointment.prescription && (
-              <>
-                <Divider />
-                <Descriptions title="Đơn thuốc" column={1}>
-                  <Descriptions.Item label="Trạng thái">
-                    {selectedAppointment.prescription.status}
-                  </Descriptions.Item>
-                  {selectedAppointment.prescription.medicines && (
-                    <Descriptions.Item label="Danh sách thuốc">
-                      <ul className="list-disc pl-4">
-                        {selectedAppointment.prescription.medicines.map((medicine) => (
-                          <li key={medicine.id}>
-                            {medicine.name} - SL: {medicine.quantity} - {medicine.total.toLocaleString('vi-VN')} VNĐ
-                          </li>
-                        ))}
-                      </ul>
-                    </Descriptions.Item>
-                  )}
-                </Descriptions>
-              </>
-            )}
-
-            {selectedAppointment.payment && (
-              <>
-                <Divider />
-                <Descriptions title="Thanh toán" column={1}>
-                  <Descriptions.Item label="Số tiền">
-                    {selectedAppointment.payment.amount.toLocaleString('vi-VN')} VNĐ
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Phương thức">
-                    {selectedAppointment.payment.payment_method}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Trạng thái">
-                    {selectedAppointment.payment.status}
-                  </Descriptions.Item>
-                </Descriptions>
-              </>
-            )}
-
-            {selectedAppointment.feedback && (
-              <>
-                <Divider />
-                <Descriptions title="Đánh giá" column={1}>
-                  <Descriptions.Item label="Điểm đánh giá">
-                    {selectedAppointment.feedback.rating}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Nhận xét">
-                    {selectedAppointment.feedback.comment}
-                  </Descriptions.Item>
-                </Descriptions>
-              </>
-            )}
-
-            <Divider />
-            
-            {renderActionButtons(selectedAppointment.appointment_info.status, selectedAppointment.appointment_info.id)}
           </>
         )}
+
+        {safeAccess(appointmentData, "prescription") !== "N/A" && (
+          <>
+            <Divider />
+            <Descriptions title="Đơn thuốc" column={1}>
+              <Descriptions.Item label="Trạng thái">
+                {safeAccess(appointmentData, "prescription.status")}
+              </Descriptions.Item>
+              {safeAccess(appointmentData, "prescription.medicines") !==
+                "N/A" && (
+                <Descriptions.Item label="Danh sách thuốc">
+                  <ul className="list-disc pl-4">
+                    {appointmentData.prescription.medicines.map(
+                      (medicine, index) => (
+                        <li key={medicine?.id || index}>
+                          {safeAccess(medicine, "name")} - SL:{" "}
+                          {safeAccess(medicine, "quantity")} -{" "}
+                          {safeAccess(medicine, "total") !== "N/A"
+                            ? formatCurrency(medicine.total)
+                            : "N/A"}
+                        </li>
+                      )
+                    )}
+                  </ul>
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+          </>
+        )}
+
+        {safeAccess(appointmentData, "payment") !== "N/A" &&
+          appointmentStatus !== "accepted" && (
+            <>
+              <Divider />
+              <Descriptions title="Thanh toán" column={1}>
+                <Descriptions.Item label="Số tiền">
+                  {safeAccess(appointmentData, "payment.amount") !== "N/A"
+                    ? formatCurrency(appointmentData.payment.amount)
+                    : "N/A"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Phương thức">
+                  {safeAccess(appointmentData, "payment.payment_method")}
+                </Descriptions.Item>
+                <Descriptions.Item label="Trạng thái">
+                  {safeAccess(appointmentData, "payment.status")}
+                </Descriptions.Item>
+              </Descriptions>
+            </>
+          )}
+
+        {safeAccess(appointmentData, "feedback") !== "N/A" && (
+          <>
+            <Divider />
+            <Descriptions title="Đánh giá" column={1}>
+              <Descriptions.Item label="Điểm đánh giá">
+                {safeAccess(appointmentData, "feedback.rating")}
+              </Descriptions.Item>
+              <Descriptions.Item label="Nhận xét">
+                {safeAccess(appointmentData, "feedback.comment")}
+              </Descriptions.Item>
+            </Descriptions>
+          </>
+        )}
+
+        <Divider />
+
+        {renderActionButtons(appointmentStatus, appointmentId)}
       </Drawer>
 
       <Modal
@@ -400,22 +479,25 @@ const AppointmentDetails = ({
         onOk={handleCancelAppointment}
         onCancel={() => {
           setIsConfirmCancelVisible(false);
-          setCancelReason('');
+          setCancelReason("");
           form.resetFields();
         }}
         footer={[
-          <Button key="back" onClick={() => {
-            setIsConfirmCancelVisible(false);
-            setCancelReason('');
-            form.resetFields();
-          }}
-          className="!bg-white !text-gray-700 px-6 py-2 h-auto rounded-full border !border-gray-700 hover:!bg-gray-100 hover:!text-gray-700">
+          <Button
+            key="back"
+            onClick={() => {
+              setIsConfirmCancelVisible(false);
+              setCancelReason("");
+              form.resetFields();
+            }}
+            className="!bg-white !text-gray-700 px-6 py-2 h-auto rounded-full border !border-gray-700 hover:!bg-gray-100 hover:!text-gray-700"
+          >
             Hủy bỏ
           </Button>,
-          <Button 
-            key="submit" 
-            type="primary" 
-            danger 
+          <Button
+            key="submit"
+            type="primary"
+            danger
             loading={isCancelling}
             onClick={handleCancelAppointment}
             className="!bg-red-700 !text-white px-6 py-2 h-auto rounded-full hover:!bg-white hover:!text-red-700 border !border-red-700"
@@ -426,35 +508,33 @@ const AppointmentDetails = ({
       >
         <Form form={form} layout="vertical">
           <p>Bạn có chắc chắn muốn hủy cuộc hẹn này không?</p>
-          {selectedAppointment && (
+          {appointmentData && (
             <p className="text-sm text-gray-500 mb-4">
-              Thông tin cuộc hẹn: {dayjs(
-                (selectedAppointment.appointment_info && selectedAppointment.appointment_info.datetime) || 
-                selectedAppointment.appointment_datetime
-              ).format('DD/MM/YYYY HH:mm')} - {selectedAppointment.patient?.name || 'Không có thông tin'}
+              Thông tin cuộc hẹn:{" "}
+              {formatDate(
+                safeAccess(appointmentData, "appointment_info.datetime")
+              )}{" "}
+              - {safeAccess(appointmentData, "familyMember.name")}
             </p>
           )}
-          
-          <Form.Item 
-            name="reason" 
+
+          <Form.Item
+            name="reason"
             label="Lý do hủy cuộc hẹn"
-            rules={[{ required: true, message: 'Vui lòng nhập lý do hủy cuộc hẹn' }]}
+            rules={[
+              { required: true, message: "Vui lòng nhập lý do hủy cuộc hẹn" },
+            ]}
           >
-            <TextArea 
-              rows={4} 
+            <TextArea
+              rows={4}
               placeholder="Nhập lý do hủy cuộc hẹn..."
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
             />
           </Form.Item>
-          
+
           <div className="text-sm text-red-600">
             <p>Lưu ý: Việc hủy cuộc hẹn có thể dẫn đến các quy định đền bù</p>
-            <ul className="list-disc pl-5 mt-1">
-              {/* <li>Hủy trước 24 giờ: Không yêu cầu đền bù</li>
-              <li>Hủy từ 3-24 giờ: Bệnh nhân được giảm giá 5% cho lần khám tiếp theo</li>
-              <li>Hủy dưới 3 giờ: Bệnh nhân được giảm giá 20% cho lần khám tiếp theo</li> */}
-            </ul>
           </div>
         </Form>
       </Modal>
@@ -462,12 +542,12 @@ const AppointmentDetails = ({
       <Modal
         title="Xác nhận hoàn thành"
         open={isConfirmCompleteVisible}
-        onOk={() => handleCompleteAppointment(selectedAppointment?.appointment_info.id)}
+        onOk={() => handleCompleteAppointment(appointmentId)}
         onCancel={() => setIsConfirmCompleteVisible(false)}
         okText="Xác nhận"
         cancelText="Hủy"
         okButtonProps={{
-          className: '!bg-blue-900 !text-white hover:!bg-blue-800'
+          className: "!bg-blue-900 !text-white hover:!bg-blue-800",
         }}
       >
         <p>Bạn có chắc chắn muốn đánh dấu cuộc hẹn này là đã hoàn thành?</p>
@@ -476,4 +556,4 @@ const AppointmentDetails = ({
   );
 };
 
-export default AppointmentDetails; 
+export default AppointmentDetails;

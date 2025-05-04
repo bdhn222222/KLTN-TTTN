@@ -2,39 +2,61 @@ import React, { useState, useEffect, useContext } from "react";
 import {
   Layout,
   Card,
-  Table,
+  Row,
+  Col,
   Button,
   Avatar,
   Space,
   Tag,
   Flex,
   notification,
+  Typography,
+  Empty,
+  Spin,
+  Drawer,
+  Statistic,
+  Timeline,
+  List,
+  DatePicker,
+  Progress,
 } from "antd";
 import {
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
   UserOutlined,
   EyeOutlined,
-  CheckOutlined,
+  MedicineBoxOutlined,
+  CalendarOutlined,
+  ClockCircleOutlined,
+  CheckCircleOutlined,
+  FileDoneOutlined,
+  DollarCircleOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import MenuDoctor from "../../components/Doctor/MenuDoctor";
 import axios from "axios";
 import { AppContext } from "../../context/AppContext";
 import dayjs from "dayjs";
-import AppointmentDetails from "../../components/Doctor/AppointmentDetails";
 
 const { Sider, Content } = Layout;
+const { Title, Text } = Typography;
 
-const AppointmentWTCDoctor = () => {
+const PharmacistDashboard = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [appointments, setAppointments] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    completed: 0,
+    pending: 0,
+    revenue: 0,
+  });
   const navigate = useNavigate();
   const { url1 } = useContext(AppContext);
   const [api, contextHolder] = notification.useNotification();
+  const [selectedDate, setSelectedDate] = useState(dayjs());
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [selectedPrescription, setSelectedPrescription] = useState(null);
 
   const showNotification = (type, message, description) => {
     api[type]({
@@ -45,45 +67,7 @@ const AppointmentWTCDoctor = () => {
     });
   };
 
-  const acceptAppointment = async (appointmentId) => {
-    try {
-      await axios.patch(
-        `${url1}/doctor/appointments/${appointmentId}/accept`,
-        null,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      showNotification(
-        "success",
-        "Xác nhận thành công",
-        "Cuộc hẹn đã được xác nhận thành công"
-      );
-
-      // Refresh appointments data
-      fetchAppointments();
-    } catch (error) {
-      console.error("Error accepting appointment:", error);
-
-      let errorMessage = "";
-      if (error.response?.status === 401) {
-        errorMessage = "Bạn không có quyền thực hiện thao tác này";
-      } else if (error.response?.status === 404) {
-        errorMessage = "Không tìm thấy cuộc hẹn";
-      } else if (error.response?.status === 400) {
-        errorMessage = "Cuộc hẹn đã được xác nhận trước đó";
-      } else {
-        errorMessage = "Có lỗi xảy ra, vui lòng thử lại sau";
-      }
-
-      showNotification("error", "Xác nhận thất bại", errorMessage);
-    }
-  };
-
-  const fetchAppointments = async () => {
+  const fetchAppointments = async (date) => {
     try {
       setLoading(true);
       const response = await axios.get(`${url1}/doctor/appointments`, {
@@ -91,19 +75,16 @@ const AppointmentWTCDoctor = () => {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         params: {
-          status: "waiting_for_confirmation",
+          status: "accepted",
+          filter_date: date.format("YYYY-MM-DD"),
         },
       });
 
       if (response.data && response.data.data) {
         setAppointments(response.data.data);
-      } else {
-        console.error("Invalid data format from API:", response.data);
-        setAppointments([]);
       }
     } catch (error) {
       console.error("Error fetching appointments:", error);
-      setAppointments([]);
       showNotification(
         "error",
         "Tải dữ liệu thất bại",
@@ -114,104 +95,156 @@ const AppointmentWTCDoctor = () => {
     }
   };
 
-  useEffect(() => {
-    fetchAppointments();
-  }, []);
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get(`${url1}/doctor/summary`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-  const getAppointmentDetails = async (appointmentId) => {
+      if (response.data && response.data.data) {
+        setStats(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+    fetchAppointments(selectedDate);
+  }, [selectedDate]);
+
+  const handleDateChange = (date) => {
+    setSelectedDate(date || dayjs());
+  };
+
+  const viewPrescription = async (appointment_id) => {
     try {
       const response = await axios.get(
-        `${url1}/doctor/appointments/${appointmentId}`,
+        `${url1}/doctor/appointments/${appointment_id}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         }
       );
-      setSelectedAppointment(response.data.data);
+      setSelectedPrescription(response.data.data);
       setIsDrawerVisible(true);
     } catch (error) {
       showNotification(
         "error",
         "Lỗi",
-        "Không thể tải thông tin chi tiết cuộc hẹn"
+        "Không thể tải thông tin chi tiết đơn thuốc"
       );
     }
   };
 
-  const getStatusTag = (status) => {
-    const statusConfig = {
-      waiting_for_confirmation: { color: "gold", text: "unconfirmed" },
-      accepted: { color: "green", text: "confirmed" },
-      completed: { color: "blue", text: "completed" },
-      cancelled: { color: "red", text: "cancelled" },
-      doctor_day_off: { color: "orange", text: "doctor_day_off" },
-      patient_not_coming: { color: "gray", text: "patient_not_coming" },
-    };
+  const renderStats = () => (
+    <Row gutter={[16, 16]} className="mb-6">
+      <Col xs={24} sm={12} lg={6}>
+        <Card>
+          <Statistic
+            title="Tổng số đơn thuốc"
+            value={stats.total}
+            prefix={<FileDoneOutlined />}
+            valueStyle={{ color: "#1890ff" }}
+          />
+          <Progress percent={100} showInfo={false} strokeColor="#1890ff" />
+        </Card>
+      </Col>
+      <Col xs={24} sm={12} lg={6}>
+        <Card>
+          <Statistic
+            title="Đã hoàn thành"
+            value={stats.completed}
+            prefix={<CheckCircleOutlined />}
+            valueStyle={{ color: "#52c41a" }}
+          />
+          <Progress
+            percent={Math.round((stats.completed / stats.total) * 100)}
+            showInfo={false}
+            strokeColor="#52c41a"
+          />
+        </Card>
+      </Col>
+      <Col xs={24} sm={12} lg={6}>
+        <Card>
+          <Statistic
+            title="Chờ xử lý"
+            value={stats.pending}
+            prefix={<ClockCircleOutlined />}
+            valueStyle={{ color: "#faad14" }}
+          />
+          <Progress
+            percent={Math.round((stats.pending / stats.total) * 100)}
+            showInfo={false}
+            strokeColor="#faad14"
+          />
+        </Card>
+      </Col>
+      <Col xs={24} sm={12} lg={6}>
+        <Card>
+          <Statistic
+            title="Doanh thu"
+            value={stats.revenue}
+            prefix={<DollarCircleOutlined />}
+            valueStyle={{ color: "#13c2c2" }}
+            suffix="VNĐ"
+          />
+          <Progress percent={100} showInfo={false} strokeColor="#13c2c2" />
+        </Card>
+      </Col>
+    </Row>
+  );
 
-    const config = statusConfig[status] || { color: "default", text: status };
-    return <Tag color={config.color}>{config.text}</Tag>;
-  };
+  const renderPrescriptionDetails = () => {
+    if (!selectedPrescription) return null;
 
-  const columns = [
-    {
-      title: "ID",
-      dataIndex: "appointment_id",
-      key: "appointment_id",
-    },
-    {
-      title: "Patient",
-      dataIndex: "patient_name",
-      key: "patient_name",
-      render: (text) => (
-        <div className="flex items-center gap-2">
-          <Avatar icon={<UserOutlined />} className="bg-blue-900" />
-          <span>{text}</span>
+    return (
+      <div className="prescription-details">
+        <Title level={4}>Chi tiết đơn thuốc</Title>
+        <div className="patient-info mb-4">
+          <Text strong>Bệnh nhân: </Text>
+          <Text>{selectedPrescription.patient_name}</Text>
+          <br />
+          <Text strong>Ngày kê: </Text>
+          <Text>{dayjs(selectedPrescription.date).format("DD/MM/YYYY")}</Text>
         </div>
-      ),
-    },
-    {
-      title: "Appointment Time",
-      dataIndex: "appointment_datetime",
-      key: "appointment_datetime",
-      render: (datetime) => dayjs(datetime).format("DD/MM/YYYY HH:mm"),
-    },
-    {
-      title: "Status",
-      dataIndex: "status",
-      key: "status",
-      render: (status) => getStatusTag(status),
-    },
-    {
-      title: "Fees",
-      dataIndex: "fees",
-      key: "fees",
-      render: (fees) => fees?.toLocaleString("vi-VN") + " VNĐ",
-    },
-    {
-      title: "More",
-      key: "action",
-      render: (_, record) => (
-        <Space>
-          <Button
-            icon={<EyeOutlined />}
-            onClick={() => getAppointmentDetails(record.appointment_id)}
-            className="!text-blue-900 hover:text-blue-800 px-6 py-2 rounded-full font-light hidden md:block hover:opacity-90 transition duration-300"
-          >
-            Details
-          </Button>
-          <Button
-            type="primary"
-            icon={<CheckOutlined />}
-            onClick={() => acceptAppointment(record.appointment_id)}
-            className="!bg-blue-900 !text-white px-6 py-2 rounded-full font-light hidden md:block hover:!bg-blue-800 hover:!text-white border border-blue-800 transition duration-300"
-          >
-            Confirmed
-          </Button>
-        </Space>
-      ),
-    },
-  ];
+
+        <Title level={5}>Danh sách thuốc</Title>
+        <List
+          dataSource={selectedPrescription.medicines}
+          renderItem={(medicine) => (
+            <List.Item>
+              <List.Item.Meta
+                avatar={<MedicineBoxOutlined />}
+                title={medicine.name}
+                description={
+                  <>
+                    <Text>Số lượng: {medicine.quantity}</Text>
+                    <br />
+                    <Text>Hướng dẫn: {medicine.instructions}</Text>
+                  </>
+                }
+              />
+              <div>
+                <Text strong>{medicine.total.toLocaleString()} VNĐ</Text>
+              </div>
+            </List.Item>
+          )}
+        />
+
+        <div className="total-section mt-4">
+          <Text strong>Tổng tiền: </Text>
+          <Text className="text-lg">
+            {selectedPrescription.total_amount?.toLocaleString()} VNĐ
+          </Text>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -258,24 +291,103 @@ const AppointmentWTCDoctor = () => {
               background: "#fff",
             }}
           >
-            <Card title="Unconfirmed Appointments">
-              <Table
-                columns={columns}
-                dataSource={appointments}
-                loading={loading}
-                rowKey="appointment_id"
+            <Flex justify="space-between" align="center" className="mb-6">
+              <Title level={2}>Quản lý đơn thuốc</Title>
+              <DatePicker
+                value={selectedDate}
+                onChange={handleDateChange}
+                format="DD/MM/YYYY"
+                allowClear={false}
               />
-            </Card>
+            </Flex>
+
+            {renderStats()}
+
+            <Title level={3}>Đơn thuốc hôm nay</Title>
+            <Spin spinning={loading}>
+              {appointments.length > 0 ? (
+                <Row gutter={[16, 16]}>
+                  {appointments.map((appointment) => (
+                    <Col
+                      xs={24}
+                      sm={12}
+                      lg={8}
+                      key={appointment.appointment_id}
+                    >
+                      <Card
+                        hoverable
+                        className="prescription-card"
+                        actions={[
+                          <Button
+                            type="primary"
+                            icon={<EyeOutlined />}
+                            onClick={() =>
+                              viewPrescription(appointment.appointment_id)
+                            }
+                          >
+                            Xem đơn thuốc
+                          </Button>,
+                        ]}
+                      >
+                        <Flex align="center" gap={16}>
+                          <Avatar
+                            size={64}
+                            icon={<UserOutlined />}
+                            className="bg-blue-900"
+                          />
+                          <div>
+                            <Title level={5}>{appointment.family_name}</Title>
+                            <Text type="secondary">
+                              {appointment.family_email}
+                            </Text>
+                            <div className="mt-2">
+                              <Space>
+                                <CalendarOutlined />
+                                <Text>
+                                  {dayjs(
+                                    appointment.appointment_datetime
+                                  ).format("DD/MM/YYYY")}
+                                </Text>
+                              </Space>
+                            </div>
+                            <div className="mt-1">
+                              <Space>
+                                <ClockCircleOutlined />
+                                <Text>
+                                  {dayjs(
+                                    appointment.appointment_datetime
+                                  ).format("HH:mm")}
+                                </Text>
+                              </Space>
+                            </div>
+                          </div>
+                        </Flex>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              ) : (
+                <Empty
+                  description="Không có đơn thuốc nào trong ngày này"
+                  className="mt-8"
+                />
+              )}
+            </Spin>
           </Content>
         </Layout>
       </Layout>
-      <AppointmentDetails
-        visible={isDrawerVisible}
+      <Drawer
+        width={640}
+        placement="right"
+        closable={true}
         onClose={() => setIsDrawerVisible(false)}
-        appointment={selectedAppointment}
-      />
+        visible={isDrawerVisible}
+        title="Chi tiết đơn thuốc"
+      >
+        {renderPrescriptionDetails()}
+      </Drawer>
     </Layout>
   );
 };
 
-export default AppointmentWTCDoctor;
+export default PharmacistDashboard;
