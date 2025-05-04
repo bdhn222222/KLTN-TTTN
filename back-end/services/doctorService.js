@@ -6,7 +6,7 @@ import UnauthorizedError from "../errors/unauthorized.js";
 import NotFoundError from "../errors/not_found.js";
 import ForbiddenError from "../errors/forbidden.js";
 import InternalServerError from "../errors/internalServerError.js";
-import { Op, fn, col, literal } from "sequelize";
+import { Op, fn, col, literal, Sequelize } from "sequelize";
 import cloudinary from "../config/cloudinary.js";
 
 const {
@@ -21,6 +21,7 @@ const {
   Medicine,
   Specialization,
   Schedule,
+  Payment,
 } = db;
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js"; // Sử dụng phần mở rộng .js
@@ -227,7 +228,7 @@ export const getAllAppointments = async ({
         },
       },
     ],
-    order: [["appointment_datetime", "ASC"]],
+    order: [["appointment_datetime", "DESC"]],
   });
 
   // Format dữ liệu trả về với múi giờ Việt Nam
@@ -247,6 +248,63 @@ export const getAllAppointments = async ({
       fees: appointment.fees,
       doctor_id: appointment.doctor_id,
     })),
+  };
+};
+
+export const getStatistics = async () => {
+  const today = dayjs().startOf("day").toDate();
+  const tomorrow = dayjs().add(1, "day").startOf("day").toDate();
+
+  // Tổng số bệnh nhân từng khám và thanh toán
+  const totalPatients = await Appointment.count({
+    distinct: true,
+    col: "family_member_id",
+    include: [
+      {
+        model: Payment,
+        as: "Payments",
+        where: { status: "paid" },
+      },
+    ],
+    where: {
+      status: "completed",
+    },
+  });
+
+  // Bệnh nhân hôm nay
+  const todayPatients = await Appointment.count({
+    distinct: true,
+    col: "family_member_id",
+    include: [
+      {
+        model: Payment,
+        where: { status: "paid" },
+      },
+    ],
+    where: {
+      status: "completed",
+      appointment_datetime: {
+        [Op.gte]: today,
+        [Op.lt]: tomorrow,
+      },
+    },
+  });
+
+  // Lịch hẹn hôm nay
+  const todayAppointments = await Appointment.count({
+    where: {
+      appointment_datetime: {
+        [Op.gte]: today,
+        [Op.lt]: tomorrow,
+      },
+    },
+  });
+
+  return {
+    total_patients: totalPatients,
+    today_patients: todayPatients,
+    today_appointments: todayAppointments,
+    today_date: dayjs().format("DD/MM/YYYY"),
   };
 };
 
@@ -487,17 +545,23 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
         ? {
             id: appointment.Prescription.prescription_id,
             status: appointment.Prescription.status,
-            medicine_details: appointment.Prescription.medicine_details,
+            // medicine_details: appointment.Prescription.medicine_details,
+
             medicines: appointment.Prescription.prescriptionMedicines.map(
               (pm) => ({
                 id: pm.Medicine?.medicine_id,
                 name: pm.Medicine?.name,
                 quantity: pm.quantity,
+                dosage: pm.dosage || null,
+                frequency: pm.frequency || null,
+                duration: pm.duration || null,
+                instructions: pm.instructions || null,
                 price: pm.Medicine?.price,
                 total: pm.quantity * (pm.Medicine?.price || 0),
                 note: pm.note,
               })
             ),
+            note: appointment.Prescription.note,
             createdAt: appointment.Prescription.createdAt,
           }
         : null,
@@ -510,13 +574,13 @@ export const getAppointmentDetails = async (appointment_id, doctor_id) => {
             payment_date: appointment.Payments.createdAt,
           }
         : null,
-      feedback: appointment.Feedback
-        ? {
-            rating: appointment.Feedback.rating,
-            comment: appointment.Feedback.comment,
-            createdAt: appointment.Feedback.createdAt,
-          }
-        : null,
+      // feedback: appointment.Feedback
+      //   ? {
+      //       rating: appointment.Feedback.rating,
+      //       comment: appointment.Feedback.comment,
+      //       createdAt: appointment.Feedback.createdAt,
+      //     }
+      //   : null,
     },
   };
 };

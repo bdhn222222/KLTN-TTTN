@@ -22,6 +22,7 @@ import {
   getPatientAppointment,
   getDoctorProfile,
   getFamilyMemberDetails,
+  getStatistics,
 } from "../services/doctorService.js";
 import BadRequestError from "../errors/bad_request.js";
 import InternalServerError from "../errors/internalServerError.js";
@@ -927,5 +928,20 @@ export const getFamilyMemberDetailsController = async (req, res) => {
         error: error.message,
       });
     }
+  }
+};
+
+export const getStatisticsController = async (req, res) => {
+  try {
+    const user_id = req.user.user_id;
+    const result = await getStatistics(user_id);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error in getStatisticsController:", error);
+    res.status(500).json({
+      success: false,
+      message: "Có lỗi xảy ra khi lấy thống kê",
+      error: error.message,
+    });
   }
 };

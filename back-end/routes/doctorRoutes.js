@@ -24,6 +24,7 @@ import {
   getDoctorProfileController,
   updateDoctorProfileController,
   getFamilyMemberDetailsController,
+  getStatisticsController,
 } from "../controllers/doctorController.js";
 import validate from "../middleware/validate.js";
 import { body, param } from "express-validator";
@@ -250,6 +251,12 @@ router.patch(
   authorize(["doctor"]),
   upload.single("avatar"),
   updateDoctorProfileController
+);
+router.get(
+  "/statistics",
+  authenticateUser,
+  authorize(["doctor"]),
+  getStatisticsController
 );
 
 export default router;

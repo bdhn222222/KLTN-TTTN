@@ -53,8 +53,8 @@ const AppointmentAccDoctor = () => {
       });
 
       if (response.data.success) {
-        console.log("Appointments data:", response.data.data);
         // FamilyMember data should already be included in the API response
+        // No need for multiple API calls anymore
         setAppointments(response.data.data);
 
         // If detailed prescription and medical record data is still needed
@@ -68,11 +68,6 @@ const AppointmentAccDoctor = () => {
                   {
                     headers: { Authorization: `Bearer ${token}` },
                   }
-                );
-
-                console.log(
-                  `Detail for appointment ${appointment.appointment_id}:`,
-                  detailsResponse.data.data
                 );
 
                 return {
@@ -107,7 +102,6 @@ const AppointmentAccDoctor = () => {
 
   const handleViewDetails = async (appointmentId) => {
     try {
-      setLoading(true);
       const token = localStorage.getItem("token");
       const response = await axios.get(
         `${url1}/doctor/appointments/${appointmentId}`,
@@ -117,41 +111,21 @@ const AppointmentAccDoctor = () => {
       );
 
       if (response.data.success) {
-        console.log("Appointment detail data:", response.data.data);
         setSelectedAppointment(response.data.data);
         setDrawerVisible(true);
       }
     } catch (error) {
       console.error("Error fetching appointment details:", error);
       showNotification("error", "Lỗi", "Không thể tải chi tiết lịch hẹn");
-    } finally {
-      setLoading(false);
     }
   };
 
   const createMedicalRecord = async (appointmentId) => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.post(
-        `${url1}/doctor/medical-records`,
-        {
-          appointment_id: appointmentId,
-          diagnosis: "",
-          treatment: "",
-          notes: "",
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (response.data.success) {
-        showNotification("success", "Thành công", "Đã tạo hồ sơ bệnh án");
-        fetchAppointments();
-      }
+      navigate(`/doctor/medical-records/create/${appointmentId}`);
     } catch (error) {
-      console.error("Error creating medical record:", error);
-      showNotification("error", "Lỗi", "Không thể tạo hồ sơ bệnh án");
+      console.error("Error navigating to medical record creation:", error);
+      showNotification("error", "Lỗi", "Không thể mở trang tạo hồ sơ bệnh án");
     }
   };
 
@@ -207,30 +181,23 @@ const AppointmentAccDoctor = () => {
       width: "25%",
     },
     {
-      title: "Email",
-      dataIndex: "family_email",
-      key: "family_email",
-      width: "20%",
-      responsive: ["lg"],
-    },
-    {
       title: "Thời gian",
       dataIndex: "appointment_datetime",
       key: "appointment_datetime",
-      width: "15%",
+      width: "20%",
       render: (datetime) => dayjs(datetime).format("DD/MM/YYYY HH:mm"),
     },
     {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      width: "10%",
+      width: "15%",
       render: (status) => getStatusTag(status),
     },
     {
       title: "Thao tác",
       key: "action",
-      width: "15%",
+      width: "25%",
       render: (_, record) => (
         <Space>
           <Button
@@ -250,7 +217,7 @@ const AppointmentAccDoctor = () => {
               Tạo hồ sơ
             </Button>
           )}
-          {record.status === "accepted" &&
+          {/* {record.status === "accepted" &&
             record.medical_record &&
             record.prescription && (
               <Button
@@ -260,7 +227,7 @@ const AppointmentAccDoctor = () => {
               >
                 Hoàn thành
               </Button>
-            )}
+            )} */}
         </Space>
       ),
     },
@@ -302,7 +269,7 @@ const AppointmentAccDoctor = () => {
         <MenuDoctor collapsed={collapsed} />
       </Sider>
       <Layout style={{ marginLeft: collapsed ? 80 : 250 }}>
-        <Header
+        {/* <Header
           style={{
             padding: 0,
             background: "#fff",
@@ -318,7 +285,7 @@ const AppointmentAccDoctor = () => {
           }}
         >
           <NavbarDoctor />
-        </Header>
+        </Header> */}
         <Content
           style={{
             margin: "80px 24px 24px",

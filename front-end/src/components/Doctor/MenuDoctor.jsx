@@ -6,6 +6,7 @@ import {
   TeamOutlined,
   UserOutlined,
   ClockCircleOutlined,
+  DashboardOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   CheckSquareOutlined,
@@ -50,6 +51,12 @@ const MenuDoctor = ({ collapsed, selectedKey: propSelectedKey }) => {
   }, [location.pathname, propSelectedKey]);
 
   const items = [
+    {
+      key: "dashboard",
+      icon: <DashboardOutlined className="text-blue-900" />,
+      label: "Dashboard",
+      onClick: () => navigate("/doctor/dashboard"),
+    },
     {
       key: "appointments",
       icon: <CalendarOutlined className="!text-blue-900" />,

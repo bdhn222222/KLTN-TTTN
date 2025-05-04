@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import {
   Drawer,
   Button,
@@ -12,6 +12,9 @@ import {
   Form,
   notification,
   Empty,
+  Card,
+  Avatar,
+  Rate,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -20,10 +23,12 @@ import {
   FileAddOutlined,
   CheckCircleOutlined,
   WalletOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import axios from "axios";
 import { AppContext } from "../../context/AppContext";
+import { useNavigate } from "react-router-dom";
 
 const { TextArea } = Input;
 
@@ -36,6 +41,14 @@ const AppointmentDetails = ({ open, onClose, appointmentData, onUpdate }) => {
   const [cancelReason, setCancelReason] = useState("");
   const [form] = Form.useForm();
   const [api, contextHolder] = notification.useNotification();
+  const navigate = useNavigate();
+
+  // Debug log khi component nhận dữ liệu mới
+  useEffect(() => {
+    if (appointmentData) {
+      console.log("AppointmentDetails received data:", appointmentData);
+    }
+  }, [appointmentData]);
 
   const statusConfig = {
     waiting_for_confirmation: { color: "gold", text: "Chờ xác nhận" },
@@ -46,12 +59,26 @@ const AppointmentDetails = ({ open, onClose, appointmentData, onUpdate }) => {
     patient_not_coming: { color: "red", text: "Bệnh nhân không đến" },
   };
 
-  // Safe accessor functions
+  // Cải thiện safeAccess để in log khi không tìm thấy đường dẫn
   const safeAccess = (obj, path, defaultValue = "N/A") => {
     try {
-      const result = path.split(".").reduce((o, p) => o && o[p], obj);
-      return result !== undefined && result !== null ? result : defaultValue;
+      const result = path.split(".").reduce((o, p) => {
+        if (o === null || o === undefined) {
+          console.log(
+            `Path error at ${p} in ${path}, object is null/undefined`
+          );
+          return undefined;
+        }
+        return o[p];
+      }, obj);
+
+      if (result === undefined || result === null) {
+        console.log(`Property at path "${path}" is ${result}`);
+        return defaultValue;
+      }
+      return result;
     } catch (e) {
+      console.log(`Error accessing path "${path}":`, e.message);
       return defaultValue;
     }
   };
@@ -277,7 +304,7 @@ const AppointmentDetails = ({ open, onClose, appointmentData, onUpdate }) => {
                   console.log(
                     `Creating medical record for appointment ID: ${appointmentId}`
                   );
-                  // Thêm phương thức tạo hồ sơ ở đây nếu cần
+                  navigate(`/doctor/medical-records/create/${appointmentId}`);
                   onClose();
                 }}
                 className="!bg-blue-900 !text-white px-6 py-2 h-auto rounded-full hover:!bg-blue-800"
@@ -295,6 +322,7 @@ const AppointmentDetails = ({ open, onClose, appointmentData, onUpdate }) => {
   };
 
   if (!appointmentData) {
+    console.log("No appointment data provided to AppointmentDetails");
     return (
       <Drawer
         open={open}
@@ -307,22 +335,39 @@ const AppointmentDetails = ({ open, onClose, appointmentData, onUpdate }) => {
     );
   }
 
-  // Extract all needed data with safe accessors
-  const appointmentId = safeAccess(appointmentData, "appointment_info.id");
-  const appointmentDateTime = safeAccess(
-    appointmentData,
-    "appointment_info.datetime"
-  );
-  const appointmentStatus = safeAccess(
-    appointmentData,
-    "appointment_info.status"
-  );
-  const appointmentFees = safeAccess(appointmentData, "appointment_info.fees");
+  // Log detailed data properties
+  console.log("Appointment ID:", appointmentData.appointment_id);
+  console.log("Appointment Info:", appointmentData.appointment_info);
+  console.log("Family Member:", appointmentData.familyMember);
+  console.log("Medical Record:", appointmentData.medical_record);
+  console.log("Prescription:", appointmentData.prescription);
 
-  const patientName = safeAccess(appointmentData, "familyMember.name");
-  const patientEmail = safeAccess(appointmentData, "familyMember.email");
-  const patientGender = safeAccess(appointmentData, "familyMember.gender");
-  const patientDob = safeAccess(appointmentData, "familyMember.dob");
+  // Extract all needed data with safe accessors
+  const appointmentId =
+    safeAccess(appointmentData, "appointment_info.id") ||
+    safeAccess(appointmentData, "appointment_id");
+  const appointmentDateTime =
+    safeAccess(appointmentData, "appointment_info.datetime") ||
+    safeAccess(appointmentData, "appointment_datetime");
+  const appointmentStatus =
+    safeAccess(appointmentData, "appointment_info.status") ||
+    safeAccess(appointmentData, "status");
+  const appointmentFees =
+    safeAccess(appointmentData, "appointment_info.fees") ||
+    safeAccess(appointmentData, "fees");
+
+  const patientName =
+    safeAccess(appointmentData, "familyMember.name") ||
+    safeAccess(appointmentData, "family_name");
+  const patientEmail =
+    safeAccess(appointmentData, "familyMember.email") ||
+    safeAccess(appointmentData, "family_email");
+  const patientGender =
+    safeAccess(appointmentData, "familyMember.gender") ||
+    safeAccess(appointmentData, "family_gender");
+  const patientDob =
+    safeAccess(appointmentData, "familyMember.dob") ||
+    safeAccess(appointmentData, "family_dob");
 
   return (
     <>
@@ -330,147 +375,239 @@ const AppointmentDetails = ({ open, onClose, appointmentData, onUpdate }) => {
       <Drawer
         open={open}
         onClose={onClose}
-        width="50%"
+        width="70%"
         title={
           <Flex justify="space-between" align="center">
-            <span>Chi tiết cuộc hẹn</span>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">Chi tiết cuộc hẹn</span>
+              <span className="text-gray-400">#{appointmentId}</span>
+            </div>
             {appointmentStatus && (
-              <Tag color={getStatusTag(appointmentStatus).props.color}>
+              <Tag
+                color={getStatusTag(appointmentStatus).props.color}
+                className="px-4 py-1"
+              >
                 {getStatusTag(appointmentStatus).props.children}
               </Tag>
             )}
           </Flex>
         }
       >
-        <Descriptions title="Thông tin cuộc hẹn" column={1}>
-          <Descriptions.Item label="Mã cuộc hẹn">
-            {appointmentId}
-          </Descriptions.Item>
-          <Descriptions.Item label="Thời gian">
-            {formatDate(appointmentDateTime)}
-          </Descriptions.Item>
-          <Descriptions.Item label="Phí khám">
-            {appointmentFees !== "N/A"
-              ? formatCurrency(appointmentFees)
-              : "N/A"}
-          </Descriptions.Item>
-          {appointmentStatus === "patient_not_coming" && (
-            <Descriptions.Item label="Lý do hủy">
-              Bệnh nhân không đến
-            </Descriptions.Item>
-          )}
-          {appointmentStatus === "doctor_day_off" && (
-            <Descriptions.Item label="Lý do hủy">
-              Bác sĩ có lịch nghỉ
-            </Descriptions.Item>
-          )}
-        </Descriptions>
-
-        <Divider />
-
-        <Descriptions title="Thông tin bệnh nhân" column={1}>
-          <Descriptions.Item label="Họ tên">{patientName}</Descriptions.Item>
-          <Descriptions.Item label="Email">{patientEmail}</Descriptions.Item>
-          <Descriptions.Item label="Giới tính">
-            {patientGender === "male"
-              ? "Nam"
-              : patientGender === "female"
-              ? "Nữ"
-              : patientGender}
-          </Descriptions.Item>
-          <Descriptions.Item label="Ngày sinh">
-            {patientDob !== "N/A"
-              ? dayjs(patientDob).format("DD/MM/YYYY")
-              : "N/A"}
-          </Descriptions.Item>
-        </Descriptions>
-
-        {safeAccess(appointmentData, "medical_record") !== "N/A" && (
-          <>
-            <Divider />
-            <Descriptions title="Hồ sơ bệnh án" column={1}>
-              <Descriptions.Item label="Chẩn đoán">
-                {safeAccess(appointmentData, "medical_record.diagnosis")}
+        <div className="space-y-6 mb-6">
+          {/* Thông tin cuộc hẹn */}
+          <Card title="Thông tin cuộc hẹn" className="shadow-sm">
+            <Descriptions column={1} className="pb-4">
+              <Descriptions.Item label="Thời gian khám">
+                {formatDate(appointmentDateTime)}
               </Descriptions.Item>
-              <Descriptions.Item label="Phương pháp điều trị">
-                {safeAccess(appointmentData, "medical_record.treatment")}
+              <Descriptions.Item label="Phí khám">
+                {appointmentFees !== "N/A"
+                  ? formatCurrency(appointmentFees)
+                  : "N/A"}
               </Descriptions.Item>
-              {safeAccess(appointmentData, "medical_record.notes") !==
-                "N/A" && (
-                <Descriptions.Item label="Ghi chú">
-                  {safeAccess(appointmentData, "medical_record.notes")}
+              {appointmentStatus === "patient_not_coming" && (
+                <Descriptions.Item label="Lý do hủy">
+                  Bệnh nhân không đến
+                </Descriptions.Item>
+              )}
+              {appointmentStatus === "doctor_day_off" && (
+                <Descriptions.Item label="Lý do hủy">
+                  Bác sĩ có lịch nghỉ
                 </Descriptions.Item>
               )}
             </Descriptions>
-          </>
-        )}
+          </Card>
 
-        {safeAccess(appointmentData, "prescription") !== "N/A" && (
-          <>
-            <Divider />
-            <Descriptions title="Đơn thuốc" column={1}>
-              <Descriptions.Item label="Trạng thái">
-                {safeAccess(appointmentData, "prescription.status")}
+          <Divider />
+
+          {/* Thông tin bệnh nhân */}
+          <Card title="Thông tin bệnh nhân" className="shadow-sm">
+            <div className="flex items-center gap-4 mb-4">
+              <Avatar
+                size={64}
+                icon={<UserOutlined />}
+                className="bg-blue-900"
+              />
+              <div>
+                <div className="text-lg font-medium">{patientName}</div>
+                <div className="text-gray-500">{patientEmail}</div>
+              </div>
+            </div>
+            <Descriptions column={1}>
+              <Descriptions.Item label="Giới tính">
+                {patientGender === "male"
+                  ? "Nam"
+                  : patientGender === "female"
+                  ? "Nữ"
+                  : patientGender}
               </Descriptions.Item>
-              {safeAccess(appointmentData, "prescription.medicines") !==
-                "N/A" && (
-                <Descriptions.Item label="Danh sách thuốc">
-                  <ul className="list-disc pl-4">
-                    {appointmentData.prescription.medicines.map(
-                      (medicine, index) => (
-                        <li key={medicine?.id || index}>
-                          {safeAccess(medicine, "name")} - SL:{" "}
-                          {safeAccess(medicine, "quantity")} -{" "}
-                          {safeAccess(medicine, "total") !== "N/A"
-                            ? formatCurrency(medicine.total)
-                            : "N/A"}
-                        </li>
-                      )
-                    )}
-                  </ul>
-                </Descriptions.Item>
-              )}
+              <Descriptions.Item label="Ngày sinh">
+                {patientDob !== "N/A"
+                  ? dayjs(patientDob).format("DD/MM/YYYY")
+                  : "N/A"}
+              </Descriptions.Item>
             </Descriptions>
-          </>
-        )}
+          </Card>
 
-        {safeAccess(appointmentData, "payment") !== "N/A" &&
-          appointmentStatus !== "accepted" && (
+          <Divider />
+
+          {/* Hồ sơ bệnh án */}
+          {(safeAccess(appointmentData, "medical_record") !== "N/A" ||
+            safeAccess(appointmentData, "medical_record_id") !== "N/A") && (
             <>
+              <Card title="Hồ sơ bệnh án" className="shadow-sm">
+                <Descriptions column={1}>
+                  <Descriptions.Item label="Chẩn đoán" className="font-medium">
+                    {safeAccess(appointmentData, "medical_record.diagnosis")}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Triệu chứng">
+                    {safeAccess(appointmentData, "medical_record.symptoms")}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Phương pháp điều trị">
+                    {safeAccess(appointmentData, "medical_record.treatment")}
+                  </Descriptions.Item>
+                  {safeAccess(appointmentData, "medical_record.notes") !==
+                    "N/A" && (
+                    <Descriptions.Item label="Ghi chú">
+                      {safeAccess(appointmentData, "medical_record.notes")}
+                    </Descriptions.Item>
+                  )}
+                </Descriptions>
+              </Card>
               <Divider />
-              <Descriptions title="Thanh toán" column={1}>
-                <Descriptions.Item label="Số tiền">
-                  {safeAccess(appointmentData, "payment.amount") !== "N/A"
-                    ? formatCurrency(appointmentData.payment.amount)
-                    : "N/A"}
-                </Descriptions.Item>
-                <Descriptions.Item label="Phương thức">
-                  {safeAccess(appointmentData, "payment.payment_method")}
-                </Descriptions.Item>
-                <Descriptions.Item label="Trạng thái">
-                  {safeAccess(appointmentData, "payment.status")}
-                </Descriptions.Item>
-              </Descriptions>
             </>
           )}
 
-        {safeAccess(appointmentData, "feedback") !== "N/A" && (
-          <>
-            <Divider />
-            <Descriptions title="Đánh giá" column={1}>
-              <Descriptions.Item label="Điểm đánh giá">
-                {safeAccess(appointmentData, "feedback.rating")}
-              </Descriptions.Item>
-              <Descriptions.Item label="Nhận xét">
-                {safeAccess(appointmentData, "feedback.comment")}
-              </Descriptions.Item>
-            </Descriptions>
-          </>
-        )}
+          {/* Đơn thuốc */}
+          {(safeAccess(appointmentData, "prescription") !== "N/A" ||
+            safeAccess(appointmentData, "prescription_id") !== "N/A") && (
+            <>
+              <Card
+                title={
+                  <Flex justify="space-between" align="center">
+                    <span>Đơn thuốc</span>
+                    <Tag
+                      color={
+                        safeAccess(appointmentData, "prescription.status") ===
+                        "completed"
+                          ? "success"
+                          : safeAccess(
+                              appointmentData,
+                              "prescription.status"
+                            ) === "processing"
+                          ? "processing"
+                          : "warning"
+                      }
+                    >
+                      {safeAccess(appointmentData, "prescription.status") ===
+                      "pending_prepare"
+                        ? "Chờ chuẩn bị"
+                        : safeAccess(appointmentData, "prescription.status") ===
+                          "pending"
+                        ? "Chờ xử lý"
+                        : safeAccess(appointmentData, "prescription.status") ===
+                          "processing"
+                        ? "Đang xử lý"
+                        : safeAccess(appointmentData, "prescription.status") ===
+                          "completed"
+                        ? "Đã hoàn thành"
+                        : safeAccess(appointmentData, "prescription.status") ===
+                          "cancelled"
+                        ? "Đã hủy"
+                        : safeAccess(appointmentData, "prescription.status")}
+                    </Tag>
+                  </Flex>
+                }
+                className="shadow-sm"
+              >
+                {safeAccess(appointmentData, "prescription.medicines") !==
+                  "N/A" &&
+                Array.isArray(appointmentData.prescription.medicines) &&
+                appointmentData.prescription.medicines.length > 0 ? (
+                  <div className="space-y-4">
+                    {appointmentData.prescription.medicines.map(
+                      (medicine, index) => {
+                        console.log("Medicine data API format:", medicine);
+                        return (
+                          <Card
+                            key={medicine?.id || index}
+                            size="small"
+                            className="bg-gray-50"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="font-medium text-blue-900">
+                                  {safeAccess(medicine, "name")}
+                                </div>
+                                <div className="text-sm text-gray-500 mt-2 space-y-1">
+                                  <div>
+                                    Số lượng: {safeAccess(medicine, "quantity")}
+                                  </div>
+                                  <div>
+                                    Liều dùng:{" "}
+                                    {safeAccess(medicine, "dosage") || "N/A"}
+                                  </div>
+                                  <div>
+                                    Tần suất:{" "}
+                                    {safeAccess(medicine, "frequency") || "N/A"}
+                                  </div>
+                                  <div>
+                                    Thời gian dùng:{" "}
+                                    {safeAccess(medicine, "duration") || "N/A"}
+                                  </div>
+                                  <div>
+                                    Hướng dẫn:{" "}
+                                    {safeAccess(medicine, "instructions") ||
+                                      "N/A"}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </Card>
+                        );
+                      }
+                    )}
+                  </div>
+                ) : (
+                  <Empty description="Không có thông tin chi tiết thuốc" />
+                )}
 
+                {/* Hiển thị thông tin bổ sung của đơn thuốc nếu có */}
+                {safeAccess(appointmentData, "prescription.note") !== "N/A" && (
+                  <div className="mt-4 pt-3 border-t">
+                    <div className="font-medium mb-1">Ghi chú đơn thuốc:</div>
+                    <div className="text-gray-600">
+                      {safeAccess(appointmentData, "prescription.note")}
+                    </div>
+                  </div>
+                )}
+              </Card>
+              <Divider />
+            </>
+          )}
+
+          {/* Đánh giá */}
+          {safeAccess(appointmentData, "feedback") !== "N/A" && (
+            <Card title="Đánh giá từ bệnh nhân" className="shadow-sm">
+              <Rate
+                disabled
+                defaultValue={safeAccess(appointmentData, "feedback.rating")}
+              />
+              <div className="mt-4">
+                <div className="font-medium mb-2">Nhận xét:</div>
+                <div className="text-gray-600 italic">
+                  "{safeAccess(appointmentData, "feedback.comment")}"
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* Action buttons */}
         <Divider />
-
-        {renderActionButtons(appointmentStatus, appointmentId)}
+        <div className="flex justify-end">
+          {renderActionButtons(appointmentStatus, appointmentId)}
+        </div>
       </Drawer>
 
       <Modal
