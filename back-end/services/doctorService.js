@@ -16,6 +16,8 @@ const {
   Appointment,
   Patient,
   CompensationCode,
+  MedicalRecord,
+  PrescriptionMedicine,
   Prescription,
   FamilyMember,
   Medicine,
@@ -2184,7 +2186,7 @@ export const getAllPatient_FamilyMember = async (
 
 export const getPatientAppointment = async (
   doctor_id,
-  patient_id,
+  family_member_id,
   { status, start_date, end_date, page = 1, limit = 10 }
 ) => {
   try {
@@ -2193,7 +2195,7 @@ export const getPatientAppointment = async (
     // Xây dựng điều kiện tìm kiếm
     let whereCondition = {
       doctor_id,
-      patient_id,
+      family_member_id,
     };
 
     // Áp dụng lọc theo trạng thái nếu có
@@ -2223,10 +2225,15 @@ export const getPatientAppointment = async (
       where: whereCondition,
     });
 
-    // Kiểm tra xem bệnh nhân có tồn tại không
+    // Kiểm tra và lấy danh sách lịch hẹn
     const appointments = await db.Appointment.findAll({
       where: whereCondition,
       include: [
+        {
+          model: db.FamilyMember,
+          as: "FamilyMember",
+          attributes: ["username", "email", "phone_number", "gender"],
+        },
         {
           model: db.Doctor,
           as: "Doctor",
@@ -2279,7 +2286,7 @@ export const getPatientAppointment = async (
     }
 
     // Trả về thông tin các cuộc hẹn của bệnh nhân
-    const patientAppointments = appointments.map((appointment) => ({
+    const familyMemberAppointments = appointments.map((appointment) => ({
       appointment_id: appointment.appointment_id,
       doctor_name: appointment.Doctor.user.username,
       specialization: appointment.Doctor.Specialization.name,
@@ -2287,10 +2294,10 @@ export const getPatientAppointment = async (
       status: appointment.status,
       fees: appointment.fees,
       symptoms: appointment.symptoms,
-      medical_record_id: appointment.MedicalRecord?.medical_record_id,
+      medical_record_id: appointment.MedicalRecord?.record_id,
       prescription_id: appointment.Prescription?.prescription_id,
-      payment_id: appointment.Payment?.payment_id,
-      payment_status: appointment.Payment?.status,
+      payment_id: appointment.Payments?.payment_id,
+      payment_status: appointment.Payments?.status,
       cancelled_at: appointment.cancelled_at,
       cancelled_by: appointment.cancelled_by,
       cancel_reason: appointment.cancel_reason,
@@ -2299,7 +2306,7 @@ export const getPatientAppointment = async (
     return {
       success: true,
       message: "Lấy danh sách cuộc hẹn của bệnh nhân thành công",
-      data: patientAppointments,
+      data: familyMemberAppointments,
       pagination: {
         total: totalAppointments,
         current_page: parseInt(page),
@@ -2373,7 +2380,7 @@ export const getDoctorProfile = async (user_id) => {
  */
 export const getFamilyMemberDetails = async (doctor_id, family_member_id) => {
   // Kiểm tra xem bác sĩ có từng khám cho family member này chưa
-  const hasAppointment = await db.Appointment.findOne({
+  const hasAppointment = await Appointment.findOne({
     where: {
       doctor_id,
       family_member_id,
@@ -2386,7 +2393,7 @@ export const getFamilyMemberDetails = async (doctor_id, family_member_id) => {
   }
 
   // Lấy thông tin chi tiết
-  const familyMember = await db.FamilyMember.findOne({
+  const familyMember = await FamilyMember.findOne({
     where: { family_member_id },
     attributes: [
       "family_member_id",
@@ -2405,7 +2412,7 @@ export const getFamilyMemberDetails = async (doctor_id, family_member_id) => {
   }
 
   // Lấy thống kê cuộc hẹn
-  const appointmentStats = await db.Appointment.findAll({
+  const appointmentStats = await Appointment.findAll({
     where: {
       doctor_id,
       family_member_id,
@@ -2416,13 +2423,13 @@ export const getFamilyMemberDetails = async (doctor_id, family_member_id) => {
   });
 
   // Lấy lịch sử bệnh án
-  const medicalHistory = await db.MedicalRecord.findAll({
+  const medicalHistory = await MedicalRecord.findAll({
     where: {
       family_member_id,
     },
     include: [
       {
-        model: db.Appointment,
+        model: Appointment,
         as: "Appointment",
         where: { doctor_id },
         attributes: ["appointment_datetime"],
@@ -2433,10 +2440,10 @@ export const getFamilyMemberDetails = async (doctor_id, family_member_id) => {
   });
 
   // Lấy đơn thuốc gần đây
-  const recentPrescriptions = await db.Prescription.findAll({
+  const recentPrescriptions = await Prescription.findAll({
     include: [
       {
-        model: db.Appointment,
+        model: Appointment,
         as: "Appointment",
         where: {
           doctor_id,
@@ -2445,11 +2452,11 @@ export const getFamilyMemberDetails = async (doctor_id, family_member_id) => {
         attributes: ["appointment_datetime"],
       },
       {
-        model: db.PrescriptionMedicine,
+        model: PrescriptionMedicine,
         as: "prescriptionMedicines",
         include: [
           {
-            model: db.Medicine,
+            model: Medicine,
             as: "Medicine",
             attributes: ["name"],
           },
@@ -2498,4 +2505,88 @@ export const getFamilyMemberDetails = async (doctor_id, family_member_id) => {
       })),
     },
   };
+};
+
+export const getPatientAppointments = async (userId, familyMemberId) => {
+  // 1. Xác thực doctor
+  const doctor = await Doctor.findOne({
+    where: { user_id: userId },
+    attributes: ["doctor_id"],
+  });
+  if (!doctor) {
+    throw new NotFoundError("Không tìm thấy thông tin bác sĩ");
+  }
+
+  // 2. Kiểm tra familyMember có lịch hẹn với doctor này hay không
+  const count = await Appointment.count({
+    where: {
+      doctor_id: doctor.doctor_id,
+      family_member_id: familyMemberId,
+    },
+  });
+  if (!count) {
+    throw new ForbiddenError(
+      "Bệnh nhân này chưa có lịch hẹn với bác sĩ của bạn"
+    );
+  }
+
+  // 3. Lấy tất cả lịch hẹn đã hoàn thành và đã thanh toán
+  const appointments = await Appointment.findAll({
+    where: {
+      family_member_id: familyMemberId,
+      status: "completed",
+    },
+    order: [["appointment_datetime", "DESC"]],
+    include: [
+      {
+        model: FamilyMember,
+        as: "FamilyMember",
+        attributes: [
+          "family_member_id",
+          "username",
+          "date_of_birth",
+          "gender",
+          "email",
+          "phone_number",
+        ],
+      },
+      {
+        model: Payment,
+        as: "Payments",
+        where: { status: "paid" },
+        required: true, // Bắt buộc phải có payment và status là paid
+      },
+      {
+        model: MedicalRecord,
+        as: "MedicalRecord",
+        attributes: ["record_id", "notes"],
+      },
+      {
+        model: Prescription,
+        as: "Prescription",
+        attributes: ["prescription_id", "status"],
+        include: [
+          {
+            model: PrescriptionMedicine,
+            as: "prescriptionMedicines",
+            attributes: [
+              "prescription_medicine_id",
+              "medicine_id",
+              "quantity",
+              "actual_quantity",
+            ],
+            include: [
+              {
+                model: Medicine,
+                as: "Medicine",
+                attributes: ["medicine_id", "name", "unit", "price"],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+
+  return appointments;
 };

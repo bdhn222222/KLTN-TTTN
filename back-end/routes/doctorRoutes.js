@@ -232,7 +232,22 @@ router.get(
 );
 
 router.get(
-  "/patients/:patient_id/appointments",
+  "/patients/:familyMemberId/appointments",
+  authenticateUser,
+  authorize(["doctor"]),
+  getPatientAppointmentsController
+);
+
+// Add new routes for family-members (same functionality, different path)
+router.get(
+  "/family-members/:family_member_id",
+  authenticateUser,
+  authorize(["doctor"]),
+  getFamilyMemberDetailsController
+);
+
+router.get(
+  "/family-members/:familyMemberId/appointments",
   authenticateUser,
   authorize(["doctor"]),
   getPatientAppointmentsController

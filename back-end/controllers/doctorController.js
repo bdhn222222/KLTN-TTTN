@@ -19,7 +19,8 @@ import {
   getAppointmentPayments,
   updatePaymentStatus,
   getAllPatient_FamilyMember,
-  getPatientAppointment,
+  // getPatientAppointments,
+  getPatientAppointments,
   getDoctorProfile,
   getFamilyMemberDetails,
   getStatistics,
@@ -741,84 +742,36 @@ export const getAllPatient_FamilyMemberController = async (req, res) => {
 /**
  * Lấy danh sách lịch hẹn của một bệnh nhân cụ thể
  */
-export const getPatientAppointmentsController = async (req, res) => {
+export const getPatientAppointmentsController = async (req, res, next) => {
   try {
-    const user_id = req.user.user_id;
+    const userId = req.user.user_id;
 
-    const doctor = await db.Doctor.findOne({
-      where: { user_id: user_id },
-      attributes: ["doctor_id"],
-    });
+    // Extract parameter from either familyMemberId or family_member_id
+    const paramId = req.params.familyMemberId || req.params.family_member_id;
+    const familyMemberId = parseInt(paramId, 10);
 
-    if (!doctor) {
-      throw new NotFoundError("Không tìm thấy bác sĩ");
-    }
-
-    const doctor_id = doctor.doctor_id;
-    const { patient_id } = req.params;
-    const { status, start_date, end_date, page = 1, limit = 10 } = req.query;
-
-    // Validate patient_id
-    if (!patient_id || isNaN(patient_id)) {
+    if (isNaN(familyMemberId) || familyMemberId <= 0) {
       return res.status(400).json({
         success: false,
-        message: "Mã bệnh nhân không hợp lệ",
+        message: "ID bệnh nhân không hợp lệ",
       });
     }
 
-    // Validate pagination parameters
-    if (page && (isNaN(page) || parseInt(page) < 1)) {
-      return res.status(400).json({
-        success: false,
-        message: "Số trang không hợp lệ",
-      });
+    const data = await getPatientAppointments(userId, familyMemberId);
+    return res.status(200).json({ success: true, data });
+  } catch (err) {
+    if (err.name === "NotFoundError") {
+      return res.status(404).json({ success: false, message: err.message });
+    }
+    if (err.name === "ForbiddenError") {
+      return res.status(403).json({ success: false, message: err.message });
     }
 
-    if (limit && (isNaN(limit) || parseInt(limit) < 1)) {
-      return res.status(400).json({
-        success: false,
-        message: "Số lượng mỗi trang không hợp lệ",
-      });
-    }
-
-    // Validate date parameters
-    if (start_date && !dayjs(start_date).isValid()) {
-      return res.status(400).json({
-        success: false,
-        message: "Ngày bắt đầu không hợp lệ",
-      });
-    }
-
-    if (end_date && !dayjs(end_date).isValid()) {
-      return res.status(400).json({
-        success: false,
-        message: "Ngày kết thúc không hợp lệ",
-      });
-    }
-
-    if (start_date && end_date && dayjs(end_date).isBefore(dayjs(start_date))) {
-      return res.status(400).json({
-        success: false,
-        message: "Ngày kết thúc phải sau ngày bắt đầu",
-      });
-    }
-
-    const result = await getPatientAppointment(doctor_id, patient_id, {
-      status,
-      start_date,
-      end_date,
-      page: parseInt(page),
-      limit: parseInt(limit),
-    });
-
-    res.status(200).json(result);
-  } catch (error) {
-    console.error("Error in getPatientAppointmentsController:", error);
-    res.status(500).json({
+    console.error("Error in getPatientAppointmentsController:", err);
+    return res.status(500).json({
       success: false,
-      message:
-        error.message ||
-        "Có lỗi xảy ra khi lấy danh sách cuộc hẹn của bệnh nhân",
+      message: "Có lỗi xảy ra khi lấy danh sách lịch hẹn",
+      error: err.message,
     });
   }
 };
@@ -898,10 +851,17 @@ export const updateDoctorProfileController = async (req, res) => {
 /**
  * Lấy thông tin chi tiết của một FamilyMember
  */
-export const getFamilyMemberDetailsController = async (req, res) => {
+export const getFamilyMemberDetailsController = async (req, res, next) => {
   try {
     const user_id = req.user.user_id;
     const { family_member_id } = req.params;
+
+    if (!family_member_id || isNaN(parseInt(family_member_id))) {
+      return res.status(400).json({
+        success: false,
+        message: "ID bệnh nhân không hợp lệ",
+      });
+    }
 
     const doctor = await db.Doctor.findOne({
       where: { user_id: user_id },
@@ -909,25 +869,33 @@ export const getFamilyMemberDetailsController = async (req, res) => {
     });
 
     if (!doctor) {
-      throw new NotFoundError("Không tìm thấy bác sĩ");
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy bác sĩ",
+      });
     }
 
     const result = await getFamilyMemberDetails(
       doctor.doctor_id,
       parseInt(family_member_id)
     );
-    res.status(200).json(result);
+
+    return res.status(200).json(result);
   } catch (error) {
     console.error("Error in getFamilyMemberDetailsController:", error);
+
     if (error instanceof NotFoundError) {
-      res.status(404).json({ success: false, message: error.message });
-    } else {
-      res.status(500).json({
+      return res.status(404).json({
         success: false,
-        message: "Có lỗi xảy ra khi lấy thông tin chi tiết bệnh nhân",
-        error: error.message,
+        message: error.message,
       });
     }
+
+    return res.status(500).json({
+      success: false,
+      message: "Có lỗi xảy ra khi lấy thông tin chi tiết bệnh nhân",
+      error: error.message,
+    });
   }
 };
 

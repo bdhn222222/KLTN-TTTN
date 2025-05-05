@@ -26,6 +26,7 @@ import AppointmentComDoctor from "./pages/Doctor/AppointmentComDoctor";
 import AppointmentCanDoctor from "./pages/Doctor/AppointmentCanDoctor";
 import AppointmentPaymentPage from "./pages/Doctor/AppointmentPaymentPage";
 import PatientDoctor from "./pages/Doctor/PatientDoctor";
+import PatientDetail from "./pages/Doctor/PatientDetail";
 import ProfileDoctor from "./pages/Doctor/ProfileDoctor";
 import PrescriptionPrepare from "./pages/Pharmacists/PrescriptionPrepare";
 import BookAppointment from "./pages/Patient/bookAppointment";
@@ -164,7 +165,19 @@ const App = () => {
             path="patients/:patient_id"
             element={<AllAppointmentPatient />}
           />
+          <Route
+            path="patients/:family_member_id/detail"
+            element={<PatientDetail />}
+          />
+          <Route
+            path="family-members/:family_member_id/appointments"
+            element={<AllAppointmentPatient />}
+          />
           <Route path="schedule" element={<ScheduleDoctor />} />
+          <Route
+            path="family-members/:family_member_id"
+            element={<PatientDetail />}
+          />
           <Route path="profile" element={<ProfileDoctor />} />
         </Route>
 
