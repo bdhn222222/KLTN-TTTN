@@ -537,7 +537,7 @@ const AppointmentDetail = () => {
       <Button
         type="link"
         icon={<ArrowLeftOutlined />}
-        onClick={() => window.history.back()}
+        onClick={() => navigate(`/my-appointments`)}
         className="mb-4 pl-0 text-gray-700"
       >
         Quay lại danh sách lịch hẹn

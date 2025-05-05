@@ -18,7 +18,7 @@ function NavbarPhar() {
       key: "profile",
       icon: <SettingOutlined />,
       label: "Thông tin cá nhân",
-      onClick: () => navigate("/doctor/profile"),
+      onClick: () => navigate("/pharmacists/profile"),
     },
     {
       key: "logout",
@@ -39,7 +39,7 @@ function NavbarPhar() {
           className="w-28 cursor-pointer"
           src={assets.logo}
           alt="Logo"
-          onClick={() => navigate("/doctor/dashboard")}
+          onClick={() => navigate("/pharmacists/prescription/pending_prepare")}
         />
         <div className="flex items-center gap-1 bg-blue-100 px-3 py-1 rounded-full">
           <UserOutlined className="!text-blue-900" />

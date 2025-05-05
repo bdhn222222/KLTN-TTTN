@@ -4,10 +4,11 @@ import TopDoctors from "../../components/Patient/TopDoctorsPatient";
 import Banner from "../../components/Patient/BannerPatient";
 import Footer from "../../components/Patient/FooterPatient";
 const Home = () => {
+  const token = localStorage.getItem("token");
+
   return (
     <div>
       <Header />
-      <Footer />
     </div>
   );
 };

@@ -8,11 +8,9 @@ export const getAllUsersController = async (req, res, next) => {
     const users = await getAllUsers();
     res.status(200).json(users);
   } catch (error) {
-    next(new InternalServerError(error.message)); 
+    next(new InternalServerError(error.message));
   }
 };
-
-
 
 export const getUserProfileController = async (req, res, next) => {
   try {
@@ -24,3 +22,14 @@ export const getUserProfileController = async (req, res, next) => {
     next(error);
   }
 };
+
+// export const getUserProfileController2 = async (req, res, next) => {
+//   try {
+//     const user_id = req.user.user_id;
+//     console.log(user_id);
+//     const user = await getUserProfile(user_id);
+//     res.status(200).json(user);
+//   } catch (error) {
+//     next(error);
+//   }
+// };

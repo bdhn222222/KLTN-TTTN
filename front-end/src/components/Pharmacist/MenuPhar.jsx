@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu } from 'antd';
+import React, { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Menu } from "antd";
 import {
   CalendarOutlined,
   TeamOutlined,
@@ -9,13 +9,13 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   CheckSquareOutlined,
-} from '@ant-design/icons';
+} from "@ant-design/icons";
 
 const MenuPhar = ({ collapsed, selectedKey: propSelectedKey }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [selectedKey, setSelectedKey] = useState('pending_prepare');
-  const [openKeys, setOpenKeys] = useState(['prescription']);
+  const [selectedKey, setSelectedKey] = useState("pending_prepare");
+  const [openKeys, setOpenKeys] = useState(["prescriptions"]);
 
   useEffect(() => {
     // Nếu có selectedKey từ prop, ưu tiên sử dụng nó
@@ -26,69 +26,57 @@ const MenuPhar = ({ collapsed, selectedKey: propSelectedKey }) => {
 
     const path = location.pathname;
     // Map URL patterns to menu keys
-    if (path.includes('pending_prepare')) {
-      setSelectedKey('pending_prepare');
-    } else if (path.includes('waiting_payment')) {
-      setSelectedKey('waiting_payment');
-    } else if (path.includes('completed')) {
-      setSelectedKey('completed');
-    } else if (path.includes('cancelled')) {
-      setSelectedKey('cancelled');
-    } else if (path.includes('medicines')) {
-      setSelectedKey('medicines');
-    } else if (path.includes('profile')) {
-      setSelectedKey('profile');
+    if (path.includes("pending")) {
+      setSelectedKey("pending_prepare");
+    } else if (path.includes("waiting_payment")) {
+      setSelectedKey("waiting_payment");
+    } else if (path.includes("completed")) {
+      setSelectedKey("completed");
+    } else if (path.includes("cancelled")) {
+      setSelectedKey("cancelled");
+    } else if (path.includes("medicines")) {
+      setSelectedKey("medicines");
+    } else if (path.includes("profile")) {
+      setSelectedKey("profile");
     }
 
-    // Keep prescription submenu open when in prescription section
-    if (path.includes('prescription')) {
-      setOpenKeys(['prescription']);
+    // Keep prescription submenu open when in prescriptions section
+    if (path.includes("prescription") || path.includes("prescriptions")) {
+      setOpenKeys(["prescriptions"]);
     }
   }, [location.pathname, propSelectedKey]);
 
   const items = [
     {
-      key: 'prescription',
+      key: "prescriptions",
       icon: <CalendarOutlined className="!text-blue-900" />,
-      label: <span className="text-blue-900">Prescription</span>,
+      label: <span className="text-blue-900">Đơn thuốc</span>,
       children: [
         {
-          key: 'pending_prepare',
+          key: "pending_prepare",
           icon: <ClockCircleOutlined className="text-blue-900" />,
-          label: 'Pending Prepare',
-          onClick: () => navigate('/pharmacists/prescription/pending_prepare')
+          label: "Chờ chuẩn bị",
+          onClick: () => navigate("/pharmacist/prescriptions/pending"),
         },
         {
-          key: 'waiting_payment',
-          icon: <CheckCircleOutlined className="text-blue-900" />,
-          label: 'Waiting Payment',
-          onClick: () => navigate('/pharmacists/prescription/waiting_payment')
-        },
-        {
-          key: 'completed',
+          key: "completed",
           icon: <CheckSquareOutlined className="text-blue-900" />,
-          label: 'Completed',
-          onClick: () => navigate('/pharmacists/prescription/completed')
+          label: "Đã hoàn thành",
+          onClick: () => navigate("/pharmacist/prescriptions/completed"),
         },
-        {
-          key: 'cancelled',
-          icon: <CloseCircleOutlined className="text-blue-900" />,
-          label: 'Cancelled',
-          onClick: () => navigate('/pharmacists/prescription/cancelled')
-        },
-      ]
+      ],
     },
     {
-      key: 'medicines',
+      key: "medicines",
       icon: <TeamOutlined className="text-blue-900" />,
-      label: 'Medicines',
-      onClick: () => navigate('/pharmacists/medicines')
+      label: "Thuốc",
+      onClick: () => navigate("/pharmacist/medicines"),
     },
     {
-      key: 'profile',
+      key: "profile",
       icon: <UserOutlined className="text-blue-900" />,
-      label: 'Profile',
-      onClick: () => navigate('/pharmacists/profile')
+      label: "Tài khoản",
+      onClick: () => navigate("/pharmacist/profile"),
     },
   ];
 

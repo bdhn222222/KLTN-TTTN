@@ -2,6 +2,7 @@ import React from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import Home from "./pages/Patient/Home";
 import NavbarPatient from "./components/Patient/NavbarPatient";
+import NavbarPhar from "./components/Pharmacist/NavbarPhar";
 import Doctors from "./pages/Patient/Doctors";
 import Login from "./pages/Login";
 import Contact from "./pages/Patient/Contact";
@@ -29,6 +30,7 @@ import PatientDoctor from "./pages/Doctor/PatientDoctor";
 import PatientDetail from "./pages/Doctor/PatientDetail";
 import ProfileDoctor from "./pages/Doctor/ProfileDoctor";
 import PrescriptionPrepare from "./pages/Pharmacists/PrescriptionPrepare";
+import PrescriptionDetail from "./pages/Pharmacists/PrescriptionDetail";
 import BookAppointment from "./pages/Patient/bookAppointment";
 import AppointmentDetail from "./pages/Patient/AppointmentDetail";
 import PaymentAppointment from "./pages/Patient/PaymentAppointment";
@@ -68,7 +70,7 @@ const DoctorLayout = () => {
 const PharmacistLayout = () => {
   return (
     <div>
-      <NavbarPharmacist />
+      <NavbarPhar />
       <Outlet />
     </div>
   );
@@ -78,10 +80,11 @@ const App = () => {
   return (
     <AppContextProvider>
       <Routes>
+        <Route index element={<Login />} />
         {/* Patient Routes */}
         <Route path="/" element={<PatientLayout />}>
           <Route path="/" element={<Navigate to="/login" />} />
-          <Route index element={<Home />} />
+          <Route path="home" element={<Home />} />
           <Route path="doctors" element={<Doctors />} />
           <Route path="doctors/:speciality" element={<Doctors />} />
           <Route path="about" element={<About />} />
@@ -182,14 +185,35 @@ const App = () => {
         </Route>
 
         {/* Pharmacist Routes */}
+        <Route path="/pharmacist" element={<PharmacistLayout />}>
+          <Route
+            index
+            element={
+              <Navigate to="/pharmacist/prescriptions/pending" replace />
+            }
+          />
+          <Route path="prescriptions">
+            <Route path="pending" element={<PrescriptionPrepare />} />
+            <Route
+              path=":prescriptionId/detail"
+              element={<PrescriptionDetail />}
+            />
+            <Route path="*" element={<PrescriptionPrepare />} />
+          </Route>
+          <Route
+            path="*"
+            element={
+              <Navigate to="/pharmacist/prescriptions/pending" replace />
+            }
+          />
+        </Route>
+
+        {/* Also update the old pharmacists route for backward compatibility */}
         <Route path="/pharmacists" element={<PharmacistLayout />}>
           <Route
             index
             element={
-              <Navigate
-                to="/pharmacists/prescription/pending_prepare"
-                replace
-              />
+              <Navigate to="/pharmacist/prescriptions/pending" replace />
             }
           />
           <Route path="prescription">
@@ -199,10 +223,7 @@ const App = () => {
           <Route
             path="*"
             element={
-              <Navigate
-                to="/pharmacists/prescription/pending_prepare"
-                replace
-              />
+              <Navigate to="/pharmacist/prescriptions/pending" replace />
             }
           />
         </Route>

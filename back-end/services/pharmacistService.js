@@ -108,7 +108,7 @@ export const getPrescriptionDetails = async (prescription_id) => {
                 "name",
                 "price",
                 "unit",
-                "is_out_of_stock",
+                // "is_out_of_stock",
                 "quantity",
               ],
             },
@@ -196,7 +196,7 @@ export const getPrescriptionDetails = async (prescription_id) => {
             price: item.Medicine.price
               ? `${item.Medicine.price.toLocaleString("vi-VN")} VNĐ`
               : "0 VNĐ",
-            status: item.Medicine.is_out_of_stock ? "Tạm hết hàng" : "Còn hàng",
+            // status: item.Medicine.is_out_of_stock ? "Tạm hết hàng" : "Còn hàng",
             description: item.Medicine.description || "Chưa có mô tả",
             supplier:
               item.Medicine.supplier || "Chưa có thông tin nhà cung cấp",
@@ -485,14 +485,14 @@ export const completePrescription = async (prescription_id, pharmacist_id) => {
     }
 
     // Kiểm tra số lượng tồn kho
-    if (item.medicine.is_out_of_stock) {
-      throw new BadRequestError(`Thuốc ${item.medicine.name} đã hết hàng`);
-    }
+    // if (item.medicine.is_out_of_stock) {
+    //   throw new BadRequestError(`Thuốc ${item.medicine.name} đã hết hàng`);
+    // }
 
     // Cập nhật trạng thái hết hàng
-    await item.medicine.update({
-      is_out_of_stock: true,
-    });
+    // await item.medicine.update({
+    //   is_out_of_stock: true,
+    // });
   }
 
   // Cập nhật đơn thuốc đã được phát
@@ -690,7 +690,7 @@ export const getAllMedicines = async ({ search, expiry_before, page = 1 }) => {
 
   const formattedMedicines = rows.map((med) => ({
     ...med.toJSON(),
-    status_message: med.is_out_of_stock ? "Tạm hết hàng" : "",
+    // status_message: med.is_out_of_stock ? "Tạm hết hàng" : "",
   }));
 
   return {
@@ -788,7 +788,7 @@ export const getMedicineById = async (medicine_id) => {
   }
 
   const data = medicine.toJSON();
-  data.status_message = medicine.is_out_of_stock ? "Tạm hết hàng" : "";
+  // data.status_message = medicine.is_out_of_stock ? "Tạm hết hàng" : "";
 
   return {
     success: true,
@@ -1151,7 +1151,7 @@ export const getAllPrescriptions = async ({
               "name",
               "unit",
               "price",
-              "is_out_of_stock",
+              // "is_out_of_stock",
               "description",
               "supplier",
             ],
@@ -1325,9 +1325,9 @@ export const getAllPrescriptions = async ({
               price: item.Medicine.price
                 ? `${item.Medicine.price.toLocaleString("vi-VN")} VNĐ`
                 : "0 VNĐ",
-              status: item.Medicine.is_out_of_stock
-                ? "Tạm hết hàng"
-                : "Còn hàng",
+              // status: item.Medicine.is_out_of_stock
+              //   ? "Tạm hết hàng"
+              //   : "Còn hàng",
               description: item.Medicine.description || "Chưa có mô tả",
               supplier:
                 item.Medicine.supplier || "Chưa có thông tin nhà cung cấp",
@@ -2140,7 +2140,7 @@ export const getRetailPrescriptionDetails = async (retail_prescription_id) => {
                 "unit",
                 "price",
                 "quantity",
-                "is_out_of_stock",
+                // "is_out_of_stock",
               ],
             },
           ],
@@ -2801,7 +2801,7 @@ export const completeRetailPrescription = async (
       await item.medicine.update(
         {
           quantity: item.medicine.quantity - item.actual_quantity,
-          is_out_of_stock: item.medicine.quantity - item.actual_quantity === 0,
+          // is_out_of_stock: item.medicine.quantity - item.actual_quantity === 0,
         },
         { transaction: t }
       );
@@ -3137,19 +3137,67 @@ export const getPrescriptionDetailsWithFIFO = async (
     );
   }
 
+  // Lấy ngày hiện tại và tính ngày hết hạn tối thiểu (1 tháng từ hiện tại)
+  const currentDate = new Date();
+  const minExpiryDate = new Date();
+  minExpiryDate.setMonth(currentDate.getMonth() + 1);
+
+  console.log(
+    "Medicine IDs in prescription:",
+    prescription.prescriptionMedicines.map((pm) => pm.medicine_id)
+  );
+
   // 2. Duyệt từng dòng thuốc
   const lines = await Promise.all(
     prescription.prescriptionMedicines.map(async (pm) => {
       const requiredQty = pm.quantity;
-      // 2.1. Lấy tất cả lô còn hoạt động
+
+      console.log(
+        `Processing medicine_id: ${pm.medicine_id}, quantity: ${requiredQty}`
+      );
+
+      // 2.1. Lấy tất cả lô còn hoạt động VÀ chưa hết hạn trong 1 tháng
       const batches = await db.Batch.findAll({
         where: {
           medicine_id: pm.medicine_id,
+          //Tạm thời bỏ các điều kiện lọc để lấy tất cả batch
           status: "Active",
           quantity: { [Op.gt]: 0 },
+          expiry_date: { [Op.gt]: minExpiryDate },
         },
-        order: fifo[["expiry_date", "ASC"]],
+        order: fifo ? [["expiry_date", "ASC"]] : null, // Sửa lỗi cú pháp order
       });
+
+      console.log(
+        `Found ${batches.length} batches for medicine_id: ${pm.medicine_id}`
+      );
+
+      // Để debug, lấy tất cả các batch bất kể điều kiện
+      const allBatches = await db.Batch.findAll({
+        where: {
+          medicine_id: pm.medicine_id,
+        },
+      });
+
+      console.log(
+        `Total batches in DB for medicine_id ${pm.medicine_id}: ${allBatches.length}`
+      );
+
+      if (allBatches.length > 0 && batches.length === 0) {
+        console.log(
+          `All batches for medicine_id ${pm.medicine_id} failed filters:`
+        );
+        allBatches.forEach((b) => {
+          console.log(
+            `Batch ${b.batch_number}: status=${b.status}, quantity=${b.quantity}, expiry_date=${b.expiry_date}, min_expiry=${minExpiryDate}`
+          );
+          console.log(
+            `Expiry check: ${
+              new Date(b.expiry_date) > minExpiryDate ? "PASS" : "FAIL"
+            }`
+          );
+        });
+      }
 
       // 2.2. Tổng tồn kho
       const totalAvailable = batches.reduce((sum, b) => sum + b.quantity, 0);
@@ -3254,59 +3302,143 @@ export const prepareAndPayPrescription = async (
     const invoiceLines = [];
 
     // 2. Với mỗi line request
-    for (const { medicine_id, allocated } of lines) {
+    for (const line of lines) {
+      const { medicine_id, allocated, allocations } = line;
+
+      // Kiểm tra thuốc có trong đơn không
       const pm = prescription.prescriptionMedicines.find(
         (pm) => pm.medicine_id === medicine_id
       );
       if (!pm)
         throw new BadRequestError(`Medicine ${medicine_id} không có trong đơn`);
+
+      // Kiểm tra số lượng được cấp có vượt quá số kê không
       if (allocated > pm.quantity) {
         throw new BadRequestError(
           `Yêu cầu ${allocated} vượt quá kê ${pm.quantity}`
         );
       }
 
-      // 3. Lấy các batch Active có đủ hàng, theo FIFO (expiry_date ASC)
-      const batches = await db.Batch.findAll({
-        where: {
+      // Nếu không có thông tin phân bổ batch cụ thể, thực hiện phân bổ tự động
+      if (!allocations || allocations.length === 0) {
+        // Ngày hiện tại + 1 tháng
+        const currentDate = new Date();
+        const minExpiryDate = new Date();
+        minExpiryDate.setMonth(currentDate.getMonth() + 1);
+
+        // 3. Lấy các batch Active có đủ hàng, theo FIFO (expiry_date ASC)
+        const batches = await db.Batch.findAll({
+          where: {
+            medicine_id,
+            status: "Active",
+            quantity: { [Op.gt]: 0 },
+            expiry_date: { [Op.gt]: minExpiryDate },
+          },
+          order: [["expiry_date", "ASC"]],
+          transaction: t,
+        });
+
+        let remaining = allocated;
+        const lineAllocations = [];
+
+        // 4. Tự động phân bổ FIFO
+        for (const batch of batches) {
+          if (remaining <= 0) break;
+          const take = Math.min(batch.quantity, remaining);
+          lineAllocations.push({
+            batch_number: batch.batch_number,
+            allocated: take,
+          });
+
+          // Trừ tồn kho
+          await batch.decrement("quantity", { by: take, transaction: t });
+          remaining -= take;
+        }
+
+        if (remaining > 0) {
+          throw new BadRequestError(
+            `Không đủ hàng cho medicine ${medicine_id}`
+          );
+        }
+
+        // 5. Cập nhật actual_quantity
+        await pm.update({ actual_quantity: allocated }, { transaction: t });
+
+        // 6. Chuẩn bị dòng hoá đơn
+        const med = await db.Medicine.findByPk(medicine_id, { transaction: t });
+        invoiceLines.push({
           medicine_id,
-          status: "Active",
-          quantity: { [Op.gt]: 0 },
-        },
-        order: [["expiry_date", "ASC"]],
-        transaction: t,
-      });
+          medicine_name: med.name,
+          allocated,
+          unit_price: med.price,
+          line_total: allocated * med.price,
+          allocations: lineAllocations,
+        });
+      } else {
+        // Sử dụng thông tin phân bổ đã được gửi lên
+        let totalAllocated = 0;
+        const lineAllocations = [];
 
-      let remaining = allocated;
-      const allocations = [];
+        // Chỉ lấy các batch allocation có allocated > 0
+        const validAllocations = allocations.filter((a) => a.allocated > 0);
 
-      // 4. Tự động phân bổ FIFO
-      for (const batch of batches) {
-        if (remaining <= 0) break;
-        const take = Math.min(batch.quantity, remaining);
-        allocations.push({ batch_number: batch.batch_number, allocated: take });
-        // Trừ tồn kho
-        await batch.decrement("quantity", { by: take, transaction: t });
-        remaining -= take;
+        for (const allocation of validAllocations) {
+          const { batch_number, allocated: batchAllocated } = allocation;
+
+          // Tìm batch trong database
+          const batch = await db.Batch.findOne({
+            where: {
+              medicine_id,
+              batch_number,
+              status: "Active",
+            },
+            transaction: t,
+          });
+
+          if (!batch) {
+            throw new BadRequestError(
+              `Không tìm thấy batch ${batch_number} cho thuốc ${medicine_id}`
+            );
+          }
+
+          if (batch.quantity < batchAllocated) {
+            throw new BadRequestError(
+              `Batch ${batch_number} không đủ số lượng (yêu cầu: ${batchAllocated}, tồn kho: ${batch.quantity})`
+            );
+          }
+
+          // Trừ tồn kho
+          await batch.decrement("quantity", {
+            by: batchAllocated,
+            transaction: t,
+          });
+
+          // Lưu allocation cho invoice
+          lineAllocations.push({ batch_number, allocated: batchAllocated });
+          totalAllocated += batchAllocated;
+        }
+
+        // Kiểm tra tổng số lượng đã phân bổ
+        if (totalAllocated !== allocated) {
+          throw new BadRequestError(
+            `Tổng số lượng phân bổ (${totalAllocated}) không khớp với số lượng cấp (${allocated})`
+          );
+        }
+
+        // 5. Cập nhật actual_quantity
+        await pm.update({ actual_quantity: allocated }, { transaction: t });
+
+        // 6. Chuẩn bị dòng hoá đơn
+        const med = await db.Medicine.findByPk(medicine_id, { transaction: t });
+        invoiceLines.push({
+          medicine_id,
+          medicine_name: med.name,
+          allocated,
+          unit_price: med.price,
+          line_total: allocated * med.price,
+          allocations: lineAllocations,
+        });
       }
-
-      if (remaining > 0) {
-        throw new BadRequestError(`Không đủ hàng cho medicine ${medicine_id}`);
-      }
-
-      // 5. Cập nhật actual_quantity
-      await pm.update({ actual_quantity: allocated }, { transaction: t });
-
-      // 6. Chuẩn bị dòng hoá đơn
-      const med = await db.Medicine.findByPk(medicine_id, { transaction: t });
-      invoiceLines.push({
-        medicine_id,
-        medicine_name: med.name,
-        allocated,
-        unit_price: med.price,
-        line_total: allocated * med.price,
-        allocations,
-      });
     }
 
     // 7. Đánh dấu đơn completed
@@ -3348,6 +3480,120 @@ export const prepareAndPayPrescription = async (
           payment_method: payment.payment_method,
           payment_date: payment.payment_date,
         },
+      },
+    };
+  } catch (error) {
+    await t.rollback();
+    throw error;
+  }
+};
+
+/**
+ * Thêm lô thuốc mới cho một loại thuốc
+ * @param {number} medicine_id - ID của thuốc
+ * @param {Object} batchData - Dữ liệu của lô thuốc
+ * @param {string} batchData.batch_number - Số lô thuốc
+ * @param {number} batchData.quantity - Số lượng thuốc trong lô
+ * @param {string} batchData.import_date - Ngày nhập thuốc (YYYY-MM-DD)
+ * @param {string} batchData.expiry_date - Ngày hết hạn (YYYY-MM-DD)
+ * @param {string} batchData.status - Trạng thái lô (Active, Expired, Disposed)
+ * @returns {Promise<Object>} - Thông tin lô thuốc đã tạo
+ */
+export const addMedicineBatch = async (medicine_id, batchData) => {
+  const t = await db.sequelize.transaction();
+
+  try {
+    // 1. Kiểm tra thuốc tồn tại
+    const medicine = await db.Medicine.findByPk(medicine_id, {
+      transaction: t,
+    });
+    if (!medicine) {
+      throw new NotFoundError(`Không tìm thấy thuốc với ID ${medicine_id}`);
+    }
+
+    // 2. Kiểm tra batch_number đã tồn tại chưa
+    const existingBatch = await db.Batch.findOne({
+      where: { batch_number: batchData.batch_number },
+      transaction: t,
+    });
+
+    if (existingBatch) {
+      throw new BadRequestError(`Số lô ${batchData.batch_number} đã tồn tại`);
+    }
+
+    // 3. Validate dữ liệu
+    if (!batchData.batch_number) {
+      throw new BadRequestError("Số lô không được để trống");
+    }
+
+    if (!batchData.quantity || batchData.quantity <= 0) {
+      throw new BadRequestError("Số lượng thuốc phải lớn hơn 0");
+    }
+
+    if (!batchData.import_date) {
+      throw new BadRequestError("Ngày nhập không được để trống");
+    }
+
+    if (!batchData.expiry_date) {
+      throw new BadRequestError("Ngày hết hạn không được để trống");
+    }
+
+    // Kiểm tra ngày hết hạn phải sau ngày nhập
+    const importDate = new Date(batchData.import_date);
+    const expiryDate = new Date(batchData.expiry_date);
+
+    if (expiryDate <= importDate) {
+      throw new BadRequestError("Ngày hết hạn phải sau ngày nhập");
+    }
+
+    // 4. Tạo batch mới - không truyền created_at và updated_at để cơ sở dữ liệu tự xử lý
+    // Sử dụng SQL thuần để tạo batch mới và tránh lỗi sequelize.literal
+    const createBatchQuery = `
+      INSERT INTO Batches 
+      (medicine_id, batch_number, quantity, import_date, expiry_date, status) 
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+
+    const [result, metadata] = await db.sequelize.query(createBatchQuery, {
+      replacements: [
+        medicine_id,
+        batchData.batch_number,
+        batchData.quantity,
+        batchData.import_date,
+        batchData.expiry_date,
+        batchData.status || "Active",
+      ],
+      type: db.sequelize.QueryTypes.INSERT,
+      transaction: t,
+    });
+
+    const batchId = result; // ID của batch mới được tạo
+
+    // 5. Cập nhật tổng số lượng thuốc
+    // await medicine.increment("quantity", {
+    //   by: batchData.quantity,
+    //   transaction: t,
+    // });
+
+    // 6. Lấy thông tin batch mới tạo để trả về
+    const newBatch = await db.Batch.findByPk(batchId, { transaction: t });
+
+    await t.commit();
+
+    // 7. Trả về thông tin batch đã tạo
+    return {
+      success: true,
+      message: "Thêm lô thuốc thành công",
+      data: {
+        batch_id: newBatch.batch_id,
+        batch_number: newBatch.batch_number,
+        medicine_id: newBatch.medicine_id,
+        medicine_name: medicine.name,
+        quantity: newBatch.quantity,
+        import_date: dayjs(newBatch.import_date).format("YYYY-MM-DD"),
+        expiry_date: dayjs(newBatch.expiry_date).format("YYYY-MM-DD"),
+        status: newBatch.status,
+        created_at: dayjs(new Date()).format("YYYY-MM-DD HH:mm:ss"),
       },
     };
   } catch (error) {

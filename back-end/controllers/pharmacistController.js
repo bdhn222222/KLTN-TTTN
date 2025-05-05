@@ -29,6 +29,7 @@ import {
   cancelRetailPrescription,
   getPrescriptionDetailsWithFIFO,
   prepareAndPayPrescription,
+  addMedicineBatch,
 } from "../services/pharmacistService.js";
 import BadRequestError from "../errors/bad_request.js";
 import asyncHandler from "express-async-handler";
@@ -693,3 +694,31 @@ export const preparePrescriptionController = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Controller xử lý thêm lô thuốc mới
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ * @param {Function} next - Next middleware function
+ */
+export const addMedicineBatchController = asyncHandler(async (req, res) => {
+  const { medicine_id } = req.params;
+  const { batch_number, quantity, import_date, expiry_date, status } = req.body;
+
+  // Validate medicine_id
+  if (!medicine_id || isNaN(medicine_id)) {
+    throw new BadRequestError("ID thuốc không hợp lệ");
+  }
+
+  const batchData = {
+    batch_number,
+    quantity,
+    import_date,
+    expiry_date,
+    status: status || "Active",
+  };
+
+  const result = await addMedicineBatch(parseInt(medicine_id), batchData);
+
+  res.status(201).json(result);
+});

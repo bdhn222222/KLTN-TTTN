@@ -1,5 +1,7 @@
 import cron from "node-cron";
 import db from "../models/index.js";
+import { Op } from "sequelize";
+import dayjs from "dayjs";
 
 export function scheduleBatchExpiryCheck() {
   // Chạy mỗi ngày lúc 00:00
@@ -27,5 +29,23 @@ export function scheduleBatchExpiryCheck() {
     {
       timezone: "Asia/Ho_Chi_Minh",
     }
+  );
+}
+
+export async function expireOldPrescriptions() {
+  const oneWeekAgo = dayjs().subtract(7, "day").toDate();
+
+  const [updatedCount] = await db.Prescription.update(
+    { status: "cancelled" },
+    {
+      where: {
+        status: "pending_prepare",
+        createdAt: { [Op.lt]: oneWeekAgo },
+      },
+    }
+  );
+
+  console.log(
+    `[Scheduler] Đã huỷ ${updatedCount} đơn thuốc (đã active > 1 tuần)`
   );
 }

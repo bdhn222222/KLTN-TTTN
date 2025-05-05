@@ -12,13 +12,15 @@ export const getAllUsers = async () => {
     }
     return { message: "Get all users successfully", users };
   } catch (error) {
-    throw new Error (error.message);
+    throw new Error(error.message);
   }
 };
 
 export const getUserProfile = async (user_id) => {
   try {
-    const user = await User.findByPk(user_id, { attributes: { exclude: ["password"] } });
+    const user = await User.findByPk(user_id, {
+      attributes: { exclude: ["password"] },
+    });
     if (!user) {
       throw new NotFoundError("User not found");
     }

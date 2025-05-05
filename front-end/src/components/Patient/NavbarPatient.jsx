@@ -19,7 +19,10 @@ function Navbar() {
 
       {/* Desktop Navigation */}
       <ul className="hidden md:flex items-center gap-6 font-medium">
-        <NavLink to="/" className="relative group flex flex-col items-center">
+        <NavLink
+          to="/home"
+          className="relative group flex flex-col items-center"
+        >
           <li className="py-1 hover:text-primary transition duration-200">
             Home
           </li>
@@ -85,7 +88,12 @@ function Navbar() {
                   My Appointments
                 </p>
                 <p
-                  onClick={() => navigate("/login")}
+                  onClick={() => {
+                    navigate("/login");
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("user");
+                    setToken(false);
+                  }}
                   className="hover:text-black cursor-pointer"
                 >
                   Logout
