@@ -16,7 +16,7 @@ import {
   getAllPrescriptions,
   confirmPrescriptionPreparation,
   updatePrescriptionPaymentStatus,
-  rejectPrescription,
+  cancelPrescription,
   getAllPrescriptionPayments,
   createRetailPrescription,
   getAllRetailPrescriptions,
@@ -346,14 +346,23 @@ export const updatePrescriptionPaymentStatusController = asyncHandler(
 );
 
 /**
- * Controller xử lý từ chối đơn thuốc
+ * Controller xử lý huỷ đơn thuốc
  */
-export const rejectPrescriptionController = asyncHandler(async (req, res) => {
+export const cancelPrescriptionController = asyncHandler(async (req, res) => {
   const { prescription_id } = req.params;
   const { reason } = req.body;
   const user_id = req.user.user_id;
 
-  const result = await rejectPrescription(prescription_id, reason, user_id);
+  // Validate input
+  if (!prescription_id) {
+    throw new BadRequestError("Thiếu mã đơn thuốc");
+  }
+
+  if (!reason) {
+    throw new BadRequestError("Vui lòng cung cấp lý do huỷ đơn");
+  }
+
+  const result = await cancelPrescription(prescription_id, reason, user_id);
 
   res.status(200).json(result);
 });

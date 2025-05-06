@@ -124,7 +124,7 @@ export default (sequelize) => {
         allowNull: true,
         comment: "Thời điểm từ chối đơn thuốc",
       },
-      rejected_by: {
+      cancelled_by: {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {

@@ -17,7 +17,7 @@ import {
   getAllPrescriptionsController,
   confirmPrescriptionPreparationController,
   updatePrescriptionPaymentStatusController,
-  rejectPrescriptionController,
+  cancelPrescriptionController,
   getAllPrescriptionPaymentsController,
   createRetailPrescriptionController,
   getAllRetailPrescriptionsController,
@@ -128,13 +128,13 @@ router.patch(
   confirmPrescriptionPreparationController
 );
 router.patch(
-  "/prescriptions/:prescription_id/reject",
+  "/prescriptions/:prescription_id/cancel",
   authenticateUser,
   authorize(["pharmacist"]),
   validate([
-    body("reason").notEmpty().withMessage("Lý do từ chối không được để trống"),
+    body("reason").notEmpty().withMessage("Lý do huỷ đơn không được để trống"),
   ]),
-  rejectPrescriptionController
+  cancelPrescriptionController
 );
 router.get(
   "/medicines",

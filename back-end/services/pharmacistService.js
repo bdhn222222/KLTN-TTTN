@@ -282,67 +282,107 @@ export const getPrescriptionDetails = async (prescription_id) => {
       }));
     }
 
+    // Tìm thông tin dược sĩ đã huỷ đơn nếu đơn đã bị huỷ
+    let cancelledByInfo = null;
+    if (prescription.status === "cancelled" && prescription.cancelled_by) {
+      const cancelledBy = await db.Pharmacist.findByPk(
+        prescription.cancelled_by,
+        {
+          include: [
+            {
+              model: db.User,
+              as: "user",
+              attributes: ["username", "email"],
+            },
+          ],
+        }
+      );
+
+      if (cancelledBy) {
+        cancelledByInfo = {
+          pharmacist_id: cancelledBy.pharmacist_id,
+          name: cancelledBy.user?.username || "Unknown",
+          email: cancelledBy.user?.email || "Unknown",
+        };
+      }
+    }
+
     // Format response data
-    return {
-      success: true,
-      message: "Lấy thông tin đơn thuốc thành công",
-      data: {
-        prescription_id: prescription.prescription_id,
-        status: prescription.status,
-        created_at: dayjs(prescription.createdAt)
+    const responseData = {
+      prescription_id: prescription.prescription_id,
+      status: prescription.status,
+      created_at: dayjs(prescription.createdAt)
+        .tz("Asia/Ho_Chi_Minh")
+        .format("YYYY-MM-DD HH:mm:ss"),
+      completed_at: prescription.completed_at
+        ? dayjs(prescription.completed_at)
+            .tz("Asia/Ho_Chi_Minh")
+            .format("YYYY-MM-DD HH:mm:ss")
+        : null,
+      appointment: {
+        appointment_id: prescription.Appointment.appointment_id,
+        datetime: dayjs(prescription.Appointment.appointment_datetime)
           .tz("Asia/Ho_Chi_Minh")
           .format("YYYY-MM-DD HH:mm:ss"),
-        completed_at: prescription.completed_at
-          ? dayjs(prescription.completed_at)
+        status: prescription.Appointment.status,
+        family_member: {
+          name: prescription.Appointment.FamilyMember.username,
+          email: prescription.Appointment.FamilyMember.email,
+          phone: prescription.Appointment.FamilyMember.phone_number,
+          date_of_birth: prescription.Appointment.FamilyMember.date_of_birth,
+          gender: prescription.Appointment.FamilyMember.gender,
+          relationship: prescription.Appointment.FamilyMember.relationship,
+        },
+        doctor: {
+          name: prescription.Appointment.Doctor.user.username,
+          email: prescription.Appointment.Doctor.user.email,
+        },
+      },
+      pharmacist: prescription.pharmacist?.user
+        ? {
+            pharmacist_id: prescription.pharmacist.pharmacist_id,
+            name: prescription.pharmacist.user.username,
+            email: prescription.pharmacist.user.email,
+          }
+        : null,
+      medicines: medicines,
+      payment: prescription.prescriptionPayments
+        ? {
+            payment_id:
+              prescription.prescriptionPayments.prescription_payment_id,
+            amount: prescription.prescriptionPayments.amount
+              ? `${prescription.prescriptionPayments.amount.toLocaleString(
+                  "vi-VN"
+                )} VNĐ`
+              : "0 VNĐ",
+            status: prescription.prescriptionPayments.status,
+            payment_method: prescription.prescriptionPayments.payment_method,
+            payment_date: prescription.prescriptionPayments.payment_date
+              ? dayjs(prescription.prescriptionPayments.payment_date)
+                  .tz("Asia/Ho_Chi_Minh")
+                  .format("YYYY-MM-DD HH:mm:ss")
+              : null,
+          }
+        : null,
+    };
+
+    // Thêm thông tin huỷ đơn nếu đơn đã bị huỷ
+    if (prescription.status === "cancelled") {
+      responseData.cancelled_info = {
+        cancelled_at: prescription.cancelled_at
+          ? dayjs(prescription.cancelled_at)
               .tz("Asia/Ho_Chi_Minh")
               .format("YYYY-MM-DD HH:mm:ss")
           : null,
-        appointment: {
-          appointment_id: prescription.Appointment.appointment_id,
-          datetime: dayjs(prescription.Appointment.appointment_datetime)
-            .tz("Asia/Ho_Chi_Minh")
-            .format("YYYY-MM-DD HH:mm:ss"),
-          status: prescription.Appointment.status,
-          family_member: {
-            name: prescription.Appointment.FamilyMember.username,
-            email: prescription.Appointment.FamilyMember.email,
-            phone: prescription.Appointment.FamilyMember.phone_number,
-            date_of_birth: prescription.Appointment.FamilyMember.date_of_birth,
-            gender: prescription.Appointment.FamilyMember.gender,
-            relationship: prescription.Appointment.FamilyMember.relationship,
-          },
-          doctor: {
-            name: prescription.Appointment.Doctor.user.username,
-            email: prescription.Appointment.Doctor.user.email,
-          },
-        },
-        pharmacist: prescription.pharmacist?.user
-          ? {
-              pharmacist_id: prescription.pharmacist.pharmacist_id,
-              name: prescription.pharmacist.user.username,
-              email: prescription.pharmacist.user.email,
-            }
-          : null,
-        medicines: medicines,
-        payment: prescription.prescriptionPayments
-          ? {
-              payment_id:
-                prescription.prescriptionPayments.prescription_payment_id,
-              amount: prescription.prescriptionPayments.amount
-                ? `${prescription.prescriptionPayments.amount.toLocaleString(
-                    "vi-VN"
-                  )} VNĐ`
-                : "0 VNĐ",
-              status: prescription.prescriptionPayments.status,
-              payment_method: prescription.prescriptionPayments.payment_method,
-              payment_date: prescription.prescriptionPayments.payment_date
-                ? dayjs(prescription.prescriptionPayments.payment_date)
-                    .tz("Asia/Ho_Chi_Minh")
-                    .format("YYYY-MM-DD HH:mm:ss")
-                : null,
-            }
-          : null,
-      },
+        cancel_reason: prescription.cancel_reason || "Không có lý do",
+        cancelled_by: cancelledByInfo,
+      };
+    }
+
+    return {
+      success: true,
+      message: "Lấy thông tin đơn thuốc thành công",
+      data: responseData,
     };
   } catch (error) {
     console.error("Error fetching prescription details:", error);
@@ -1046,7 +1086,7 @@ export const changePharmacistPassword = async (user_id, data) => {
  * @param {number} user_id - ID của user dược sĩ
  * @returns {Promise<Object>} - Thông tin đơn thuốc đã từ chối
  */
-export const rejectPrescription = async (prescription_id, reason, user_id) => {
+export const cancelPrescription = async (prescription_id, reason, user_id) => {
   const t = await db.sequelize.transaction();
 
   try {
@@ -1074,17 +1114,15 @@ export const rejectPrescription = async (prescription_id, reason, user_id) => {
           as: "Appointment",
           include: [
             {
-              model: db.Patient,
-              as: "Patient",
-              include: [
-                {
-                  model: db.User,
-                  as: "user",
-                  attributes: ["username", "email"],
-                },
-              ],
+              model: db.FamilyMember,
+              as: "FamilyMember",
+              attributes: ["username", "email"],
             },
           ],
+        },
+        {
+          model: db.PrescriptionPayment,
+          as: "prescriptionPayments",
         },
       ],
     });
@@ -1093,23 +1131,24 @@ export const rejectPrescription = async (prescription_id, reason, user_id) => {
       throw new NotFoundError("Không tìm thấy đơn thuốc");
     }
 
-    // 3. Kiểm tra điều kiện từ chối
-    if (!prescription.use_hospital_pharmacy) {
-      throw new BadRequestError(
-        "Đơn thuốc này không sử dụng nhà thuốc bệnh viện"
-      );
+    // 3. Kiểm tra điều kiện huỷ đơn
+    if (prescription.status === "completed") {
+      throw new BadRequestError("Không thể huỷ đơn thuốc đã hoàn tất");
     }
 
+    if (prescription.status === "cancelled") {
+      throw new BadRequestError("Đơn thuốc đã bị huỷ trước đó");
+    }
+
+    // 4. Kiểm tra thanh toán - không thể huỷ đơn đã thanh toán
     if (
-      prescription.status === "completed" ||
-      prescription.status === "cancelled"
+      prescription.prescriptionPayments &&
+      prescription.prescriptionPayments.status === "paid"
     ) {
-      throw new BadRequestError(
-        "Không thể từ chối đơn thuốc đã hoàn tất hoặc đã hủy"
-      );
+      throw new BadRequestError("Không thể huỷ đơn thuốc đã thanh toán");
     }
 
-    // 4. Cập nhật đơn thuốc
+    // 5. Cập nhật đơn thuốc
     await prescription.update(
       {
         status: "cancelled",
@@ -1120,7 +1159,7 @@ export const rejectPrescription = async (prescription_id, reason, user_id) => {
       { transaction: t }
     );
 
-    // 5. Nếu đã có payment, cập nhật trạng thái payment thành cancelled
+    // 6. Nếu đã có payment, cập nhật trạng thái payment thành cancelled
     const prescriptionPayment = await db.PrescriptionPayment.findOne({
       where: { prescription_id },
       transaction: t,
@@ -1131,7 +1170,7 @@ export const rejectPrescription = async (prescription_id, reason, user_id) => {
         {
           status: "cancelled",
           updated_by: pharmacist.pharmacist_id,
-          note: `Đơn thuốc bị từ chối: ${reason}`,
+          note: `Đơn thuốc bị huỷ: ${reason}`,
         },
         { transaction: t }
       );
@@ -1139,10 +1178,10 @@ export const rejectPrescription = async (prescription_id, reason, user_id) => {
 
     await t.commit();
 
-    // 6. Trả về kết quả
+    // 7. Trả về kết quả
     return {
       success: true,
-      message: "Từ chối đơn thuốc thành công",
+      message: "Huỷ đơn thuốc thành công",
       data: {
         prescription_id: prescription.prescription_id,
         cancelled_at: dayjs(prescription.cancelled_at)
@@ -1154,8 +1193,8 @@ export const rejectPrescription = async (prescription_id, reason, user_id) => {
           name: pharmacist.user.username,
         },
         patient: {
-          name: prescription.Appointment.Patient.user.username,
-          email: prescription.Appointment.Patient.user.email,
+          name: prescription.Appointment?.FamilyMember?.username || "Unknown",
+          email: prescription.Appointment?.FamilyMember?.email || "Unknown",
         },
       },
     };

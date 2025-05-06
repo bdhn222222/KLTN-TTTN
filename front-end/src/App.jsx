@@ -47,6 +47,7 @@ import DoctorManageAdmin from "./pages/Admin/DoctorManageAdmin";
 import DoctorDetailAdmin from "./pages/Admin/DoctorDetailAdmin";
 import PrescriptionCompleted from "./pages/Pharmacists/PrescriptionCompleted";
 import PrescriptionDetailToPrepare from "./pages/Pharmacists/PrescriptionDetailToPrepare";
+import PrescriptionCancelled from "./pages/Pharmacists/PrescriptionCancelled";
 
 // Layout cho Patient Portal
 const PatientLayout = () => {
@@ -197,6 +198,7 @@ const App = () => {
           <Route path="prescriptions">
             <Route path="pending" element={<PrescriptionPrepare />} />
             <Route path="completed" element={<PrescriptionCompleted />} />
+            <Route path="cancelled" element={<PrescriptionCancelled />} />
             <Route
               path=":prescriptionId/detail"
               element={<PrescriptionDetail />}

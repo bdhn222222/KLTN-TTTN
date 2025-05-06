@@ -64,6 +64,12 @@ const MenuPhar = ({ collapsed, selectedKey: propSelectedKey }) => {
           label: "Đã hoàn thành",
           onClick: () => navigate("/pharmacist/prescriptions/completed"),
         },
+        {
+          key: "cancelled",
+          icon: <CloseCircleOutlined className="text-blue-900" />,
+          label: "Đã huỷ",
+          onClick: () => navigate("/pharmacist/prescriptions/cancelled"),
+        },
       ],
     },
     {

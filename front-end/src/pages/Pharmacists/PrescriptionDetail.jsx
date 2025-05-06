@@ -21,6 +21,7 @@ import {
   Empty,
   Descriptions,
   Tooltip,
+  Input,
 } from "antd";
 import {
   UserOutlined,
@@ -33,6 +34,7 @@ import {
   CalendarOutlined,
   ArrowLeftOutlined,
   DeleteOutlined,
+  StopOutlined,
 } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -61,6 +63,7 @@ const PrescriptionDetail = () => {
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [preparationLoading, setPreparationLoading] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isCancelled, setIsCancelled] = useState(false);
 
   useEffect(() => {
     fetchPrescriptionDetail();
@@ -102,6 +105,13 @@ const PrescriptionDetail = () => {
           // For completed prescriptions
           fetchedData.medicines = fetchedData.medicines || [];
           setIsCompleted(true);
+          setAllocations([]);
+        } else if (fetchedData.status === "cancelled") {
+          // For cancelled prescriptions
+          fetchedData.medicines = fetchedData.medicines || [];
+          fetchedData.cancelled_info = fetchedData.cancelled_info || {};
+          setIsCompleted(false);
+          setIsCancelled(true);
           setAllocations([]);
         } else {
           // For pending prescriptions
@@ -347,15 +357,18 @@ const PrescriptionDetail = () => {
     // Nếu là null hoặc undefined
     if (amount == null) return "0 VNĐ";
 
-    // Nếu đã là chuỗi có định dạng VNĐ, trả về nguyên bản
+    // Nếu đã là chuỗi có định dạng VNĐ
     if (typeof amount === "string" && amount.includes("VNĐ")) {
-      // Kiểm tra xem chuỗi có đúng định dạng VNĐ hay không
-      // Ví dụ: từ "960 VNĐ" thành "960.000 VNĐ"
+      // Trích xuất phần số từ chuỗi (loại bỏ "VNĐ", dấu chấm, khoảng trắng)
       const numPart = amount.replace(/VNĐ|\.|\s+/g, "");
-      if (numPart === "960") {
-        return "960.000 VNĐ";
+
+      // Chuyển đổi thành số
+      const numericAmount = parseInt(numPart, 10);
+      if (!isNaN(numericAmount)) {
+        // Format lại theo định dạng Việt Nam
+        return numericAmount.toLocaleString("vi-VN") + " VNĐ";
       }
-      return amount.trim();
+      return amount.trim(); // Nếu không chuyển được, giữ nguyên giá trị
     }
 
     // Chuyển đổi về số
@@ -364,23 +377,13 @@ const PrescriptionDetail = () => {
     if (typeof amount === "number") {
       numericAmount = amount;
     } else if (typeof amount === "string") {
-      // Xử lý đặc biệt cho giá trị "960"
-      if (amount.trim() === "960") {
-        return "960.000 VNĐ";
-      }
       numericAmount = parseFloat(amount.replace(/[^\d.-]/g, "")) || 0;
     } else {
-      numericAmount = parseFloat(String(amount).replace(/[^\d.-]/g, "")) || 0;
+      numericAmount = 0;
     }
 
-    // Xử lý trường hợp đặc biệt cho giá 960
-    if (numericAmount === 960) {
-      return "960.000 VNĐ";
-    }
-
-    // Làm tròn số và định dạng
-    const roundedAmount = Math.round(numericAmount);
-    return `${roundedAmount.toLocaleString("vi-VN")} VNĐ`;
+    // Làm tròn số và định dạng theo tiền Việt Nam
+    return numericAmount.toLocaleString("vi-VN") + " VNĐ";
   };
 
   const formatDate = (date) => {
@@ -390,16 +393,38 @@ const PrescriptionDetail = () => {
   const handleCancelPrescription = () => {
     Modal.confirm({
       title: "Xác nhận huỷ đơn thuốc",
-      content: "Bạn có chắc chắn muốn huỷ đơn thuốc này không?",
+      content: (
+        <div>
+          <p>Bạn có chắc chắn muốn huỷ đơn thuốc này không?</p>
+          <Input.TextArea
+            id="cancel-reason"
+            placeholder="Vui lòng nhập lý do huỷ đơn thuốc"
+            style={{ marginTop: "10px" }}
+            autoSize={{ minRows: 2, maxRows: 4 }}
+          />
+        </div>
+      ),
       okText: "Xác nhận huỷ",
       cancelText: "Không",
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
+          const reason = document.getElementById("cancel-reason").value.trim();
+          if (!reason) {
+            showNotification(
+              "error",
+              "Lỗi",
+              "Vui lòng nhập lý do huỷ đơn thuốc"
+            );
+            return Promise.reject("Vui lòng nhập lý do huỷ đơn thuốc");
+          }
+
           const token = localStorage.getItem("token");
-          const response = await axios.post(
+          const response = await axios.patch(
             `${url1}/pharmacist/prescriptions/${prescriptionId}/cancel`,
-            {},
+            {
+              reason: reason,
+            },
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -415,7 +440,7 @@ const PrescriptionDetail = () => {
             );
 
             setTimeout(() => {
-              navigate("/pharmacist/prescriptions/pending");
+              navigate("/pharmacist/prescriptions/cancelled");
             }, 1500);
           } else {
             showNotification(
@@ -434,6 +459,35 @@ const PrescriptionDetail = () => {
         }
       },
     });
+  };
+
+  const renderPatientInfo = () => {
+    const familyMember = prescriptionDetail.appointment?.family_member;
+    if (!familyMember) {
+      return (
+        <>
+          <Text strong style={{ fontSize: "16px" }}>
+            N/A
+          </Text>
+          <div>
+            <Text type="secondary">SĐT: Không có SĐT</Text>
+          </div>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <Text strong style={{ fontSize: "16px" }}>
+          {familyMember.name || "N/A"}
+        </Text>
+        <div>
+          <Text type="secondary">
+            SĐT: {familyMember.phone || "Không có SĐT"}
+          </Text>
+        </div>
+      </>
+    );
   };
 
   if (loading) {
@@ -539,12 +593,18 @@ const PrescriptionDetail = () => {
         >
           <MenuPhar
             collapsed={collapsed}
-            selectedKey={isCompleted ? "completed" : "pending_prepare"}
+            selectedKey={
+              isCompleted
+                ? "completed"
+                : isCancelled
+                ? "cancelled"
+                : "pending_prepare"
+            }
           />
         </Sider>
         <Layout style={{ marginLeft: collapsed ? 80 : 250, marginTop: 64 }}>
           <Content style={{ margin: "24px 16px", overflow: "initial" }}>
-            <Card bordered={false} className="shadow-sm mb-4">
+            <Card variant="outlined" className="shadow-sm mb-4">
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center">
                   <Button
@@ -552,6 +612,8 @@ const PrescriptionDetail = () => {
                       navigate(
                         isCompleted
                           ? "/pharmacist/prescriptions/completed"
+                          : isCancelled
+                          ? "/pharmacist/prescriptions/cancelled"
                           : "/pharmacist/prescriptions/pending"
                       )
                     }
@@ -573,13 +635,17 @@ const PrescriptionDetail = () => {
                 </div>
                 <div className="flex items-center">
                   <Tag
-                    color={isCompleted ? "green" : "gold"}
+                    color={isCompleted ? "green" : isCancelled ? "red" : "gold"}
                     className="mr-4"
                     style={{ padding: "4px 12px" }}
                   >
                     {isCompleted ? (
                       <>
                         <CheckCircleOutlined /> Đã hoàn thành
+                      </>
+                    ) : isCancelled ? (
+                      <>
+                        <StopOutlined /> Đã huỷ
                       </>
                     ) : (
                       <>
@@ -588,7 +654,7 @@ const PrescriptionDetail = () => {
                     )}
                   </Tag>
 
-                  {!isCompleted && (
+                  {!isCompleted && !isCancelled && (
                     <Space>
                       <Button
                         danger
@@ -615,73 +681,46 @@ const PrescriptionDetail = () => {
 
               <Row gutter={[24, 24]}>
                 <Col xs={24} md={12}>
-                  <Card title="Thông tin bệnh nhân" className="h-full">
+                  <Card
+                    title="Thông tin bệnh nhân"
+                    className="h-full"
+                    variant="outlined"
+                  >
                     <div className="flex items-center mb-3">
                       <Avatar
                         icon={<UserOutlined />}
                         className={`mr-3 ${
-                          isCompleted ? "bg-green-700" : "bg-blue-900"
+                          isCompleted
+                            ? "bg-green-700"
+                            : isCancelled
+                            ? "bg-red-600"
+                            : "bg-blue-900"
                         }`}
                         size={40}
                       />
-                      <div>
-                        <Text strong style={{ fontSize: "16px" }}>
-                          {isCompleted
-                            ? prescriptionDetail.appointment?.family_member
-                                ?.name
-                            : prescriptionDetail.family_member?.name}
-                          {(!isCompleted &&
-                            !prescriptionDetail.family_member?.name) ||
-                          (isCompleted &&
-                            !prescriptionDetail.appointment?.family_member
-                              ?.name)
-                            ? " N/A"
-                            : ""}
-                        </Text>
-                        <div>
-                          <Text type="secondary">
-                            SĐT:{" "}
-                            {isCompleted
-                              ? prescriptionDetail.appointment?.family_member
-                                  ?.phone
-                              : prescriptionDetail.family_member?.phone_number}
-                            {(!isCompleted &&
-                              !prescriptionDetail.family_member?.phone) ||
-                            (isCompleted &&
-                              !prescriptionDetail.appointment?.family_member
-                                ?.phone)
-                              ? " Không có SĐT"
-                              : ""}
-                          </Text>
-                        </div>
-                      </div>
+                      <div>{renderPatientInfo()}</div>
                     </div>
 
                     <Descriptions column={1} size="small">
                       <Descriptions.Item label="Ngày sinh">
-                        {isCompleted
-                          ? prescriptionDetail.appointment?.family_member
-                              ?.date_of_birth
-                          : prescriptionDetail.family_member?.dob}
-                        {(!isCompleted &&
-                          !prescriptionDetail.family_member?.dob) ||
-                        (isCompleted &&
-                          !prescriptionDetail.appointment?.family_member
-                            ?.date_of_birth)
-                          ? " N/A"
-                          : ""}
+                        {prescriptionDetail.appointment?.family_member
+                          ?.date_of_birth || "N/A"}
                       </Descriptions.Item>
                     </Descriptions>
                   </Card>
                 </Col>
 
                 <Col xs={24} md={12}>
-                  <Card title="Thông tin khám bệnh" className="h-full">
+                  <Card
+                    title="Thông tin khám bệnh"
+                    className="h-full"
+                    variant="outlined"
+                  >
                     <Descriptions column={1} size="small">
                       <Descriptions.Item label="Mã cuộc hẹn">
                         #
                         {prescriptionDetail.appointment?.appointment_id ||
-                          " N/A"}
+                          "N/A"}
                       </Descriptions.Item>
                       <Descriptions.Item label="Ngày khám">
                         <CalendarOutlined className="mr-1" />
@@ -691,19 +730,43 @@ const PrescriptionDetail = () => {
                         )}
                       </Descriptions.Item>
                       <Descriptions.Item label="Bác sĩ">
-                        {isCompleted
-                          ? prescriptionDetail.appointment?.doctor?.name
-                          : prescriptionDetail.appointment?.doctor_name}
-                        {(!isCompleted &&
-                          !prescriptionDetail.appointment?.doctor_name) ||
-                        (isCompleted &&
-                          !prescriptionDetail.appointment?.doctor?.name)
-                          ? " N/A"
-                          : ""}
+                        {prescriptionDetail.appointment?.doctor?.name || "N/A"}
                       </Descriptions.Item>
                     </Descriptions>
                   </Card>
                 </Col>
+
+                {isCancelled && prescriptionDetail.cancelled_info && (
+                  <Col xs={24}>
+                    <Card
+                      title="Thông tin huỷ đơn"
+                      className="bg-red-50"
+                      variant="outlined"
+                    >
+                      <Descriptions column={1} size="small">
+                        <Descriptions.Item label="Thời gian huỷ">
+                          <ClockCircleOutlined className="mr-1" />
+                          {formatDate(
+                            prescriptionDetail.cancelled_info.cancelled_at ||
+                              prescriptionDetail.created_at
+                          )}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Người huỷ">
+                          <UserOutlined className="mr-1" />
+                          {(prescriptionDetail.cancelled_info.cancelled_by &&
+                            prescriptionDetail.cancelled_info.cancelled_by
+                              .name) ||
+                            "N/A"}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Lý do huỷ">
+                          <StopOutlined className="mr-1" />
+                          {prescriptionDetail.cancelled_info.cancel_reason ||
+                            "Không có lý do"}
+                        </Descriptions.Item>
+                      </Descriptions>
+                    </Card>
+                  </Col>
+                )}
               </Row>
 
               <Divider>Thông tin thuốc</Divider>
@@ -711,12 +774,12 @@ const PrescriptionDetail = () => {
               <List
                 itemLayout="vertical"
                 dataSource={
-                  isCompleted
+                  isCompleted || isCancelled
                     ? prescriptionDetail?.medicines || []
                     : prescriptionDetail?.lines || []
                 }
                 renderItem={(item) => {
-                  const isLine = !isCompleted;
+                  const isLine = !isCompleted && !isCancelled;
                   const medicineId = isLine
                     ? item?.medicine_id
                     : item?.medicine?.medicine_id;
@@ -740,15 +803,18 @@ const PrescriptionDetail = () => {
                     : item?.dispensed || { quantity: 0 };
                   const lineData = isLine ? item : null;
 
-                  const allocation = !isCompleted
-                    ? allocations.find(
-                        (a) => a.medicine_id === item.medicine_id
-                      )
-                    : null;
+                  const allocation =
+                    !isCompleted && !isCancelled
+                      ? allocations.find(
+                          (a) => a.medicine_id === item.medicine_id
+                        )
+                      : null;
                   const isOutOfStock =
-                    !isCompleted && item.total_available === 0;
+                    !isCompleted && !isCancelled && item.total_available === 0;
                   const isLimited =
-                    !isCompleted && item.total_available < item.quantity;
+                    !isCompleted &&
+                    !isCancelled &&
+                    item.total_available < item.quantity;
 
                   const unitPrice =
                     parseFloat(
@@ -759,20 +825,25 @@ const PrescriptionDetail = () => {
                     !isLine && item?.allocations ? item.allocations : [];
 
                   return (
-                    <Card className="mb-4" key={medicineId}>
+                    <Card className="mb-4" key={medicineId} variant="outlined">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex items-center">
                           <MedicineBoxOutlined
                             className={`text-xl mr-2 ${
-                              isCompleted ? "text-green-700" : "text-blue-900"
+                              isCompleted
+                                ? "text-green-700"
+                                : isCancelled
+                                ? "text-red-600"
+                                : "text-blue-900"
                             }`}
                           />
                           <Text strong style={{ fontSize: "16px" }}>
                             {medicineData?.name}
                           </Text>
                         </div>
-                        <div>
+                        <div className="flex items-center">
                           {!isCompleted &&
+                            !isCancelled &&
                             (isOutOfStock ? (
                               <Tag color="red">Hết hàng</Tag>
                             ) : isLimited ? (
@@ -781,15 +852,19 @@ const PrescriptionDetail = () => {
                               <Tag color="green">Còn hàng</Tag>
                             ))}
                           {isCompleted && <Tag color="green">Đã cấp phát</Tag>}
+                          {isCancelled && <Tag color="red">Đã huỷ</Tag>}
+                          <Text type="danger" className="ml-2" strong>
+                            {formatCurrency(medicineData?.price)}
+                          </Text>
                         </div>
                       </div>
 
                       <Row gutter={[24, 16]}>
-                        <Col xs={24} md={isCompleted ? 12 : 8}>
+                        <Col xs={24} md={isCompleted || isCancelled ? 12 : 8}>
                           <Card
                             size="small"
                             title="Thông tin kê thuốc"
-                            bordered={false}
+                            variant="outlined"
                             className="bg-gray-50"
                           >
                             <Descriptions column={1} size="small">
@@ -829,7 +904,7 @@ const PrescriptionDetail = () => {
                             <Card
                               size="small"
                               title="Thông tin kho"
-                              bordered={false}
+                              variant="outlined"
                               className="bg-gray-50"
                             >
                               <Descriptions column={1} size="small">
@@ -857,42 +932,64 @@ const PrescriptionDetail = () => {
                           </Col>
                         )}
 
-                        <Col xs={24} md={isCompleted ? 12 : 8}>
+                        <Col xs={24} md={isCompleted || isCancelled ? 12 : 8}>
                           <Card
                             size="small"
                             title={
-                              isCompleted ? "Thông tin phát thuốc" : "Cấp thuốc"
+                              isCompleted
+                                ? "Thông tin phát thuốc"
+                                : isCancelled
+                                ? "Thông tin đơn thuốc đã huỷ"
+                                : "Cấp thuốc"
                             }
-                            bordered={false}
+                            variant="outlined"
                             className={
-                              isCompleted ? "bg-green-50" : "bg-blue-50"
+                              isCompleted
+                                ? "bg-green-50"
+                                : isCancelled
+                                ? "bg-red-50"
+                                : "bg-blue-50"
                             }
                           >
-                            {isCompleted ? (
+                            {isCompleted || isCancelled ? (
                               <Descriptions column={1} size="small">
-                                <Descriptions.Item label="Số lượng đã cấp">
+                                <Descriptions.Item label="Số lượng đã kê">
                                   <Text strong>
-                                    {dispensedData?.quantity ||
-                                      prescribedData?.quantity ||
-                                      0}
+                                    {prescribedData?.quantity || 0}
                                   </Text>{" "}
                                   {medicineData?.unit || "đơn vị"}
                                 </Descriptions.Item>
-                                <Descriptions.Item label="Thành tiền">
-                                  <Text type="danger" strong>
-                                    {formatCurrency(
-                                      (dispensedData?.quantity ||
+                                {isCompleted && (
+                                  <Descriptions.Item label="Số lượng đã cấp">
+                                    <Text strong type="success">
+                                      {dispensedData?.quantity ||
                                         prescribedData?.quantity ||
-                                        0) * unitPrice
+                                        0}
+                                    </Text>{" "}
+                                    {medicineData?.unit || "đơn vị"}
+                                  </Descriptions.Item>
+                                )}
+                                <Descriptions.Item label="Thành tiền">
+                                  <Text
+                                    type={isCancelled ? "danger" : "success"}
+                                    strong
+                                  >
+                                    {formatCurrency(
+                                      (isCancelled
+                                        ? prescribedData?.quantity
+                                        : dispensedData?.quantity ||
+                                          prescribedData?.quantity ||
+                                          0) * unitPrice
                                     )}
                                   </Text>
                                 </Descriptions.Item>
-                                {prescriptionDetail.pharmacist && (
-                                  <Descriptions.Item label="Dược sĩ phát thuốc">
-                                    {prescriptionDetail.pharmacist?.name ||
-                                      "N/A"}
-                                  </Descriptions.Item>
-                                )}
+                                {isCompleted &&
+                                  prescriptionDetail.pharmacist && (
+                                    <Descriptions.Item label="Dược sĩ phát thuốc">
+                                      {prescriptionDetail.pharmacist?.name ||
+                                        "N/A"}
+                                    </Descriptions.Item>
+                                  )}
                               </Descriptions>
                             ) : (
                               <div className="flex flex-col items-center">
@@ -928,148 +1025,154 @@ const PrescriptionDetail = () => {
                         </Col>
                       </Row>
 
-                      {isCompleted && allocationsData.length > 0 && (
-                        <>
-                          <Divider
-                            orientation="left"
-                            plain
-                            style={{ margin: "12px 0" }}
-                          >
-                            Chi tiết lô thuốc đã cấp
-                          </Divider>
-                          <Table
-                            dataSource={allocationsData}
-                            columns={[
-                              {
-                                title: "Mã lô",
-                                dataIndex: "batch_number",
-                                key: "batch_number",
-                                render: (text) => text || "N/A",
-                              },
-                              {
-                                title: "Số lượng đã cấp",
-                                dataIndex: "allocated",
-                                key: "allocated",
-                                render: (allocated) => (
-                                  <Tag color="green">
-                                    {allocated || 0} {medicineData?.unit || ""}
-                                  </Tag>
-                                ),
-                              },
-                              {
-                                title: "Hạn sử dụng",
-                                dataIndex: "expiry_date",
-                                key: "expiry_date",
-                                render: (date) => {
-                                  if (!date) return "N/A";
-
-                                  const expiryDate = dayjs(date);
-                                  const monthsUntilExpiry = expiryDate.diff(
-                                    dayjs(),
-                                    "month"
-                                  );
-
-                                  let color = "default";
-                                  let tooltipText = "";
-
-                                  if (
-                                    monthsUntilExpiry <= 3 &&
-                                    monthsUntilExpiry > 1
-                                  ) {
-                                    color = "warning";
-                                    tooltipText =
-                                      "Sắp hết hạn (trong vòng 3 tháng)";
-                                  } else if (monthsUntilExpiry <= 1) {
-                                    color = "error";
-                                    tooltipText =
-                                      "Sắp hết hạn (trong vòng 1 tháng)";
-                                  }
-
-                                  return (
-                                    <Tooltip title={tooltipText}>
-                                      <Tag color={color}>{date}</Tag>
-                                    </Tooltip>
-                                  );
+                      {isCompleted &&
+                        allocationsData &&
+                        allocationsData.length > 0 && (
+                          <>
+                            <Divider
+                              orientation="left"
+                              plain
+                              style={{ margin: "12px 0" }}
+                            >
+                              Chi tiết lô thuốc đã cấp
+                            </Divider>
+                            <Table
+                              dataSource={allocationsData}
+                              columns={[
+                                {
+                                  title: "Mã lô",
+                                  dataIndex: "batch_number",
+                                  key: "batch_number",
+                                  render: (text) => text || "N/A",
                                 },
-                              },
-                            ]}
-                            pagination={false}
-                            size="small"
-                            bordered={false}
-                            style={{ marginBottom: "16px" }}
-                          />
-                        </>
-                      )}
-
-                      {isLine && lineData && lineData.batches?.length > 0 && (
-                        <>
-                          <Divider
-                            orientation="left"
-                            plain
-                            style={{ margin: "12px 0" }}
-                          >
-                            Chi tiết lô thuốc
-                          </Divider>
-                          <Table
-                            dataSource={lineData.batches}
-                            columns={[
-                              {
-                                title: "Mã lô",
-                                dataIndex: "batch_number",
-                                key: "batch_number",
-                                render: (text) => text || "N/A",
-                              },
-                              {
-                                title: "Hạn sử dụng",
-                                dataIndex: "expiry_date",
-                                key: "expiry_date",
-                                render: (date) => {
-                                  if (!date) return "N/A";
-
-                                  const expiryDate = dayjs(date);
-                                  const monthsUntilExpiry = expiryDate.diff(
-                                    dayjs(),
-                                    "month"
-                                  );
-
-                                  let color = "default";
-                                  let tooltipText = "";
-
-                                  if (
-                                    monthsUntilExpiry <= 3 &&
-                                    monthsUntilExpiry > 1
-                                  ) {
-                                    color = "warning";
-                                    tooltipText =
-                                      "Sắp hết hạn (trong vòng 3 tháng)";
-                                  } else if (monthsUntilExpiry <= 1) {
-                                    color = "error";
-                                    tooltipText =
-                                      "Sắp hết hạn (trong vòng 1 tháng)";
-                                  }
-
-                                  return (
-                                    <Tooltip title={tooltipText}>
-                                      <Tag color={color}>{date}</Tag>
-                                    </Tooltip>
-                                  );
+                                {
+                                  title: "Số lượng đã cấp",
+                                  dataIndex: "allocated",
+                                  key: "allocated",
+                                  render: (allocated) => (
+                                    <Tag color="green">
+                                      {allocated || 0}{" "}
+                                      {medicineData?.unit || ""}
+                                    </Tag>
+                                  ),
                                 },
-                              },
-                              {
-                                title: "Số lượng",
-                                dataIndex: "quantity",
-                                key: "quantity",
-                                render: (quantity) =>
-                                  `${quantity || 0} ${lineData.unit || ""}`,
-                              },
-                            ]}
-                            pagination={false}
-                            size="small"
-                            bordered={false}
-                            style={{ marginBottom: "16px" }}
-                          />
-                        </>
-                      )}
+                                {
+                                  title: "Hạn sử dụng",
+                                  dataIndex: "expiry_date",
+                                  key: "expiry_date",
+                                  render: (date) => {
+                                    if (!date) return "N/A";
+
+                                    const expiryDate = dayjs(date);
+                                    const monthsUntilExpiry = expiryDate.diff(
+                                      dayjs(),
+                                      "month"
+                                    );
+
+                                    let color = "default";
+                                    let tooltipText = "";
+
+                                    if (
+                                      monthsUntilExpiry <= 3 &&
+                                      monthsUntilExpiry > 1
+                                    ) {
+                                      color = "warning";
+                                      tooltipText =
+                                        "Sắp hết hạn (trong vòng 3 tháng)";
+                                    } else if (monthsUntilExpiry <= 1) {
+                                      color = "error";
+                                      tooltipText =
+                                        "Sắp hết hạn (trong vòng 1 tháng)";
+                                    }
+
+                                    return (
+                                      <Tooltip title={tooltipText}>
+                                        <Tag color={color}>{date}</Tag>
+                                      </Tooltip>
+                                    );
+                                  },
+                                },
+                              ]}
+                              pagination={false}
+                              size="small"
+                              variant="outlined"
+                              style={{ marginBottom: "16px" }}
+                            />
+                          </>
+                        )}
+
+                      {isLine &&
+                        lineData &&
+                        lineData.batches &&
+                        lineData.batches.length > 0 && (
+                          <>
+                            <Divider
+                              orientation="left"
+                              plain
+                              style={{ margin: "12px 0" }}
+                            >
+                              Chi tiết lô thuốc
+                            </Divider>
+                            <Table
+                              dataSource={lineData.batches}
+                              columns={[
+                                {
+                                  title: "Mã lô",
+                                  dataIndex: "batch_number",
+                                  key: "batch_number",
+                                  render: (text) => text || "N/A",
+                                },
+                                {
+                                  title: "Hạn sử dụng",
+                                  dataIndex: "expiry_date",
+                                  key: "expiry_date",
+                                  render: (date) => {
+                                    if (!date) return "N/A";
+
+                                    const expiryDate = dayjs(date);
+                                    const monthsUntilExpiry = expiryDate.diff(
+                                      dayjs(),
+                                      "month"
+                                    );
+
+                                    let color = "default";
+                                    let tooltipText = "";
+
+                                    if (
+                                      monthsUntilExpiry <= 3 &&
+                                      monthsUntilExpiry > 1
+                                    ) {
+                                      color = "warning";
+                                      tooltipText =
+                                        "Sắp hết hạn (trong vòng 3 tháng)";
+                                    } else if (monthsUntilExpiry <= 1) {
+                                      color = "error";
+                                      tooltipText =
+                                        "Sắp hết hạn (trong vòng 1 tháng)";
+                                    }
+
+                                    return (
+                                      <Tooltip title={tooltipText}>
+                                        <Tag color={color}>{date}</Tag>
+                                      </Tooltip>
+                                    );
+                                  },
+                                },
+                                {
+                                  title: "Số lượng",
+                                  dataIndex: "quantity",
+                                  key: "quantity",
+                                  render: (quantity) =>
+                                    `${quantity || 0} ${lineData.unit || ""}`,
+                                },
+                              ]}
+                              pagination={false}
+                              size="small"
+                              variant="outlined"
+                              style={{ marginBottom: "16px" }}
+                            />
+                          </>
+                        )}
                     </Card>
                   );
                 }}
@@ -1079,11 +1182,14 @@ const PrescriptionDetail = () => {
 
               <Row>
                 <Col xs={24} md={12} offset={12}>
-                  <Card className="bg-gray-50">
+                  <Card
+                    className={isCancelled ? "bg-red-50" : "bg-gray-50"}
+                    variant="outlined"
+                  >
                     <div className="flex justify-between mb-3">
                       <Text strong>Tổng số loại thuốc:</Text>
                       <Text>
-                        {(isCompleted
+                        {(isCompleted || isCancelled
                           ? prescriptionDetail.medicines?.length
                           : prescriptionDetail.lines?.length) || 0}{" "}
                         loại
@@ -1092,7 +1198,7 @@ const PrescriptionDetail = () => {
                     <div className="flex justify-between mb-3">
                       <Text strong>Tổng số lượng thuốc được kê:</Text>
                       <Text>
-                        {(isCompleted
+                        {(isCompleted || isCancelled
                           ? prescriptionDetail.medicines?.reduce(
                               (sum, item) =>
                                 sum + (item.prescribed?.quantity || 0),
@@ -1102,7 +1208,7 @@ const PrescriptionDetail = () => {
                               (sum, line) => sum + line.quantity,
                               0
                             )) || 0}{" "}
-                        {(isCompleted
+                        {(isCompleted || isCancelled
                           ? prescriptionDetail.medicines?.[0]?.medicine?.unit
                           : prescriptionDetail.lines?.[0]?.unit) || "đơn vị"}
                       </Text>
@@ -1111,6 +1217,8 @@ const PrescriptionDetail = () => {
                       <Text strong>
                         {isCompleted
                           ? "Tổng số lượng đã cấp:"
+                          : isCancelled
+                          ? "Tổng số lượng kê (đã huỷ):"
                           : "Tổng số lượng cấp:"}
                       </Text>
                       <Text>
@@ -1123,18 +1231,26 @@ const PrescriptionDetail = () => {
                                   0),
                               0
                             )
+                          : isCancelled
+                          ? prescriptionDetail.medicines?.reduce(
+                              (sum, item) =>
+                                sum + (item.prescribed?.quantity || 0),
+                              0
+                            )
                           : allocations.reduce(
                               (sum, alloc) => sum + (alloc.allocated || 0),
                               0
                             )}{" "}
-                        {(isCompleted
+                        {(isCompleted || isCancelled
                           ? prescriptionDetail.medicines?.[0]?.medicine?.unit
                           : prescriptionDetail.lines?.[0]?.unit) || "đơn vị"}
                       </Text>
                     </div>
                     <Divider style={{ margin: "12px 0" }} />
                     <div className="flex justify-between">
-                      <Title level={5}>Tổng tiền:</Title>
+                      <Title level={5}>
+                        {isCancelled ? "Tổng tiền (đã huỷ):" : "Tổng tiền:"}
+                      </Title>
                       <Title level={5} type="danger">
                         {isCompleted && prescriptionDetail.payment?.amount
                           ? formatCurrency(prescriptionDetail.payment.amount)
@@ -1149,6 +1265,18 @@ const PrescriptionDetail = () => {
                         </Text>
                       </div>
                     )}
+                    {isCancelled && (
+                      <div className="flex justify-between mt-3">
+                        <Text strong>Trạng thái:</Text>
+                        <Text type="danger">
+                          Đã huỷ -{" "}
+                          {formatDate(
+                            prescriptionDetail.cancelled_info?.cancelled_at ||
+                              prescriptionDetail.created_at
+                          )}
+                        </Text>
+                      </div>
+                    )}
                   </Card>
                 </Col>
               </Row>
@@ -1157,7 +1285,7 @@ const PrescriptionDetail = () => {
         </Layout>
       </Layout>
 
-      {!isCompleted && (
+      {!isCompleted && !isCancelled && (
         <>
           <Modal
             title={
@@ -1336,7 +1464,7 @@ const PrescriptionDetail = () => {
                             ]}
                             pagination={false}
                             size="small"
-                            bordered={false}
+                            variant="outlined"
                           />
                         </div>
                       )}
