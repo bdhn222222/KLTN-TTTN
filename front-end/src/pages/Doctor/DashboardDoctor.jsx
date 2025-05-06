@@ -198,10 +198,8 @@ const DashboardDoctor = () => {
           upcomingAppointments
         );
 
-        // Get the top 7 upcoming appointments
-        const top7UpcomingAppointments = upcomingAppointments.slice(0, 7);
-        console.log("Top 7 upcoming appointments:", top7UpcomingAppointments);
-        setFilteredAppointments(top7UpcomingAppointments);
+        // Show all upcoming appointments instead of limiting to 7
+        setFilteredAppointments(upcomingAppointments);
 
         // Find next patient (the closest upcoming appointment)
         const nextPatient =
@@ -211,23 +209,24 @@ const DashboardDoctor = () => {
 
         // Count today's unique patients by family_name
         const uniqueTodayPatients = new Set();
-        const todayAppointmentsCount = top7UpcomingAppointments.length;
+        // Use the full list of upcoming appointments for the count
+        const todayAppointmentsCount = upcomingAppointments.length;
 
-        // Only count patients from appointments that are actually displayed (filtered)
-        top7UpcomingAppointments.forEach((appointment) => {
+        // Count patients from all appointments
+        upcomingAppointments.forEach((appointment) => {
           if (appointment.family_name) {
             uniqueTodayPatients.add(appointment.family_name);
           }
         });
 
-        // Calculate summary statistics - sync with what's displayed on the UI
-        const withRecords = top7UpcomingAppointments.filter(
+        // Calculate summary statistics - using all appointments
+        const withRecords = upcomingAppointments.filter(
           (app) => app.medical_record
         ).length;
-        const withPrescriptions = top7UpcomingAppointments.filter(
+        const withPrescriptions = upcomingAppointments.filter(
           (app) => app.prescription
         ).length;
-        const pending = top7UpcomingAppointments.filter(
+        const pending = upcomingAppointments.filter(
           (app) => !app.medical_record || !app.prescription
         ).length;
 
@@ -285,12 +284,8 @@ const DashboardDoctor = () => {
               );
             });
 
-          // Get the top 7 upcoming appointments with details
-          const top7UpcomingWithDetails = upcomingAppointmentsWithDetails.slice(
-            0,
-            7
-          );
-          setFilteredAppointments(top7UpcomingWithDetails);
+          // Show all upcoming appointments with details instead of limiting to 7
+          setFilteredAppointments(upcomingAppointmentsWithDetails);
 
           // Update next patient with details
           if (upcomingAppointmentsWithDetails.length > 0) {
@@ -299,9 +294,10 @@ const DashboardDoctor = () => {
 
           // Update statistics with the refreshed data
           const updatedUniqueTodayPatients = new Set();
-          const updatedTodayAppointmentsCount = top7UpcomingWithDetails.length;
+          const updatedTodayAppointmentsCount =
+            upcomingAppointmentsWithDetails.length;
 
-          top7UpcomingWithDetails.forEach((appointment) => {
+          upcomingAppointmentsWithDetails.forEach((appointment) => {
             if (appointment.family_name) {
               updatedUniqueTodayPatients.add(appointment.family_name);
             }
