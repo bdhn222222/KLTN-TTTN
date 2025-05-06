@@ -172,7 +172,13 @@ const PrescriptionPrepare = () => {
   };
 
   const handleViewPrescriptionDetail = (prescriptionId) => {
-    navigate(`/pharmacist/prescriptions/${prescriptionId}/detail`);
+    navigate(`/pharmacist/prescriptions/${prescriptionId}/detail-to-prepare`, {
+      state: {
+        fromPage: "pending_prepare",
+        prescriptionId,
+        isCompleted: false,
+      },
+    });
   };
 
   // Format date for Vietnamese locale

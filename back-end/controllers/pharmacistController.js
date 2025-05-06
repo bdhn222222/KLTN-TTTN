@@ -30,6 +30,7 @@ import {
   getPrescriptionDetailsWithFIFO,
   prepareAndPayPrescription,
   addMedicineBatch,
+  updateMedicineBatch,
 } from "../services/pharmacistService.js";
 import BadRequestError from "../errors/bad_request.js";
 import asyncHandler from "express-async-handler";
@@ -721,4 +722,30 @@ export const addMedicineBatchController = asyncHandler(async (req, res) => {
   const result = await addMedicineBatch(parseInt(medicine_id), batchData);
 
   res.status(201).json(result);
+});
+
+/**
+ * Controller xử lý cập nhật thông tin lô thuốc
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+export const updateMedicineBatchController = asyncHandler(async (req, res) => {
+  const { batch_id } = req.params;
+  const { batch_number, quantity, import_date, expiry_date, status } = req.body;
+
+  // Validate batch_id
+  if (!batch_id || isNaN(batch_id)) {
+    throw new BadRequestError("ID lô thuốc không hợp lệ");
+  }
+
+  const batchData = {};
+  if (batch_number) batchData.batch_number = batch_number;
+  if (quantity !== undefined) batchData.quantity = quantity;
+  if (import_date) batchData.import_date = import_date;
+  if (expiry_date) batchData.expiry_date = expiry_date;
+  if (status) batchData.status = status;
+
+  const result = await updateMedicineBatch(parseInt(batch_id), batchData);
+
+  res.status(200).json(result);
 });

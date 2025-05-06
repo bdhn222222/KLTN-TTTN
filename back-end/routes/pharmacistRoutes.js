@@ -31,6 +31,7 @@ import {
   getPrescriptionDetailsWithFIFOController,
   preparePrescriptionController,
   addMedicineBatchController,
+  updateMedicineBatchController,
 } from "../controllers/pharmacistController.js";
 import validate from "../middleware/validate.js";
 import { body, query, param } from "express-validator";
@@ -429,5 +430,40 @@ router.post(
       .withMessage("Trạng thái không hợp lệ"),
   ]),
   addMedicineBatchController
+);
+router.patch(
+  "/medicines/batches/:batch_id",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  validate([
+    param("batch_id")
+      .notEmpty()
+      .withMessage("ID lô thuốc không được để trống")
+      .isInt({ min: 1 })
+      .withMessage("ID lô thuốc phải là số nguyên dương"),
+    body("batch_number")
+      .optional()
+      .isString()
+      .withMessage("Số lô phải là chuỗi")
+      .isLength({ max: 50 })
+      .withMessage("Số lô tối đa 50 ký tự"),
+    body("quantity")
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage("Số lượng thuốc phải là số nguyên không âm"),
+    body("import_date")
+      .optional()
+      .isISO8601()
+      .withMessage("Ngày nhập phải có định dạng YYYY-MM-DD"),
+    body("expiry_date")
+      .optional()
+      .isISO8601()
+      .withMessage("Ngày hết hạn phải có định dạng YYYY-MM-DD"),
+    body("status")
+      .optional()
+      .isIn(["Active", "Expired", "Disposed"])
+      .withMessage("Trạng thái không hợp lệ"),
+  ]),
+  updateMedicineBatchController
 );
 export default router;
