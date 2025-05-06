@@ -266,6 +266,8 @@ const PrescriptionDetail = () => {
     try {
       setPreparationLoading(true);
       const token = localStorage.getItem("token");
+      const pharmacistData = JSON.parse(localStorage.getItem("user")) || {};
+      const pharmacist_id = pharmacistData.id || null;
 
       if (!prescriptionDetail || !prescriptionDetail.lines || !allocations) {
         showNotification("error", "Lỗi", "Dữ liệu đơn thuốc không hợp lệ");
@@ -306,6 +308,7 @@ const PrescriptionDetail = () => {
         {
           lines: requestLines,
           payment_method: paymentMethod || "cash",
+          pharmacist_id: pharmacist_id,
         },
         {
           headers: {
@@ -323,7 +326,7 @@ const PrescriptionDetail = () => {
         setPaymentModalVisible(false);
 
         setTimeout(() => {
-          navigate("/pharmacist/prescriptions/pending");
+          navigate("/pharmacist/prescriptions/completed");
         }, 1500);
       } else {
         showNotification(
@@ -420,10 +423,14 @@ const PrescriptionDetail = () => {
           }
 
           const token = localStorage.getItem("token");
+          const pharmacistData = JSON.parse(localStorage.getItem("user")) || {};
+          const pharmacist_id = pharmacistData.id || null;
+
           const response = await axios.patch(
             `${url1}/pharmacist/prescriptions/${prescriptionId}/cancel`,
             {
               reason: reason,
+              pharmacist_id: pharmacist_id,
             },
             {
               headers: {

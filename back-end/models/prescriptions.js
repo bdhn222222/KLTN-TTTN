@@ -147,6 +147,17 @@ export default (sequelize) => {
         comment:
           "Xác định bệnh nhân có lấy thuốc tại nhà thuốc bệnh viện hay không",
       },
+      completed_by: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: "Pharmacists",
+          key: "pharmacist_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
+        comment: "ID dược sĩ hoàn tất đơn thuốc",
+      },
     },
     {
       sequelize,

@@ -12,6 +12,7 @@ import {
   Col,
   Button,
   InputNumber,
+  Input,
   Table,
   notification,
   Space,
@@ -58,6 +59,9 @@ const PrescriptionDetailToPrepare = () => {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [preparationLoading, setPreparationLoading] = useState(false);
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   useEffect(() => {
     fetchPrescriptionDetail();
@@ -227,6 +231,51 @@ const PrescriptionDetailToPrepare = () => {
     }
   };
 
+  const handleCancelPrescription = async () => {
+    try {
+      setCancelLoading(true);
+      const token = localStorage.getItem("token");
+
+      const response = await axios.patch(
+        `${url1}/pharmacist/prescriptions/${prescriptionId}/cancel`,
+        {
+          reason: cancelReason,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        showNotification(
+          "success",
+          "Thành công",
+          "Đã huỷ đơn thuốc thành công"
+        );
+        setCancelModalVisible(false);
+        setCancelReason("");
+
+        // Navigate back to the prescriptions list after success
+        setTimeout(() => {
+          navigate("/pharmacist/prescriptions/pending");
+        }, 1500);
+      } else {
+        showNotification("error", "Lỗi", "Không thể huỷ đơn thuốc");
+      }
+    } catch (error) {
+      console.error("Error cancelling prescription:", error);
+      showNotification(
+        "error",
+        "Lỗi",
+        error.response?.data?.message || "Không thể huỷ đơn thuốc"
+      );
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
   const formatCurrency = (amount) => {
     return `${amount?.toLocaleString("vi-VN")} VNĐ`;
   };
@@ -345,6 +394,34 @@ const PrescriptionDetailToPrepare = () => {
                 <Tag color="gold">
                   <ClockCircleOutlined /> Chờ chuẩn bị
                 </Tag>
+              </div>
+
+              <div className="mb-4">
+                <Space>
+                  <Button
+                    onClick={() =>
+                      navigate("/pharmacist/prescriptions/pending")
+                    }
+                  >
+                    Quay lại
+                  </Button>
+                  <Button
+                    danger
+                    icon={<WarningOutlined />}
+                    onClick={() => setCancelModalVisible(true)}
+                  >
+                    Huỷ đơn
+                  </Button>
+                  <Button
+                    type="primary"
+                    icon={<MoneyCollectOutlined />}
+                    onClick={handlePrepareClick}
+                    disabled={allocations.every((a) => a.allocated === 0)}
+                    className="!bg-blue-900"
+                  >
+                    Chuẩn bị và thanh toán
+                  </Button>
+                </Space>
               </div>
 
               <Row gutter={[24, 24]}>
@@ -631,27 +708,6 @@ const PrescriptionDetailToPrepare = () => {
                       </Title>
                     </div>
                   </Card>
-
-                  <div className="mt-4 text-right">
-                    <Space>
-                      <Button
-                        onClick={() =>
-                          navigate("/pharmacist/prescriptions/pending")
-                        }
-                      >
-                        Quay lại
-                      </Button>
-                      <Button
-                        type="primary"
-                        icon={<MoneyCollectOutlined />}
-                        onClick={handlePrepareClick}
-                        disabled={allocations.every((a) => a.allocated === 0)}
-                        className="!bg-blue-900"
-                      >
-                        Chuẩn bị và thanh toán
-                      </Button>
-                    </Space>
-                  </div>
                 </Col>
               </Row>
             </Card>
@@ -879,6 +935,62 @@ const PrescriptionDetailToPrepare = () => {
           type="info"
           showIcon
         />
+      </Modal>
+
+      {/* Cancel Prescription Modal */}
+      <Modal
+        title={
+          <div className="flex items-center">
+            <WarningOutlined className="text-red-500 mr-2" />
+            Huỷ đơn thuốc
+          </div>
+        }
+        open={cancelModalVisible}
+        onCancel={() => {
+          setCancelModalVisible(false);
+          setCancelReason("");
+        }}
+        footer={[
+          <Button
+            key="back"
+            onClick={() => {
+              setCancelModalVisible(false);
+              setCancelReason("");
+            }}
+          >
+            Đóng
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            danger
+            onClick={handleCancelPrescription}
+            loading={cancelLoading}
+            disabled={!cancelReason.trim()}
+          >
+            Xác nhận huỷ đơn
+          </Button>,
+        ]}
+      >
+        <Alert
+          message="Lưu ý"
+          description="Đơn thuốc sau khi huỷ sẽ không thể khôi phục lại. Vui lòng chắc chắn trước khi thực hiện."
+          type="warning"
+          showIcon
+          className="mb-4"
+        />
+        <div className="mb-4">
+          <Text strong className="block mb-2">
+            Lý do huỷ đơn:
+          </Text>
+          <Input.TextArea
+            placeholder="Nhập lý do huỷ đơn thuốc"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            rows={4}
+            required
+          />
+        </div>
       </Modal>
     </Layout>
   );

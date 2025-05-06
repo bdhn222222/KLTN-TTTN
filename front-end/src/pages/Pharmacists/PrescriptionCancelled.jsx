@@ -275,7 +275,7 @@ const PrescriptionCancelled = () => {
                           className="h-full flex flex-col"
                           title={
                             <div className="flex justify-between items-center">
-                              <div className="flex items-center">
+                              <div className="flex items-center gap-x-2">
                                 <Badge status="error" className="mr-2" />
                                 <Text strong>
                                   Đơn #{prescription.prescription_id}
