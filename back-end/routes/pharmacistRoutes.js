@@ -32,6 +32,7 @@ import {
   preparePrescriptionController,
   addMedicineBatchController,
   updateMedicineBatchController,
+  deleteBatchController,
 } from "../controllers/pharmacistController.js";
 import validate from "../middleware/validate.js";
 import { body, query, param } from "express-validator";
@@ -465,5 +466,11 @@ router.patch(
       .withMessage("Trạng thái không hợp lệ"),
   ]),
   updateMedicineBatchController
+);
+router.delete(
+  "/medicines/batches/:batch_id",
+  authenticateUser,
+  authorize(["pharmacist"]),
+  deleteBatchController
 );
 export default router;

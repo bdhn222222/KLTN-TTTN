@@ -612,31 +612,33 @@ const PrescriptionDetail = () => {
         <Layout style={{ marginLeft: collapsed ? 80 : 250, marginTop: 64 }}>
           <Content style={{ margin: "24px 16px", overflow: "initial" }}>
             <Card variant="outlined" className="shadow-sm mb-4">
+              <Button
+                onClick={() =>
+                  navigate(
+                    isCompleted
+                      ? "/pharmacist/prescriptions/completed"
+                      : isCancelled
+                      ? "/pharmacist/prescriptions/cancelled"
+                      : "/pharmacist/prescriptions/pending"
+                  )
+                }
+                icon={<ArrowLeftOutlined />}
+                className="mr-4"
+                style={{
+                  borderRadius: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  boxShadow: "0 2px 0 rgba(0,0,0,0.02)",
+                  border: "1px solid #d9d9d9",
+                  marginTop: "10px",
+                  marginBottom: "10px",
+                }}
+              >
+                <span style={{ marginLeft: "4px" }}>Quay lại</span>
+              </Button>
               <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center">
-                  <Button
-                    onClick={() =>
-                      navigate(
-                        isCompleted
-                          ? "/pharmacist/prescriptions/completed"
-                          : isCancelled
-                          ? "/pharmacist/prescriptions/cancelled"
-                          : "/pharmacist/prescriptions/pending"
-                      )
-                    }
-                    icon={<ArrowLeftOutlined />}
-                    className="mr-4"
-                    style={{
-                      borderRadius: "4px",
-                      display: "flex",
-                      alignItems: "center",
-                      boxShadow: "0 2px 0 rgba(0,0,0,0.02)",
-                      border: "1px solid #d9d9d9",
-                    }}
-                  >
-                    <span style={{ marginLeft: "4px" }}>Quay lại</span>
-                  </Button>
-                  <Title level={4} className="m-0">
+                <div className="flex items-center ">
+                  <Title level={4} className="!m-0">
                     Chi tiết đơn thuốc #{prescriptionDetail.prescription_id}
                   </Title>
                 </div>
@@ -705,7 +707,7 @@ const PrescriptionDetail = () => {
                         }`}
                         size={40}
                       />
-                      <div>{renderPatientInfo()}</div>
+                      <div className="ml-2">{renderPatientInfo()}</div>
                     </div>
 
                     <Descriptions column={1} size="small">
@@ -860,9 +862,6 @@ const PrescriptionDetail = () => {
                             ))}
                           {isCompleted && <Tag color="green">Đã cấp phát</Tag>}
                           {isCancelled && <Tag color="red">Đã huỷ</Tag>}
-                          <Text type="danger" className="ml-2" strong>
-                            {formatCurrency(medicineData?.price)}
-                          </Text>
                         </div>
                       </div>
 

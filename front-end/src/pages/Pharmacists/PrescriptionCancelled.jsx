@@ -262,127 +262,71 @@ const PrescriptionCancelled = () => {
               ) : (
                 <>
                   <Row gutter={[24, 24]}>
-                    {filteredPrescriptions.map((prescription) => (
+                    {filteredPrescriptions.map((prescription, index) => (
                       <Col
                         xs={24}
                         sm={24}
                         md={12}
                         lg={8}
                         key={prescription.prescription_id}
+                        className={`card-animation col-animation-${
+                          (index % 6) + 1
+                        }`}
                       >
                         <Card
                           hoverable
-                          className="h-full flex flex-col"
-                          title={
-                            <div className="flex justify-between items-center">
-                              <div className="flex items-center gap-x-2">
-                                <Badge status="error" className="mr-2" />
-                                <Text strong>
-                                  Đơn #{prescription.prescription_id}
-                                </Text>
-                              </div>
-                              <Tag color="red">
-                                <StopOutlined /> Đã huỷ
-                              </Tag>
-                            </div>
-                          }
-                          bodyStyle={{
-                            display: "flex",
-                            flexDirection: "column",
-                            flex: 1,
-                            padding: "15px",
+                          className="h-full flex flex-col prescription-card-cancelled"
+                          styles={{
+                            body: {
+                              display: "flex",
+                              flexDirection: "column",
+                              flex: 1,
+                              padding: "15px",
+                            },
                           }}
+                          onClick={() =>
+                            handleViewDetails(prescription.prescription_id)
+                          }
                         >
-                          <div className="mb-2">
-                            {/* Patient info and Date on the same line */}
-                            <div className="flex justify-between mb-3">
-                              {/* Left side: Patient info */}
-                              <div className="flex items-start">
-                                <Avatar
-                                  icon={<UserOutlined />}
-                                  className="mr-2 bg-red-600 mt-1"
-                                />
-                                <div>
-                                  <Text strong className="ml-2">
-                                    {prescription.appointment?.family_member
-                                      ?.name || "N/A"}
+                          {/* Header: Prescription Info + Patient Info */}
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex items-center">
+                              <div>
+                                <Text strong className="text-lg">
+                                  {prescription.appointment?.family_member
+                                    ?.name || "N/A"}
+                                </Text>
+                                <div className="flex items-center mt-1">
+                                  <Text>
+                                    Đơn #{prescription.prescription_id}
                                   </Text>
-                                  <div>
-                                    <Text
-                                      type="secondary"
-                                      className="text-xs ml-2"
-                                    >
-                                      SĐT:{" "}
-                                      {prescription.appointment?.family_member
-                                        ?.phone_number || "Không có SĐT"}
-                                    </Text>
-                                  </div>
                                 </div>
                               </div>
-
-                              {/* Right side: Date info */}
-                              <div className="text-right text-gray-500 text-sm">
-                                <CalendarOutlined className="mr-1" />
-                                <span>
-                                  {formatRelativeTime(
-                                    prescription.status_info?.cancelled_at ||
-                                      prescription.created_at
-                                  )}
-                                </span>
-                              </div>
                             </div>
-                          </div>
 
-                          {/* <Divider orientation="left" plain className="my-2">
-                            <Text type="secondary">Thông tin huỷ đơn</Text>
-                          </Divider> */}
-
-                          {/* <div className="mb-3">
-                            <div className="flex justify-between mb-1">
-                              <Text type="secondary">Người huỷ:</Text>
-                              <Text strong>
-                                {prescription.status_info?.cancelled_by?.name ||
-                                  "N/A"}
-                              </Text>
-                            </div>
-                            <div className="flex justify-between mb-1">
-                              <Text type="secondary">Thời gian huỷ:</Text>
-                              <Text>
-                                {formatDateTime(
-                                  prescription.status_info?.cancelled_at
+                            <div className="text-right">
+                              <Tag color="error" className="mt-1">
+                                <StopOutlined /> Đã huỷ
+                              </Tag>
+                              <Text type="secondary" className="block">
+                                {formatRelativeTime(
+                                  prescription.status_info?.cancelled_at ||
+                                    prescription.created_at
                                 )}
                               </Text>
                             </div>
-                          </div> */}
-
-                          {/* <Divider orientation="left" plain className="my-2">
-                            <Text type="secondary">Lý do huỷ</Text>
-                          </Divider>
-
-                          <Tooltip
-                            title={
-                              prescription.status_info?.cancel_reason ||
-                              "Không có lý do"
-                            }
-                          >
-                            <div className="mb-3 p-2 bg-gray-50 rounded-md max-h-16 overflow-y-auto">
-                              <Text>
-                                {prescription.status_info?.cancel_reason ||
-                                  "Không có lý do"}
-                              </Text>
-                            </div>
-                          </Tooltip> */}
+                          </div>
 
                           <Divider orientation="left" plain className="my-2">
                             <Text type="secondary">Danh sách thuốc</Text>
                           </Divider>
 
-                          {/* Medications list - scrollable area with max height */}
+                          {/* Medications list - fixed height with max 3 visible items */}
                           <div
                             style={{
-                              maxHeight: "110px",
+                              height: "130px",
                               overflowY: "auto",
-                              marginBottom: "15px",
+                              marginBottom: "10px",
                               scrollbarWidth: "thin",
                               scrollbarColor: "#d4d4d4 #f5f5f5",
                             }}
@@ -393,37 +337,26 @@ const PrescriptionCancelled = () => {
                               <List
                                 dataSource={prescription.medicines}
                                 renderItem={(medicine, index) => (
-                                  <List.Item key={index} className="py-1 px-2">
-                                    <div className="w-full">
-                                      <div className="flex justify-between">
-                                        <Text strong>
-                                          {medicine.medicine?.name ||
-                                            "Không có tên"}
-                                        </Text>
-                                        <div>
-                                          <Tag color="red">
-                                            {medicine.prescribed?.quantity || 0}{" "}
-                                            {medicine.medicine?.unit ||
-                                              "Đơn vị"}
-                                          </Tag>
-                                          <Text type="danger" className="ml-2">
-                                            {formatCurrency(
-                                              medicine.medicine?.price || 0
-                                            )}
-                                          </Text>
-                                        </div>
-                                      </div>
-                                      <div className="text-xs text-gray-500">
-                                        <Text>
-                                          {medicine.prescribed?.dosage || "N/A"}{" "}
-                                          -{" "}
-                                          {medicine.prescribed?.frequency ||
-                                            "N/A"}
-                                          {" - "}
-                                          {medicine.prescribed?.duration ||
-                                            "N/A"}
-                                        </Text>
-                                      </div>
+                                  <List.Item
+                                    key={index}
+                                    className="py-1 px-2 flex justify-between card-medicine-item"
+                                  >
+                                    <Text className="flex-1 truncate mr-2">
+                                      {medicine.medicine?.name ||
+                                        "Không có tên"}
+                                    </Text>
+                                    <div className="flex items-center">
+                                      <Text className="mr-2">
+                                        {medicine.prescribed?.quantity || 0}{" "}
+                                        {medicine.medicine?.unit || ""}
+                                      </Text>
+                                      <Text>
+                                        {formatCurrency(
+                                          medicine.prescribed?.total_price ||
+                                            medicine.medicine?.price ||
+                                            "0 VNĐ"
+                                        )}
+                                      </Text>
                                     </div>
                                   </List.Item>
                                 )}
@@ -436,26 +369,35 @@ const PrescriptionCancelled = () => {
                             )}
                           </div>
 
-                          <div className="mt-2 text-right mb-2">
-                            <Text type="secondary">
-                              Tổng số loại thuốc:{" "}
-                              {prescription.medicines?.length || 0}
-                            </Text>
-                          </div>
+                          {/* Reason and payment info */}
+                          <div className="mt-auto border-t pt-3">
+                            <div className="flex justify-between items-center">
+                              <Text strong>Lý do huỷ:</Text>
+                              <Tooltip
+                                title={
+                                  prescription.status_info?.cancel_reason ||
+                                  "Không có lý do"
+                                }
+                              >
+                                <Text
+                                  type="danger"
+                                  className="max-w-[70%] truncate"
+                                >
+                                  {prescription.status_info?.cancel_reason ||
+                                    "Không có lý do"}
+                                </Text>
+                              </Tooltip>
+                            </div>
+                            <br />
 
-                          {/* Spacer div to push button to bottom */}
-                          <div className="flex-grow"></div>
-
-                          {/* View details button at the bottom of the card */}
-                          <div className="mt-auto">
+                            {/* View details button */}
                             <Button
                               type="primary"
                               icon={<EyeOutlined />}
                               onClick={() =>
                                 handleViewDetails(prescription.prescription_id)
                               }
-                              className="w-full !bg-red-600 !text-white"
-                              style={{ borderColor: "#dc2626" }}
+                              className="w-full mt-3 !bg-red-600 !text-white card-action-button"
                             >
                               Xem chi tiết
                             </Button>
@@ -464,7 +406,7 @@ const PrescriptionCancelled = () => {
                       </Col>
                     ))}
                   </Row>
-
+                  <br />
                   <Pagination
                     current={pagination.current}
                     pageSize={pagination.pageSize}

@@ -48,6 +48,8 @@ import DoctorDetailAdmin from "./pages/Admin/DoctorDetailAdmin";
 import PrescriptionCompleted from "./pages/Pharmacists/PrescriptionCompleted";
 import PrescriptionDetailToPrepare from "./pages/Pharmacists/PrescriptionDetailToPrepare";
 import PrescriptionCancelled from "./pages/Pharmacists/PrescriptionCancelled";
+import ManagementMedicine from "./pages/Pharmacists/ManagementMedicine";
+import MedicineDetail from "./pages/Pharmacists/MedicineDetail";
 
 // Layout cho Patient Portal
 const PatientLayout = () => {
@@ -208,6 +210,10 @@ const App = () => {
               element={<PrescriptionDetailToPrepare />}
             />
             <Route path="*" element={<PrescriptionPrepare />} />
+          </Route>
+          <Route path="medicines">
+            <Route index element={<ManagementMedicine />} />
+            <Route path=":medicineId" element={<MedicineDetail />} />
           </Route>
           <Route
             path="*"

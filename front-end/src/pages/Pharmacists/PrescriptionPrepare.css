@@ -26,4 +26,151 @@
 
 .ant-card-body {
   flex: 1;
+}
+
+/* Add custom style for prescription card with blue bottom border */
+.prescription-card {
+  border-radius: 1 !important;
+  border-top: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-bottom: 3px solid  !important;
+  color: rgb(30,58,138);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24) !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+  cursor: pointer;
+}
+
+.prescription-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1), 0 6px 6px rgba(0,0,0,0.12) !important;
+  border-bottom: 3px solid #0050b3 !important;
+}
+
+.prescription-card:active {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 10px rgba(0,0,0,0.1), 0 3px 3px rgba(0,0,0,0.12) !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #d4d4d4;
+  border-radius: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #a0a0a0;
+}
+
+.card-medicine-item {
+  transition: background-color 0.2s ease;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.card-medicine-item:hover {
+  background-color: rgba(24, 144, 255, 0.05);
+}
+
+.card-action-button {
+  transition: all 0.2s ease;
+}
+
+.card-action-button:hover {
+  transform: scale(1.02);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card-animation {
+  animation: fadeInUp 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+.col-animation-1 { animation-delay: 0.1s; }
+.col-animation-2 { animation-delay: 0.2s; }
+.col-animation-3 { animation-delay: 0.3s; }
+.col-animation-4 { animation-delay: 0.4s; }
+.col-animation-5 { animation-delay: 0.5s; }
+.col-animation-6 { animation-delay: 0.6s; }
+
+/* Green card for completed prescriptions */
+.prescription-card-completed {
+  border-radius: 1 !important;
+  border-top: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-bottom: 3px solid #52c41a !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24) !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+  cursor: pointer;
+}
+
+.prescription-card-completed:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1), 0 6px 6px rgba(0,0,0,0.12) !important;
+  border-bottom: 3px solid #389e0d !important;
+}
+
+/* Red card for cancelled prescriptions */
+.prescription-card-cancelled {
+  border-radius: 1 !important;
+  border-top: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-bottom: 3px solid #f5222d !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24) !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+  cursor: pointer;
+}
+
+.prescription-card-cancelled:hover {
+  transform: translateY(-4px);
+
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1), 0 6px 6px rgba(0,0,0,0.12) !important;
+  border-bottom: 3px solid #cf1322 !important;
+}
+
+/* Styling for medicine management table */
+.medicine-table .ant-table-thead > tr > th {
+  background-color: #f0f7ff;
+  font-weight: 600;
+}
+
+.medicine-table .ant-table-tbody > tr:hover > td {
+  background-color: #f0f7ff;
+}
+
+.medicine-table .ant-table-tbody > tr > td {
+  transition: all 0.2s;
+}
+
+/* Animation for table rows */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.medicine-table .ant-table-tbody > tr {
+  animation: fadeIn 0.5s ease-in-out;
 } 

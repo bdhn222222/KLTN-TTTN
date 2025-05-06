@@ -32,6 +32,7 @@ import {
   CheckCircleOutlined,
   FileTextOutlined,
   CalendarOutlined,
+  ArrowLeftOutlined,
 } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -50,6 +51,7 @@ const PrescriptionDetailToPrepare = () => {
   const navigate = useNavigate();
   const { url1 } = useContext(AppContext);
   const [api, contextHolder] = notification.useNotification();
+  const [pharmacistName, setPharmacistName] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [prescriptionDetail, setPrescriptionDetail] = useState(null);
@@ -65,7 +67,8 @@ const PrescriptionDetailToPrepare = () => {
 
   useEffect(() => {
     fetchPrescriptionDetail();
-  }, [prescriptionId]);
+    getUserInfo();
+  }, [prescriptionId, url1]);
 
   const fetchPrescriptionDetail = async () => {
     try {
@@ -105,6 +108,27 @@ const PrescriptionDetailToPrepare = () => {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getUserInfo = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const userId = localStorage.getItem("user_id");
+
+      if (token && userId) {
+        const response = await axios.get(`${url1}/pharmacist/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.data && response.data.username) {
+          setPharmacistName(response.data.username);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching pharmacist info:", error);
     }
   };
 
@@ -169,6 +193,7 @@ const PrescriptionDetailToPrepare = () => {
     try {
       setPreparationLoading(true);
       const token = localStorage.getItem("token");
+      const userId = localStorage.getItem("user_id"); // Get user ID from localStorage
 
       // Chuẩn bị dữ liệu gửi lên server
       const requestLines = prescriptionDetail.lines
@@ -196,6 +221,7 @@ const PrescriptionDetailToPrepare = () => {
         {
           lines: requestLines,
           payment_method: paymentMethod,
+          pharmacist_id: userId, // Add the pharmacist ID to the request
         },
         {
           headers: {
@@ -208,7 +234,9 @@ const PrescriptionDetailToPrepare = () => {
         showNotification(
           "success",
           "Thành công",
-          "Đã chuẩn bị và thanh toán đơn thuốc thành công"
+          `Đơn thuốc #${prescriptionId} đã được chuẩn bị và thanh toán thành công bởi ${
+            pharmacistName || "dược sĩ"
+          }`
         );
         setPaymentModalVisible(false);
 
@@ -235,11 +263,13 @@ const PrescriptionDetailToPrepare = () => {
     try {
       setCancelLoading(true);
       const token = localStorage.getItem("token");
+      const userId = localStorage.getItem("user_id"); // Get user ID from localStorage
 
       const response = await axios.patch(
         `${url1}/pharmacist/prescriptions/${prescriptionId}/cancel`,
         {
           reason: cancelReason,
+          pharmacist_id: userId, // Add pharmacist ID to the request
         },
         {
           headers: {
@@ -249,10 +279,12 @@ const PrescriptionDetailToPrepare = () => {
       );
 
       if (response.data.success) {
+        const pharmacistName = response.data.data.pharmacist?.name || "Dược sĩ";
+
         showNotification(
           "success",
           "Thành công",
-          "Đã huỷ đơn thuốc thành công"
+          `Đã huỷ đơn thuốc thành công bởi ${pharmacistName}`
         );
         setCancelModalVisible(false);
         setCancelReason("");
@@ -277,7 +309,36 @@ const PrescriptionDetailToPrepare = () => {
   };
 
   const formatCurrency = (amount) => {
-    return `${amount?.toLocaleString("vi-VN")} VNĐ`;
+    // If amount is null, undefined, or NaN, return default value
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      return "0 VNĐ";
+    }
+
+    // If amount is a string with format like "100,000 VNĐ"
+    if (typeof amount === "string" && amount.includes("VNĐ")) {
+      // Extract numeric part removing commas and VNĐ
+      const numericPart = amount.replace(/[^\d]/g, "");
+      if (numericPart) {
+        // Convert to number and format back
+        const numAmount = parseInt(numericPart, 10);
+        if (!isNaN(numAmount)) {
+          return `${numAmount.toLocaleString("vi-VN")} VNĐ`;
+        }
+      }
+      // If we couldn't parse the string, return it as is
+      return amount;
+    }
+
+    // Ensure amount is a number
+    const numAmount = typeof amount === "number" ? amount : parseFloat(amount);
+
+    // If conversion resulted in NaN, return default
+    if (isNaN(numAmount)) {
+      return "0 VNĐ";
+    }
+
+    // Format the number
+    return `${numAmount.toLocaleString("vi-VN")} VNĐ`;
   };
 
   const formatDate = (date) => {
@@ -387,24 +448,30 @@ const PrescriptionDetailToPrepare = () => {
         <Layout style={{ marginLeft: collapsed ? 80 : 250, marginTop: 64 }}>
           <Content style={{ margin: "24px 16px", overflow: "initial" }}>
             <Card bordered={false} className="shadow-sm mb-4">
-              <div className="flex justify-between items-center mb-4">
-                <Title level={4}>
-                  Chi tiết đơn thuốc #{prescriptionDetail.prescription_id}
-                </Title>
-                <Tag color="gold">
-                  <ClockCircleOutlined /> Chờ chuẩn bị
-                </Tag>
+              <Button
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate("/pharmacist/prescriptions/pending")}
+                className="mr-4 !border-none !bg-white !shadow-none"
+              >
+                Quay lại
+              </Button>
+              <div className="flex justify-between items-center mb-4 mt-4">
+                <div className="flex items-center ">
+                  <div>
+                    <Title level={4} className="!m-0">
+                      Chi tiết đơn thuốc #{prescriptionDetail.prescription_id}
+                    </Title>
+                  </div>
+                </div>
+                <div>
+                  <Tag color="gold">
+                    <ClockCircleOutlined /> Chờ chuẩn bị
+                  </Tag>
+                </div>
               </div>
 
-              <div className="mb-4">
+              <div className="flex justify-end mb-4">
                 <Space>
-                  <Button
-                    onClick={() =>
-                      navigate("/pharmacist/prescriptions/pending")
-                    }
-                  >
-                    Quay lại
-                  </Button>
                   <Button
                     danger
                     icon={<WarningOutlined />}
@@ -412,15 +479,18 @@ const PrescriptionDetailToPrepare = () => {
                   >
                     Huỷ đơn
                   </Button>
-                  <Button
-                    type="primary"
-                    icon={<MoneyCollectOutlined />}
-                    onClick={handlePrepareClick}
-                    disabled={allocations.every((a) => a.allocated === 0)}
-                    className="!bg-blue-900"
-                  >
-                    Chuẩn bị và thanh toán
-                  </Button>
+
+                  {allocations.every((a) => a.allocated == 0) && (
+                    <Button
+                      type="primary"
+                      icon={<MoneyCollectOutlined />}
+                      onClick={handlePrepareClick}
+                      //   disabled={allocations.every((a) => a.allocated === 0)}
+                      className="!bg-blue-900"
+                    >
+                      Chuẩn bị và thanh toán
+                    </Button>
+                  )}
                 </Space>
               </div>
 
@@ -434,7 +504,7 @@ const PrescriptionDetailToPrepare = () => {
                         className="mr-3 bg-blue-900"
                         size={40}
                       />
-                      <div>
+                      <div className="ml-2">
                         <Text strong style={{ fontSize: "16px" }}>
                           {prescriptionDetail.family_member.name}
                         </Text>
@@ -808,6 +878,9 @@ const PrescriptionDetailToPrepare = () => {
               <Text type="danger" strong>
                 {formatCurrency(calculateTotalAmount())}
               </Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Dược sĩ thực hiện">
+              <Text strong>{pharmacistName || "Chưa xác định"}</Text>
             </Descriptions.Item>
           </Descriptions>
         </Card>

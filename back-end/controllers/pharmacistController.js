@@ -31,6 +31,7 @@ import {
   prepareAndPayPrescription,
   addMedicineBatch,
   updateMedicineBatch,
+  deleteBatch,
 } from "../services/pharmacistService.js";
 import BadRequestError from "../errors/bad_request.js";
 import asyncHandler from "express-async-handler";
@@ -250,8 +251,34 @@ export const confirmPrescriptionPreparationController = asyncHandler(
 
 // Lấy danh sách thuốc
 export const getAllMedicinesController = asyncHandler(async (req, res) => {
-  const { search, expiry_before, page } = req.query;
-  const result = await getAllMedicines({ search, expiry_before, page });
+  const { search, expiry_before, page, limit } = req.query;
+
+  // Convert pagination parameters to numbers
+  const parsedPage = page ? parseInt(page, 10) : 1;
+  const parsedLimit = limit ? parseInt(limit, 10) : 10;
+
+  // Validate pagination parameters
+  if (isNaN(parsedPage) || parsedPage < 1) {
+    return res.status(400).json({
+      success: false,
+      message: "Tham số page không hợp lệ",
+    });
+  }
+
+  if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
+    return res.status(400).json({
+      success: false,
+      message: "Tham số limit không hợp lệ",
+    });
+  }
+
+  const result = await getAllMedicines({
+    search,
+    expiry_before,
+    page: parsedPage,
+    limit: parsedLimit,
+  });
+
   res.status(200).json(result);
 });
 
@@ -276,6 +303,15 @@ export const updateMedicineController = asyncHandler(async (req, res) => {
 // Lấy chi tiết thuốc
 export const getMedicineByIdController = asyncHandler(async (req, res) => {
   const { id } = req.params;
+
+  // Validate medicine_id
+  if (!id || isNaN(id)) {
+    return res.status(400).json({
+      success: false,
+      message: "ID thuốc không hợp lệ",
+    });
+  }
+
   const result = await getMedicineById(id);
   res.status(200).json(result);
 });
@@ -709,7 +745,6 @@ export const preparePrescriptionController = async (req, res, next) => {
  * Controller xử lý thêm lô thuốc mới
  * @param {Object} req - Request object
  * @param {Object} res - Response object
- * @param {Function} next - Next middleware function
  */
 export const addMedicineBatchController = asyncHandler(async (req, res) => {
   const { medicine_id } = req.params;
@@ -717,12 +752,23 @@ export const addMedicineBatchController = asyncHandler(async (req, res) => {
 
   // Validate medicine_id
   if (!medicine_id || isNaN(medicine_id)) {
-    throw new BadRequestError("ID thuốc không hợp lệ");
+    return res.status(400).json({
+      success: false,
+      message: "ID thuốc không hợp lệ",
+    });
+  }
+
+  // Validate required fields
+  if (!batch_number || !quantity || !import_date || !expiry_date) {
+    return res.status(400).json({
+      success: false,
+      message: "Vui lòng điền đầy đủ thông tin lô thuốc",
+    });
   }
 
   const batchData = {
     batch_number,
-    quantity,
+    quantity: parseInt(quantity, 10),
     import_date,
     expiry_date,
     status: status || "Active",
@@ -744,17 +790,58 @@ export const updateMedicineBatchController = asyncHandler(async (req, res) => {
 
   // Validate batch_id
   if (!batch_id || isNaN(batch_id)) {
-    throw new BadRequestError("ID lô thuốc không hợp lệ");
+    return res.status(400).json({
+      success: false,
+      message: "ID lô thuốc không hợp lệ",
+    });
   }
 
+  // Chuẩn bị dữ liệu cập nhật
   const batchData = {};
+
   if (batch_number) batchData.batch_number = batch_number;
-  if (quantity !== undefined) batchData.quantity = quantity;
+
+  if (quantity !== undefined) {
+    // Validate quantity
+    const parsedQuantity = parseInt(quantity, 10);
+    if (isNaN(parsedQuantity) || parsedQuantity < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Số lượng thuốc phải là số không âm",
+      });
+    }
+    batchData.quantity = parsedQuantity;
+  }
+
   if (import_date) batchData.import_date = import_date;
   if (expiry_date) batchData.expiry_date = expiry_date;
-  if (status) batchData.status = status;
+
+  if (status) {
+    // Validate status
+    const validStatuses = ["Active", "Expired", "Disposed"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Trạng thái không hợp lệ",
+      });
+    }
+    batchData.status = status;
+  }
+
+  // Kiểm tra nếu không có thông tin cập nhật
+  if (Object.keys(batchData).length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Không có thông tin cập nhật",
+    });
+  }
 
   const result = await updateMedicineBatch(parseInt(batch_id), batchData);
+  res.status(200).json(result);
+});
 
+export const deleteBatchController = asyncHandler(async (req, res) => {
+  const { batch_id } = req.params;
+  const result = await deleteBatch(parseInt(batch_id));
   res.status(200).json(result);
 });

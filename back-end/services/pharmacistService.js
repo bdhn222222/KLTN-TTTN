@@ -822,8 +822,12 @@ export const confirmPrescriptionPreparation = async (
   }
 };
 
-export const getAllMedicines = async ({ search, expiry_before, page = 1 }) => {
-  const limit = 10;
+export const getAllMedicines = async ({
+  search,
+  expiry_before,
+  page = 1,
+  limit = 10,
+}) => {
   const offset = (page - 1) * limit;
   const whereClause = {};
 
@@ -851,18 +855,24 @@ export const getAllMedicines = async ({ search, expiry_before, page = 1 }) => {
   }));
 
   return {
+    success: true,
     message:
       count > 0 ? "Lấy danh sách thuốc thành công" : "Không tìm thấy thuốc nào",
-    medicines: formattedMedicines,
-    currentPage: +page,
-    totalPages: Math.ceil(count / limit) || 1,
-    totalRecords: count,
+    data: {
+      medicines: formattedMedicines,
+      pagination: {
+        current_page: +page,
+        total_pages: Math.ceil(count / limit) || 1,
+        total_records: count,
+        per_page: limit,
+      },
+    },
   };
 };
 
 export const addMedicine = async (medicineData) => {
   try {
-    const { name, unit, price, description } = medicineData;
+    const { name, unit, price, description, supplier } = medicineData;
 
     // 1. Validate bắt buộc
     if (!name || !unit || !price) {
@@ -883,9 +893,11 @@ export const addMedicine = async (medicineData) => {
       unit,
       price,
       description,
+      supplier,
     });
 
     return {
+      success: true,
       message: "Thêm thuốc thành công",
       medicine: newMedicine,
     };
@@ -944,13 +956,45 @@ export const getMedicineById = async (medicine_id) => {
     throw new NotFoundError("Không tìm thấy thuốc với ID này");
   }
 
-  const data = medicine.toJSON();
-  // data.status_message = medicine.is_out_of_stock ? "Tạm hết hàng" : "";
+  // Fetch all batches for this medicine
+  const batches = await db.Batch.findAll({
+    where: { medicine_id },
+    order: [["expiry_date", "ASC"]],
+  });
+
+  const medicineData = medicine.toJSON();
+
+  // Format batch data
+  const formattedBatches = batches.map((batch) => ({
+    batch_id: batch.batch_id,
+    batch_number: batch.batch_number,
+    medicine_id: batch.medicine_id,
+    initial_quantity: batch.quantity,
+    current_quantity: batch.quantity,
+    import_date: batch.import_date,
+    expiry_date: batch.expiry_date,
+    status: batch.status,
+    created_at: batch.created_at,
+    updated_at: batch.updated_at,
+  }));
+
+  // Calculate total quantity from active batches
+  const totalQuantity = formattedBatches.reduce((sum, batch) => {
+    // Only count quantities from active batches
+    if (batch.status === "Active") {
+      return sum + batch.current_quantity;
+    }
+    return sum;
+  }, 0);
 
   return {
     success: true,
     message: "Lấy thông tin thuốc thành công",
-    data,
+    data: {
+      medicine: medicineData,
+      batches: formattedBatches,
+      total_quantity: totalQuantity,
+    },
   };
 };
 
@@ -3868,6 +3912,34 @@ export const updateMedicineBatch = async (batch_id, batchData) => {
           "YYYY-MM-DD HH:mm:ss"
         ),
       },
+    };
+  } catch (error) {
+    await t.rollback();
+    throw error;
+  }
+};
+
+export const deleteBatch = async (batch_id) => {
+  const t = await db.sequelize.transaction();
+
+  try {
+    // 1. Kiểm tra lô thuốc tồn tại
+    const batch = await db.Batch.findByPk(batch_id, {
+      transaction: t,
+    });
+
+    if (!batch) {
+      throw new NotFoundError(`Không tìm thấy lô thuốc với ID ${batch_id}`);
+    }
+
+    // 2. Xóa lô thuốc
+    await batch.destroy({ transaction: t });
+
+    await t.commit();
+
+    return {
+      success: true,
+      message: "Xóa lô thuốc thành công",
     };
   } catch (error) {
     await t.rollback();

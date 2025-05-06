@@ -264,72 +264,60 @@ const PrescriptionCompleted = () => {
               ) : (
                 <>
                   <Row gutter={[24, 24]}>
-                    {filteredPrescriptions.map((prescription) => (
+                    {filteredPrescriptions.map((prescription, index) => (
                       <Col
                         xs={24}
                         sm={24}
                         md={12}
                         lg={8}
                         key={prescription.prescription_id}
+                        className={`card-animation col-animation-${
+                          (index % 6) + 1
+                        }`}
                       >
                         <Card
                           hoverable
-                          className="h-full flex flex-col"
-                          title={
-                            <div className="flex justify-between items-center">
-                              <div className="flex items-center gap-x-2">
-                                <Badge status="success" className="mr-2" />
-                                <Text strong>
-                                  Đơn #{prescription.prescription_id}
-                                </Text>
-                              </div>
-                              {getPrescriptionStatusTag(prescription)}
-                            </div>
-                          }
-                          bodyStyle={{
-                            display: "flex",
-                            flexDirection: "column",
-                            flex: 1,
-                            padding: "15px",
+                          className="h-full flex flex-col prescription-card-completed"
+                          styles={{
+                            body: {
+                              display: "flex",
+                              flexDirection: "column",
+                              flex: 1,
+                              padding: "15px",
+                            },
                           }}
+                          onClick={() =>
+                            handleViewPrescriptionDetail(
+                              prescription.prescription_id
+                            )
+                          }
                         >
-                          <div className="mb-2">
-                            {/* Patient info and Date on the same line */}
-                            <div className="flex justify-between mb-3">
-                              {/* Left side: Patient info */}
-                              <div className="flex items-start">
-                                <Avatar
-                                  icon={<UserOutlined />}
-                                  className="mr-2 bg-green-700 mt-1"
-                                />
-                                <div>
-                                  <Text strong className="ml-2">
-                                    {prescription.appointment?.family_member
-                                      ?.name || "N/A"}
+                          {/* Header: Prescription Info + Patient Info */}
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex items-center">
+                              <div>
+                                <Text strong className="text-lg">
+                                  {prescription.appointment?.family_member
+                                    ?.name || "N/A"}
+                                </Text>
+                                <div className="flex items-center mt-1">
+                                  <Text>
+                                    Đơn #{prescription.prescription_id}
                                   </Text>
-                                  <div>
-                                    <Text
-                                      type="secondary"
-                                      className="text-xs ml-2"
-                                    >
-                                      SĐT:{" "}
-                                      {prescription.appointment?.family_member
-                                        ?.phone_number || "Không có SĐT"}
-                                    </Text>
-                                  </div>
                                 </div>
                               </div>
+                            </div>
 
-                              {/* Right side: Date info */}
-                              <div className="text-right text-gray-500 text-sm">
-                                <CalendarOutlined className="mr-1" />
-                                <span>
-                                  {formatVietnameseDate(
-                                    prescription.status_info?.completed_at ||
-                                      prescription.created_at
-                                  )}
-                                </span>
-                              </div>
+                            <div className="text-right">
+                              <Tag color="success" className="mt-1">
+                                <CheckCircleOutlined /> Đã hoàn thành
+                              </Tag>
+                              <Text type="secondary" className="block">
+                                {formatRelativeTime(
+                                  prescription.status_info?.completed_at ||
+                                    prescription.created_at
+                                )}
+                              </Text>
                             </div>
                           </div>
 
@@ -337,12 +325,12 @@ const PrescriptionCompleted = () => {
                             <Text type="secondary">Danh sách thuốc</Text>
                           </Divider>
 
-                          {/* Medications list - scrollable area with max 2 visible items */}
+                          {/* Medications list - fixed height with max 3 visible items */}
                           <div
                             style={{
-                              maxHeight: "110px",
+                              height: "130px",
                               overflowY: "auto",
-                              marginBottom: "15px",
+                              marginBottom: "10px",
                               scrollbarWidth: "thin",
                               scrollbarColor: "#d4d4d4 #f5f5f5",
                             }}
@@ -353,30 +341,25 @@ const PrescriptionCompleted = () => {
                               <List
                                 dataSource={prescription.medicines}
                                 renderItem={(medicine, index) => (
-                                  <List.Item key={index} className="py-1 px-2">
-                                    <div className="w-full">
-                                      <div className="flex justify-between">
-                                        <Text strong>
-                                          {medicine.medicine?.name ||
-                                            "Không có tên"}
-                                        </Text>
-                                        <Tag color="green">
-                                          {medicine.dispensed?.quantity || 0}/
-                                          {medicine.prescribed?.quantity || 0}{" "}
-                                          {medicine.medicine?.unit || "Đơn vị"}
-                                        </Tag>
-                                      </div>
-                                      <div className="text-xs text-gray-500">
-                                        <Text>
-                                          {medicine.prescribed?.dosage || "N/A"}{" "}
-                                          -{" "}
-                                          {medicine.prescribed?.frequency ||
-                                            "N/A"}
-                                          {" - "}
-                                          {medicine.prescribed?.duration ||
-                                            "N/A"}
-                                        </Text>
-                                      </div>
+                                  <List.Item
+                                    key={index}
+                                    className="py-1 px-2 flex justify-between card-medicine-item"
+                                  >
+                                    <Text className="flex-1 truncate mr-2">
+                                      {medicine.medicine?.name ||
+                                        "Không có tên"}
+                                    </Text>
+                                    <div className="flex items-center">
+                                      <Text className="mr-2">
+                                        {medicine.dispensed?.quantity || 0}{" "}
+                                        {medicine.medicine?.unit || ""}
+                                      </Text>
+                                      <Text>
+                                        {formatCurrency(
+                                          medicine.prescribed?.total_price ||
+                                            "0 VNĐ"
+                                        )}
+                                      </Text>
                                     </div>
                                   </List.Item>
                                 )}
@@ -389,38 +372,17 @@ const PrescriptionCompleted = () => {
                             )}
                           </div>
 
-                          <div className="mt-2 text-gray-500 text-sm mb-2">
-                            <Space
-                              direction="vertical"
-                              size="small"
-                              className="w-full"
-                            >
-                              <div className="flex justify-between">
-                                <span>Tổng số loại thuốc:</span>
-                                <span>
-                                  {prescription.medicines?.length || 0}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Thanh toán:</span>
-                                <Tag color="green">
-                                  {formatCurrency(prescription.payment?.amount)}
-                                </Tag>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Dược sĩ phụ trách:</span>
-                                <span>
-                                  {prescription.pharmacist?.name || "N/A"}
-                                </span>
-                              </div>
-                            </Space>
-                          </div>
+                          {/* Payment info */}
+                          <div className="mt-auto border-t pt-3">
+                            <div className="flex justify-between items-center">
+                              <Text strong>Thanh toán:</Text>
+                              <Text type="success" strong>
+                                {formatCurrency(prescription.payment?.amount)}
+                              </Text>
+                            </div>
+                            <br />
 
-                          {/* Spacer div to push button to bottom */}
-                          <div className="flex-grow"></div>
-
-                          {/* View details button at the bottom of the card */}
-                          <div className="mt-auto">
+                            {/* View details button */}
                             <Button
                               type="primary"
                               icon={<EyeOutlined />}
@@ -429,7 +391,7 @@ const PrescriptionCompleted = () => {
                                   prescription.prescription_id
                                 )
                               }
-                              className="w-full !bg-green-700 !text-white"
+                              className="w-full mt-3 !bg-green-600 !text-white card-action-button"
                             >
                               Xem chi tiết
                             </Button>
@@ -438,6 +400,7 @@ const PrescriptionCompleted = () => {
                       </Col>
                     ))}
                   </Row>
+                  <br />
 
                   <Pagination
                     current={page}
